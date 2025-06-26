@@ -1,5 +1,7 @@
 # Telecord
 
+<img src="./telecord.png" alt="Telecord Logo" width="200" height="200" />
+
 A simple Python app to forward messages from Telegram channels to a Discord channel using Telethon and Discord webhooks.
 
 ## Features

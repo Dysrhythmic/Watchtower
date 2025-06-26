@@ -12,7 +12,7 @@ A simple Python app to forward messages from Telegram channels to a Discord chan
 ## Requirements
 - Python 3.8+
 - Telegram API credentials ([get them here](https://my.telegram.org/apps))
-- Discord webhook URL
+- Discord webhook URL (edit channel -> integrations -> webhooks)
 
 ## Setup
 1. **Clone or download this repository**

@@ -25,7 +25,7 @@ class Telecord:
 
         self.client = TelegramClient('telecord_session', self.api_id, self.api_hash)
 
-    def send_to_discord(self, message: str) -> bool:
+    def send_to_discord(self, message):
         """Send message to Discord using webhook, splitting into 2000-char chunks if needed."""
         max_length = 2000
         success = True

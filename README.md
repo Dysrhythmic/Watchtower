@@ -33,12 +33,6 @@ A simple Python app to forward messages from Telegram channels to Discord channe
    - On first run, you will be prompted to log in to Telegram (phone number and code).
    - The session will be saved in `telecord_session.session` for future runs.
 
-## How it works
-- On startup, posts the most recent message from each channel to the appropriate Discord webhook(s)
-- Listens for new messages in all channels and posts them to the configured webhook(s) in real time
-- If a message is longer than 2000 characters, it is split into multiple Discord messages
-- Messages are only sent to the specified webhook(s) if they contain specified keywords (case-insensitive)
-
 ## Keyword Filtering
 - Keywords are case-insensitive
 - If no keywords are specified for a channel, all messages from that channel are sent

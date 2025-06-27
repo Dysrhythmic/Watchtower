@@ -24,7 +24,12 @@ class ConfigManager:
         self.telegram_channel_ids = os.getenv('TELEGRAM_CHANNEL_IDS', '').split(',')
         self.discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
         self.config_file = os.getenv('WEBHOOK_CONFIG_FILE', 'webhook_config.json')
-        self.webhook_config = self._load_webhook_config()
+        
+        if not self.discord_webhook_url:
+            self.webhook_config = self._load_webhook_config()
+        else:
+            self.webhook_config = None
+            logger.info("Using simple routing mode with default webhook")
         
         self._validate_config()
     
@@ -38,7 +43,6 @@ class ConfigManager:
                 config = json.load(f)
                 logger.info(f"Loaded webhook configuration from {self.config_file}")
                 
-                # Resolve environment variable references
                 self._resolve_webhook_urls(config)
                 
                 return config
@@ -48,6 +52,8 @@ class ConfigManager:
     
     def _resolve_webhook_urls(self, config):
         """Resolve environment variable references to actual webhook URLs."""
+        valid_webhooks = []
+        
         for webhook in config.get('webhooks', []):
             env_key = webhook.get('env_key')
             if env_key:
@@ -55,10 +61,15 @@ class ConfigManager:
                 if webhook_url:
                     webhook['url'] = webhook_url
                     webhook.pop('env_key', None)
+                    valid_webhooks.append(webhook)
                     logger.info(f"Resolved {env_key} to webhook URL")
                 else:
-                    logger.warning(f"Environment variable {env_key} not found, skipping webhook")
-                    config['webhooks'].remove(webhook)
+                    if not self.discord_webhook_url:
+                        logger.warning(f"Environment variable {env_key} not found, skipping webhook")
+            else:
+                valid_webhooks.append(webhook)
+        
+        config['webhooks'] = valid_webhooks
     
     def _validate_config(self):
         if not all([self.api_id, self.api_hash, self.telegram_channel_ids]):
@@ -66,6 +77,13 @@ class ConfigManager:
         
         if not self.discord_webhook_url and not self.webhook_config:
             raise ValueError(f"Either DISCORD_WEBHOOK_URL or {self.config_file} must be provided")
+        
+        if self.discord_webhook_url and self.webhook_config:
+            logger.info("Using advanced routing mode with fallback to default webhook")
+        elif self.discord_webhook_url:
+            logger.info("Using simple routing mode (all messages to default webhook)")
+        else:
+            logger.info("Using advanced routing mode only")
     
     def get_telegram_credentials(self):
         return self.api_id, self.api_hash
@@ -420,6 +438,9 @@ class Telecord:
             resolved_channel_id = await self.telegram_handler.resolve_channel_username(channel_id)
         
         webhook_urls = self.message_router.get_webhooks_for_message(resolved_channel_id, message_text) if resolved_channel_id else []
+        
+        if not webhook_urls and self.discord_webhook_url:
+            webhook_urls = [self.discord_webhook_url]
         
         self._log_message_info(channel_title, username, timestamp, message_text, media_type, is_latest)
         

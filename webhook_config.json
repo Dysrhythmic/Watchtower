@@ -1,0 +1,48 @@
+{
+    "webhooks": [
+      {
+        "name": "cyber_news",
+        "url": "webhook_url_1",
+        "channels": [
+          {
+            "id": "@threat_research_news"
+          },
+          {
+            "id": "@new_vulnerabilities",
+            "keywords": ["PoC", "0 day", "CVE"]
+          },
+          {
+            "id": "@tech_news"
+          }
+        ]
+      },
+      {
+        "name": "tech_updates",
+        "url": "webhook_url_2",
+        "channels": [
+          {
+            "id": "@tech_news",
+            "keywords": ["technology", "software", "AI", "machine learning"]
+          },
+          {
+            "id": "@startup_news"
+          }
+        ]
+      },
+      {
+        "name": "general_feed",
+        "url": "webhook_url_3",
+        "channels": [
+          {
+            "id": "@general_news"
+          },
+          {
+            "id": "@breaking_news"
+          },
+          {
+            "id": "@local_news"
+          }
+        ]
+      }
+    ]
+  } 

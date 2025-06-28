@@ -359,12 +359,14 @@ class MessageRouter:
         webhook in the main processing logic.
         """
         if not self.webhook_config:
+            logger.debug(f"No webhook config found, skipping keyword filtering for channel {channel_id}")
             return []
         
         webhook_urls = []
         message_text_lower = message_text.lower()
         
         normalized_channel_id = self._normalize_channel_id(channel_id)
+        logger.debug(f"Checking keyword filters for channel {channel_id} (normalized: {normalized_channel_id})")
         
         for webhook in self.webhook_config.get('webhooks', []):
             webhook_url = webhook.get('url')
@@ -384,11 +386,20 @@ class MessageRouter:
                                 keyword_matches.append(keyword)
                         if keyword_matches:
                             webhook_urls.append(webhook_url)
+                            logger.info(f"Keyword match found for channel {channel_id}: {keyword_matches} -> webhook added")
                             break  # Found match for this webhook, move to next
+                        else:
+                            logger.debug(f"No keyword matches for channel {channel_id}. Keywords: {keywords}, Message: {message_text[:50]}...")
                     else:
                         # No keywords specified, send all messages from this channel
                         webhook_urls.append(webhook_url)
+                        logger.debug(f"No keywords configured for channel {channel_id}, sending to webhook")
                         break  # Found match for this webhook, move to next
+
+        if webhook_urls:
+            logger.info(f"Channel {channel_id} matched {len(webhook_urls)} webhook(s) after keyword filtering")
+        else:
+            logger.debug(f"Channel {channel_id} filtered out by keyword rules - no webhooks selected")
 
         return webhook_urls
     
@@ -437,6 +448,10 @@ class TelegramHandler:
         Used for getting channel titles and metadata when processing
         messages or establishing initial connections.
         """
+        # Convert numeric channel IDs to integers for proper Telethon handling
+        if isinstance(channel_id, str) and channel_id.startswith('-') and channel_id[1:].isdigit():
+            channel_id = int(channel_id)
+        
         return await self.client.get_entity(channel_id)
     
     async def resolve_channel_username(self, channel_id):
@@ -623,14 +638,24 @@ class Telecord:
         # Get target webhooks based on channel and keyword filtering
         webhook_urls = self.message_router.get_webhooks_for_message(resolved_channel_id, message_text) if resolved_channel_id else []
         
+        # Log the filtering results
+        if resolved_channel_id:
+            if webhook_urls:
+                logger.info(f"Keyword filtering for channel {resolved_channel_id}: {len(webhook_urls)} webhook(s) matched")
+            else:
+                logger.info(f"Keyword filtering for channel {resolved_channel_id}: message filtered out (no keywords matched)")
+        else:
+            logger.warning(f"No resolved channel ID for {channel_id}, skipping keyword filtering")
+        
         # Fallback to default webhook if no advanced routing matches
         if not webhook_urls and self.discord_webhook_url:
             webhook_urls = [self.discord_webhook_url]
+            logger.info(f"Using fallback to default webhook for channel {resolved_channel_id}")
         
         self._log_message_info(channel_title, username, timestamp, message_text, media_type, is_latest)
         
         if not webhook_urls:
-            logger.info(f"No webhook configured for channel {channel_title} ({resolved_channel_id}) or message filtered out")
+            logger.info(f"Message from channel {channel_title} ({resolved_channel_id}) filtered out by keyword rules")
             return
         
         # Route message based on content type
@@ -727,7 +752,15 @@ class Telecord:
         Sets up the callback that will be triggered whenever a new message
         is received from any monitored channel.
         """
-        @self.telegram_handler.client.on(events.NewMessage(chats=self.telegram_channel_ids))
+        # Convert negative channel IDs to integers for proper Telethon handling
+        processed_channel_ids = []
+        for channel_id in self.telegram_channel_ids:
+            if isinstance(channel_id, str) and channel_id.startswith('-') and channel_id[1:].isdigit():
+                processed_channel_ids.append(int(channel_id))
+            else:
+                processed_channel_ids.append(channel_id)
+        
+        @self.telegram_handler.client.on(events.NewMessage(chats=processed_channel_ids))
         async def new_message_handler(event):
             await self.handle_new_message(event)
 

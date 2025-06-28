@@ -5,10 +5,10 @@
 A simple Python app to forward messages from Telegram channels to Discord channels using Telethon and Discord webhooks.
 
 ## Features
-- Forwards the latest message from each configured Telegram channel on startup
+- Forwards the latest message from each configured Telegram channel on startup if there is a keyword match
 - Forwards all new messages in real time
 - Automatically splits long messages into 2000-character chunks for Discord
-- Multiple webhooks with channel-specific routing
+- Multiple webhooks with channel specific routing
 - Keyword filtering per channel per webhook for flexible message routing based on content
 
 ## Requirements

@@ -15,11 +15,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def format_message_content(channel_title, username, timestamp, content_type, message_text="", is_latest=False):
+def format_message_content(channel_title, username, timestamp, content_type, message_text="", is_latest=False, reply_context=None):
     """Formats message content for Discord webhooks.
     
     The 'is_latest' flag changes the prefix to indicate this is the most recent
     message when establishing initial connection to a channel.
+    
+    The 'reply_context' parameter includes information about what message this is replying to.
     """
     prefix = "CONNECTION ESTABLISHED - Latest message" if is_latest else "New message"
     content_parts = [
@@ -28,6 +30,22 @@ def format_message_content(channel_title, username, timestamp, content_type, mes
         f"**Time:** {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
         f"**Content:** {content_type}"
     ]
+    
+    # Add reply context if available
+    if reply_context:
+        reply_author = reply_context.get('author', 'Unknown')
+        reply_text = reply_context.get('text', '')
+        reply_time = reply_context.get('time', '')
+        
+        reply_info = f"**Replying to:** {reply_author}"
+        if reply_time:
+            reply_info += f" ({reply_time})"
+        if reply_text:
+            # Truncate long reply text to keep messages readable
+            truncated_reply = reply_text[:100] + "..." if len(reply_text) > 100 else reply_text
+            reply_info += f"\n**Original message:** {truncated_reply}"
+        
+        content_parts.append(reply_info)
     
     if message_text:
         content_parts.append(f"**Message:**\n{message_text}")
@@ -233,7 +251,7 @@ class DiscordHandler:
             logger.error(f"Error sending {description.lower()} to Discord: {e}")
             return False
     
-    async def send_media_to_discord(self, file_path, media_type, channel_title, username, timestamp, message_text="", is_latest=False, webhook_url=None):
+    async def send_media_to_discord(self, file_path, media_type, channel_title, username, timestamp, message_text="", is_latest=False, webhook_url=None, cleanup_after=True, reply_context=None):
         """Uploads media files to Discord with formatted message caption.
         
         Uses multipart form data to upload files directly to Discord webhooks,
@@ -250,7 +268,7 @@ class DiscordHandler:
                 files = {'file': f}
                 
                 full_content = format_message_content(
-                    channel_title, username, timestamp, media_type, message_text, is_latest
+                    channel_title, username, timestamp, media_type, message_text, is_latest, reply_context
                 )
                 
                 data = {
@@ -273,8 +291,9 @@ class DiscordHandler:
             logger.error(f"Error sending media to Discord: {e}")
             return False
         finally:
-            # Always cleanup temporary files, even if upload fails
-            self._cleanup_temp_file(file_path)
+            # Only cleanup if explicitly requested (for single webhook sends)
+            if cleanup_after:
+                self._cleanup_temp_file(file_path)
     
     def _cleanup_temp_file(self, file_path):
         """Removes temporary media files to prevent disk space accumulation.
@@ -289,7 +308,7 @@ class DiscordHandler:
         except Exception as e:
             logger.error(f"Error cleaning up file {file_path}: {e}")
     
-    async def send_media_to_multiple_webhooks(self, file_path, media_type, channel_title, username, timestamp, message_text="", is_latest=False, webhook_urls=None):
+    async def send_media_to_multiple_webhooks(self, file_path, media_type, channel_title, username, timestamp, message_text="", is_latest=False, webhook_urls=None, reply_context=None):
         """Sends the same media file to multiple Discord webhooks.
         
         Downloads the file once and uploads it to each webhook.
@@ -300,8 +319,12 @@ class DiscordHandler:
             
         success = True
         for webhook_url in webhook_urls:
-            if not await self.send_media_to_discord(file_path, media_type, channel_title, username, timestamp, message_text, is_latest, webhook_url):
+            # Don't cleanup after each webhook, only after all are processed
+            if not await self.send_media_to_discord(file_path, media_type, channel_title, username, timestamp, message_text, is_latest, webhook_url, cleanup_after=False, reply_context=reply_context):
                 success = False
+        
+        # Cleanup the file after all webhooks have been processed
+        self._cleanup_temp_file(file_path)
         return success
 
 class MessageRouter:
@@ -486,6 +509,36 @@ class TelegramHandler:
         else:
             return "Other Media"
     
+    async def get_reply_context(self, message):
+        """Extracts reply context from a Telegram message.
+        
+        If the message is a reply to another message, retrieves information
+        about the original message including author, text, and timestamp.
+        Returns None if the message is not a reply.
+        """
+        try:
+            if hasattr(message, 'reply_to') and message.reply_to:
+                # Get the replied-to message
+                replied_message = await self.client.get_messages(
+                    message.chat_id, 
+                    ids=message.reply_to.reply_to_msg_id
+                )
+                
+                if replied_message:
+                    reply_author = self.extract_username(replied_message.sender)
+                    reply_text = replied_message.text or ""
+                    reply_time = replied_message.date.strftime('%Y-%m-%d %H:%M:%S UTC') if replied_message.date else ""
+                    
+                    return {
+                        'author': reply_author,
+                        'text': reply_text,
+                        'time': reply_time
+                    }
+        except Exception as e:
+            logger.error(f"Error getting reply context: {e}")
+        
+        return None
+    
     async def get_latest_message(self, channel):
         """Retrieves the most recent message from a channel.
         
@@ -559,6 +612,9 @@ class Telecord:
         media_type = self.telegram_handler.get_media_type(message)
         has_media = media_type is not None
         
+        # Get reply context if this message is a reply
+        reply_context = await self.telegram_handler.get_reply_context(message)
+        
         # Resolve numeric channel IDs to @username format for config matching
         resolved_channel_id = channel_id
         if channel_id and str(channel_id).isdigit():
@@ -579,15 +635,15 @@ class Telecord:
         
         # Route message based on content type
         if has_media and not message_text:
-            await self._handle_media_msg(message, media_type, channel_title, username, timestamp, is_latest, webhook_urls)
+            await self._handle_media_msg(message, media_type, channel_title, username, timestamp, is_latest, webhook_urls, reply_context=reply_context)
         elif has_media and message_text:
-            await self._handle_media_msg(message, media_type, channel_title, username, timestamp, is_latest, webhook_urls, message_text)
+            await self._handle_media_msg(message, media_type, channel_title, username, timestamp, is_latest, webhook_urls, message_text, reply_context)
         elif message_text:
-            await self._handle_text_only_msg(channel_title, username, timestamp, message_text, is_latest, webhook_urls)
+            await self._handle_text_only_msg(channel_title, username, timestamp, message_text, is_latest, webhook_urls, reply_context)
         else:
             logger.info(f"Empty or unsupported message from {channel_title}")
 
-    async def _handle_media_msg(self, message, media_type, channel_title, username, timestamp, is_latest, webhook_urls, message_text=""):
+    async def _handle_media_msg(self, message, media_type, channel_title, username, timestamp, is_latest, webhook_urls, message_text="", reply_context=None):
         """Handles media messages (with or without captions).
         
         Downloads media file once and uploads to all target webhooks,
@@ -595,18 +651,18 @@ class Telecord:
         """
         file_path = await self.telegram_handler.download_media(message)
         if file_path:
-            await self.discord_handler.send_media_to_multiple_webhooks(file_path, media_type, channel_title, username, timestamp, message_text, is_latest=is_latest, webhook_urls=webhook_urls)
+            await self.discord_handler.send_media_to_multiple_webhooks(file_path, media_type, channel_title, username, timestamp, message_text, is_latest=is_latest, webhook_urls=webhook_urls, reply_context=reply_context)
         else:
             self._send_media_fallback_message(channel_title, username, timestamp, media_type, is_latest, message_text, webhook_urls)
 
-    async def _handle_text_only_msg(self, channel_title, username, timestamp, message_text, is_latest, webhook_urls):
+    async def _handle_text_only_msg(self, channel_title, username, timestamp, message_text, is_latest, webhook_urls, reply_context=None):
         """Handles text-only messages.
         
         Formats message with metadata and sends to all target webhooks
         using the unified message formatting utility.
         """
         discord_message = format_message_content(
-            channel_title, username, timestamp, "Text", message_text, is_latest
+            channel_title, username, timestamp, "Text", message_text, is_latest, reply_context
         )
         self.discord_handler.send_to_multiple_webhooks(discord_message, webhook_urls)
 

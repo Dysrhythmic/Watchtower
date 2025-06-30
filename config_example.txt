@@ -12,13 +12,7 @@ TELEGRAM_CHANNEL_IDS=@tech_news,@general_news,@breaking_news,@startup_news,@loca
 
 
 # === Discord Webhook Configuration ===
-# Choose ONE of the following options:
-
-# Option 1: Simple single webhook
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_webhook_url_here
-
-# Option 2: Advanced JSON configuration
-# Create a json configuration file with detailed routing rules and specify it like so:
+# Create a json configuration file with routing rules (two examples are provided) and specify it as an environment variable, e.g.:
 # WEBHOOK_CONFIG_FILE=webhook_config.json
 
 # Then add your webhook URLs as environment variables, e.g.:
@@ -26,8 +20,12 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_webhook_url_here
 # DISCORD_WEBHOOK_TECH_UPDATES=webhook_url_2
 # DISCORD_WEBHOOK_GENERAL_FEED=webhook_url_3
 
-# Add those environment variables to your configuraiton file
-# See webhook_config.json for a complete example that:
+# Add those environment variable names to your configuraiton file
+
+# See webhook_config_ex_1.json for an example that:
+# - Routes messages from the "@threat_research_news" Telecord channel to the "cyber_news" webhook
+
+# See webhook_config_ex_2.json for an example that:
 # - Routes messages from "@threat_research_news" to the "cyber_news" webhook
 # - Routes messages from "@new_vulnerabilities" to the "cyber_news" webhook (only if they contain "PoC", "0 day", or "CVE") and all messages to the "cyber_news" webhook
 # - Routes messages from "@tech_news" to the "tech_updates" webhook (only if they contain "technology", "software", "AI", or "machine learning")

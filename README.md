@@ -24,13 +24,13 @@ A simple Python app to forward messages from Telegram channels to Discord channe
    ```
 3. **Create a `.env` file** in the project directory based on the provided `config_example.txt` file
 
-4. **Optionally customize `webhook_config.json`** if you wish to use more advanced message routing than the default. See `config_example.txt` for more details.
+4. **Create a configuration file** based on one of the provided `webhook_config_ex_n.json` files. See `config_example.txt` for more details.
 
 5. **Run the bot:**
    ```bash
    python telecord.py
    ```
-   - On first run, you will be prompted to log in to Telegram (phone number and code).
+   - On first run, you will be prompted to log in to Telegram (phone number and code) to create you Telethon session.
    - The session will be saved in `telecord_session.session` for future runs.
 
 ## Keyword Filtering

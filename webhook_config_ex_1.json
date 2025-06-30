@@ -1,0 +1,14 @@
+{
+    "webhooks": [
+      {
+        "name": "cyber_news",
+        "url": "webhook_url_1",
+        "channels": [
+          {
+            "id": "@threat_research_news"
+          }
+        ]
+      }
+    ]
+  }
+  

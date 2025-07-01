@@ -3,698 +3,540 @@ import asyncio
 import logging
 import requests
 import json
-from telethon import TelegramClient, events
-from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, MessageMediaWebPage
+from telethon import TelegramClient, events, utils
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from dotenv import load_dotenv
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Set
 
 load_dotenv()
 
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
 @dataclass
 class MessageData:
-    """Container for extracted message information"""
+    """Container for extracted message information from Telegram."""
+    msg_id: int
+    channel_id: str
+    channel_name: str
     username: str
     timestamp: object
     text: str
-    media_type: Optional[str]
     has_media: bool
-    reply_context: Optional[Dict] = None
-
-@dataclass
-class RoutingResult:
-    """Container for routing decision results"""
-    webhook_urls: List[str]
-    matched_keywords: List[str]
-    should_send: bool
-
-def normalize_channel_id(channel_id) -> Optional[str]:
-    """Convert any channel ID format to consistent string representation"""
-    if not channel_id:
-        return None
-    
-    channel_str = str(channel_id).strip()
-    if not channel_str:
-        return None
-        
-    # Handle @username format
-    if channel_str.startswith('@'):
-        return channel_str
-    
-    # Handle numeric IDs (including negative ones)
-    if channel_str.lstrip('-').isdigit():
-        return channel_str
-    
-    return channel_str
-
-def format_message_content(channel_title, username, timestamp, content_type, message_text="", 
-                         is_latest=False, reply_context=None, matched_keywords=None):
-    """Formats message content for Discord webhooks with optional keyword matches"""
-    prefix = "CONNECTION ESTABLISHED - Latest message" if is_latest else "New message"
-    content_parts = [
-        f"**{prefix.lower().title()} from channel:** {channel_title}",
-        f"**By:** {username}",
-        f"**Time:** {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
-        f"**Content:** {content_type}"
-    ]
-    
-    # Add matched keywords if any
-    if matched_keywords:
-        keywords_text = ", ".join(f"`{kw}`" for kw in matched_keywords)
-        content_parts.append(f"**Matched keywords:** {keywords_text}")
-    
-    # Add reply context if available
-    if reply_context:
-        reply_author = reply_context.get('author', 'Unknown')
-        reply_text = reply_context.get('text', '')
-        reply_time = reply_context.get('time', '')
-        
-        reply_info = f"**Replying to:** {reply_author}"
-        if reply_time:
-            reply_info += f" ({reply_time})"
-        if reply_text:
-            truncated_reply = reply_text[:100] + "..." if len(reply_text) > 100 else reply_text
-            reply_info += f"\n**Original message:** {truncated_reply}"
-        
-        content_parts.append(reply_info)
-    
-    if message_text:
-        content_parts.append(f"**Message:**\n{message_text}")
-    
-    return "\n".join(content_parts)
+    media_type: Optional[str] = None
+    media_path: Optional[str] = None
+    reply_context: Optional[Dict] = None 
+    original_message: Optional[object] = None
 
 class ConfigManager:
-    """Simplified configuration manager with clear separation of routing modes"""
+    """Manages configuration from environment variables and JSON config."""
     
     def __init__(self):
         self.api_id = os.getenv('TELEGRAM_API_ID')
         self.api_hash = os.getenv('TELEGRAM_API_HASH')
-        self.telegram_channel_ids = [
-            id.strip() for id in os.getenv('TELEGRAM_CHANNEL_IDS', '').split(',') 
-            if id.strip()
-        ]
-        self.default_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
-        self.config_file = os.getenv('WEBHOOK_CONFIG_FILE', 'webhook_config.json')
         
-        self.webhook_config = self._load_webhook_config()
-        self._validate_config()
-    
-    def _load_webhook_config(self) -> Optional[Dict]:
-        """Load and resolve webhook configuration"""
-        if not os.path.exists(self.config_file):
-            logger.info(f"Webhook config file {self.config_file} not found")
-            return None
-            
-        try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                self._resolve_webhook_urls(config)
-                logger.info(f"Loaded webhook configuration from {self.config_file}")
-                return config
-        except Exception as e:
-            logger.error(f"Error loading webhook config: {e}")
-            return None
-    
-    def _resolve_webhook_urls(self, config: Dict):
-        """Resolve environment variable references to actual webhook URLs"""
-        valid_webhooks = []
+        if not all([self.api_id, self.api_hash]):
+            raise ValueError("Missing required: TELEGRAM_API_ID, TELEGRAM_API_HASH")
         
+        # Load webhook configuration
+        config_file = os.getenv('WEBHOOK_CONFIG_FILE', 'webhook_config.json')
+        self.webhooks = self._load_webhooks(config_file)
+        self.channel_names = {}  # channel_id -> friendly name mapping for display/logging
+        
+        logger.info(f"[ConfigManager] Loaded {len(self.webhooks)} webhooks")
+    
+    def _load_webhooks(self, config_file: str) -> List[Dict]:
+        """Load and validate webhook configuration."""
+        if not os.path.exists(config_file):
+            raise ValueError(f"Config file {config_file} not found")
+        
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        webhooks = []
         for webhook in config.get('webhooks', []):
-            env_key = webhook.get('env_key')
-            if env_key:
-                webhook_url = os.getenv(env_key)
-                if webhook_url:
-                    webhook['url'] = webhook_url
-                    webhook.pop('env_key', None)
-                    valid_webhooks.append(webhook)
-                    logger.info(f"Resolved {env_key} to webhook URL")
-                else:
-                    logger.warning(f"Environment variable {env_key} not found, skipping webhook")
+            name = webhook.get('name', 'Unnamed')
+            
+            # Resolve webhook URL
+            if 'env_key' in webhook:
+                url = os.getenv(webhook['env_key'])
+                if not url:
+                    logger.warning(f"[ConfigManager] Missing environment variable {webhook['env_key']} for {name}")
+                    continue
+            elif 'url' in webhook:
+                url = webhook['url']
             else:
-                valid_webhooks.append(webhook)
+                logger.warning(f"[ConfigManager] No URL for webhook {name}")
+                continue
+            
+            # Validate channels
+            channels = webhook.get('channels', [])
+            if not channels or not all('id' in channel for channel in channels):
+                logger.warning(f"[ConfigManager] Invalid channels for webhook {name}")
+                continue
+            
+            webhooks.append({
+                'name': name,
+                'url': url,
+                'channels': channels
+            })
         
-        config['webhooks'] = valid_webhooks
-    
-    def _validate_config(self):
-        """Validate configuration completeness"""
-        if not all([self.api_id, self.api_hash, self.telegram_channel_ids]):
-            raise ValueError("Missing required environment variables: TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_CHANNEL_IDS")
+        if not webhooks:
+            raise ValueError("[ConfigManager] No valid webhooks configured")
         
-        if not self.default_webhook_url and not self.webhook_config:
-            raise ValueError("Either DISCORD_WEBHOOK_URL or webhook config file must be provided")
+        return webhooks
     
-    def has_advanced_routing(self) -> bool:
-        """Check if advanced routing is available"""
-        return self.webhook_config is not None
-    
-    def has_default_webhook(self) -> bool:
-        """Check if default webhook is available"""
-        return self.default_webhook_url is not None
+    def get_all_channel_ids(self) -> Set[str]:
+        """Get all unique channel IDs from webhook config."""
+        ids = set()
+        for webhook in self.webhooks:
+            for channel in webhook['channels']:
+                ids.add(channel['id'])
+        return ids
 
 class MessageRouter:
-    """Clean message routing with keyword matching"""
+    """Routes messages to webhooks based on configuration."""
     
-    def __init__(self, webhook_config: Optional[Dict]):
-        self.webhook_config = webhook_config
+    def __init__(self, config: ConfigManager):
+        self.config = config
+        self.channel_mappings = {}
     
-    def route_message(self, channel_id: str, message_text: str = "") -> RoutingResult:
-        """
-        Determine webhooks and matched keywords for a message
-        Returns RoutingResult with webhook URLs and matched keywords
-        """
-        if not self.webhook_config:
-            return RoutingResult(webhook_urls=[], matched_keywords=[], should_send=False)
+    def add_channel_mapping(self, config_id: str, actual_id: str):
+        """Store mapping between configured ID and actual channel ID."""
+        self.channel_mappings[config_id] = actual_id
+    
+    def get_destinations(self, msg: MessageData, connection_proof=False) -> List[Dict]:
+        """Get list of webhooks that should receive this message."""
+        destinations = []
         
-        webhook_urls = []
-        all_matched_keywords = []
-        
-        normalized_channel_id = normalize_channel_id(channel_id)
-        message_lower = message_text.lower()
-        
-        for webhook in self.webhook_config.get('webhooks', []):
-            webhook_url = webhook.get('url')
-            if not webhook_url:
-                continue
-                
-            webhook_matched_keywords = []
-            
-            for channel_config in webhook.get('channels', []):
-                config_channel_id = normalize_channel_id(channel_config.get('id'))
-                keywords = channel_config.get('keywords', [])
-                
-                if config_channel_id == normalized_channel_id:
-                    if not keywords:
-                        # No keywords = all messages from this channel
-                        webhook_urls.append(webhook_url)
-                        logger.info(f"Channel {channel_id} -> webhook (no keyword filter)")
-                        break
-                    else:
-                        # Check for keyword matches
-                        for keyword in keywords:
-                            keyword_lower = keyword.lower()
-                            if keyword_lower in message_lower:
-                                webhook_matched_keywords.append(keyword)
-                                logger.info(f"Keyword match found: '{keyword}' in channel {channel_id}")
-                        
-                        if webhook_matched_keywords:
-                            webhook_urls.append(webhook_url)
-                            all_matched_keywords.extend(webhook_matched_keywords)
-                            logger.info(f"Channel {channel_id} -> webhook (keywords: {webhook_matched_keywords})")
-                            break
-                        else:
-                            logger.info(f"No keyword matches found for channel {channel_id}")
-                    
-                    # Only match one channel config per webhook
+        for webhook in self.config.webhooks:
+            # Find matching channel config
+            channel_config = None
+            for channel in webhook['channels']:
+                if self._channel_matches(msg.channel_id, msg.channel_name, channel['id']):
+                    channel_config = channel
                     break
-        
-        # Remove duplicate keywords while preserving order
-        unique_keywords = []
-        seen = set()
-        for kw in all_matched_keywords:
-            if kw not in seen:
-                unique_keywords.append(kw)
-                seen.add(kw)
-        
-        return RoutingResult(
-            webhook_urls=webhook_urls,
-            matched_keywords=unique_keywords,
-            should_send=len(webhook_urls) > 0
-        )
-    
-    def get_all_webhook_urls(self) -> List[str]:
-        """Get all configured webhook URLs for notifications"""
-        if not self.webhook_config:
-            return []
-        
-        urls = set()
-        for webhook in self.webhook_config.get('webhooks', []):
-            if webhook.get('url'):
-                urls.add(webhook['url'])
-        return list(urls)
-
-class DiscordHandler:
-    """Simplified Discord webhook handler"""
-    
-    DISCORD_MAX_LENGTH = 2000
-    DISCORD_SUCCESS_CODES = [200, 204]
-    
-    def __init__(self, default_webhook_url: Optional[str] = None):
-        self.default_webhook_url = default_webhook_url
-    
-    def send_to_webhooks(self, message: str, webhook_urls: List[str]) -> bool:
-        """Send message to multiple webhooks"""
-        if not webhook_urls:
-            return False
             
-        success = True
-        for url in webhook_urls:
-            if not self._send_message(message, url):
-                success = False
-        return success
-    
-    def send_to_default(self, message: str) -> bool:
-        """Send message to default webhook"""
-        if not self.default_webhook_url:
-            return False
-        return self._send_message(message, self.default_webhook_url)
-    
-    def _send_message(self, message: str, webhook_url: str) -> bool:
-        """Send message with automatic chunking if needed"""
-        if len(message) <= self.DISCORD_MAX_LENGTH:
-            return self._make_request(message, webhook_url)
-        
-        # Chunk long messages
-        chunks = [message[i:i+self.DISCORD_MAX_LENGTH] 
-                 for i in range(0, len(message), self.DISCORD_MAX_LENGTH)]
-        
-        success = True
-        for chunk in chunks:
-            if not self._make_request(chunk, webhook_url):
-                success = False
-        return success
-    
-    def _make_request(self, content: str, webhook_url: str) -> bool:
-        """Make HTTP request to Discord webhook"""
-        try:
-            payload = {"content": content, "username": "Telecord"}
-            response = requests.post(webhook_url, json=payload, timeout=10)
+            if not channel_config:
+                continue
             
-            if response.status_code in self.DISCORD_SUCCESS_CODES:
-                logger.info("Message sent to Discord successfully")
-                return True
-            else:
-                logger.error(f"Discord webhook failed: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error sending to Discord: {e}")
-            return False
-    
-    async def send_media_to_webhooks(self, file_path: str, media_type: str, 
-                                   channel_title: str, username: str, timestamp: object,
-                                   webhook_urls: List[str], message_text: str = "",
-                                   is_latest: bool = False, reply_context: Optional[Dict] = None,
-                                   matched_keywords: Optional[List[str]] = None) -> bool:
-        """Send media to multiple webhooks"""
-        if not webhook_urls:
-            return False
+            # Always send metadata for proof of connection
+            if connection_proof:
+                destinations.append({
+                    'name': webhook['name'],
+                    'url': webhook['url'],
+                    'keywords': ['CONNECTION_PROOF']
+                })
+                continue
             
-        success = True
-        for url in webhook_urls:
-            if not await self._send_media(file_path, media_type, channel_title, username, 
-                                        timestamp, url, message_text, is_latest, 
-                                        reply_context, matched_keywords, cleanup=False):
-                success = False
+            # Check keywords
+            keywords = channel_config.get('keywords')
+            if keywords is None:
+                # No keywords field, forward all
+                destinations.append({
+                    'name': webhook['name'],
+                    'url': webhook['url'],
+                    'keywords': []
+                })
+            elif keywords and msg.text:
+                # Check for keyword matches
+                matched = [keyword for keyword in keywords if keyword.lower() in msg.text.lower()]
+                if matched:
+                    destinations.append({
+                        'name': webhook['name'],
+                        'url': webhook['url'],
+                        'keywords': matched
+                    })
         
-        # Cleanup after all sends
-        self._cleanup_file(file_path)
-        return success
+        return destinations
     
-    async def send_media_to_default(self, file_path: str, media_type: str,
-                                  channel_title: str, username: str, timestamp: object,
-                                  message_text: str = "", is_latest: bool = False,
-                                  reply_context: Optional[Dict] = None,
-                                  matched_keywords: Optional[List[str]] = None) -> bool:
-        """Send media to default webhook"""
-        if not self.default_webhook_url:
-            return False
-        return await self._send_media(file_path, media_type, channel_title, username,
-                                    timestamp, self.default_webhook_url, message_text,
-                                    is_latest, reply_context, matched_keywords, cleanup=True)
-    
-    async def _send_media(self, file_path: str, media_type: str, channel_title: str,
-                        username: str, timestamp: object, webhook_url: str,
-                        message_text: str = "", is_latest: bool = False,
-                        reply_context: Optional[Dict] = None,
-                        matched_keywords: Optional[List[str]] = None,
-                        cleanup: bool = True) -> bool:
-        """Send media file to specific webhook"""
-        try:
-            with open(file_path, 'rb') as f:
-                files = {'file': f}
-                
-                content = format_message_content(
-                    channel_title, username, timestamp, media_type, message_text,
-                    is_latest, reply_context, matched_keywords
-                )
-                
-                data = {'username': 'Telecord', 'content': content}
-                response = requests.post(webhook_url, files=files, data=data, timeout=30)
-                
-                if response.status_code in self.DISCORD_SUCCESS_CODES:
-                    logger.info(f"Media ({media_type}) sent to Discord successfully")
-                    return True
-                else:
-                    logger.error(f"Failed to send media: {response.status_code}")
-                    return False
-                    
-        except Exception as e:
-            logger.error(f"Error sending media: {e}")
-            return False
-        finally:
-            if cleanup:
-                self._cleanup_file(file_path)
-    
-    def _cleanup_file(self, file_path: str):
-        """Remove temporary file"""
-        try:
-            if file_path and os.path.exists(file_path):
-                os.remove(file_path)
-                logger.info(f"Cleaned up temporary file: {file_path}")
-        except Exception as e:
-            logger.error(f"Error cleaning up file {file_path}: {e}")
+    def _channel_matches(self, channel_id: str, channel_name: str, config_id: str) -> bool:
+        """Check if channel matches configuration."""
+        # Direct matches
+        if channel_id == config_id or channel_name == config_id:
+            return True
+        
+        # Handle -100 prefix for supergroups
+        if f"-100{channel_id}" == config_id:
+            return True
+        
+        # Handle numeric config without -100 prefix
+        if config_id.isdigit() and channel_id == f"-100{config_id}":
+            return True
+        
+        return False
 
 class TelegramHandler:
-    """Simplified Telegram operations"""
+    """Handles all Telegram operations."""
     
-    def __init__(self, api_id: str, api_hash: str, channel_ids: List[str]):
-        self.api_id = api_id
-        self.api_hash = api_hash
-        self.channel_ids = channel_ids
-        self.client = TelegramClient('telecord_session', api_id, api_hash)
+    def __init__(self, config: ConfigManager):
+        self.config = config
+        self.client = TelegramClient('telecord_session', config.api_id, config.api_hash)
+        self.channels = {}  # channel_id -> entity mapping for Telegram API
+        self.msg_callback = None
+        self._msg_counter = 0
     
     async def start(self):
-        """Start Telegram client"""
+        """Start client and resolve channels."""
         await self.client.start()
-    
-    async def get_channel_info(self, channel_id: str) -> Tuple[object, str]:
-        """Get channel entity and title"""
-        # Convert string channel IDs to int if they're numeric (including negative)
-        if isinstance(channel_id, str) and channel_id.lstrip('-').isdigit():
-            channel_id = int(channel_id)
+        logger.info("[TelegramHandler] Telegram client started")
         
-        channel = await self.client.get_entity(channel_id)
-        title = getattr(channel, 'title', None) or getattr(channel, 'username', str(channel_id))
-        return channel, title
+        # Resolve all channels
+        for channel_id in self.config.get_all_channel_ids():
+            entity = await self._resolve_channel(channel_id)
+            if entity:
+                # Use telethon utils to get the correct peer ID to ensure we get the same ID format as events
+                entity_id = str(utils.get_peer_id(entity))
+                
+                self.channels[entity_id] = entity
+                
+                # Store friendly name
+                name = f"@{entity.username}" if getattr(entity, 'username', None) else entity.title
+                self.config.channel_names[entity_id] = name
+                
+                logger.info(f"[TelegramHandler] Resolved {channel_id} -> ID: {entity_id}, Name: {name}")
+            else:
+                logger.warning(f"[TelegramHandler] Failed to resolve channel: {channel_id}")
+        
+        logger.info(f"[TelegramHandler] Resolved {len(self.channels)} channels")
     
-    def extract_message_data(self, message) -> MessageData:
-        """Extract all relevant data from a Telegram message"""
-        username = self._extract_username(message.sender)
-        timestamp = message.date
-        text = message.text or ""
-        media_type = self._get_media_type(message)
-        has_media = media_type is not None
+    async def _resolve_channel(self, channel_id: str):
+        """Resolve a channel ID to an entity."""
+        try:
+            # Try different formats
+            if channel_id.startswith('@'):
+                return await self.client.get_entity(channel_id)
+            elif channel_id.startswith('-100'):
+                return await self.client.get_entity(int(channel_id))
+            # Try with and without adding -100 prefix
+            elif channel_id.isdigit():
+                try:
+                    return await self.client.get_entity(int(channel_id))
+                except:
+                    return await self.client.get_entity(int(f"-100{channel_id}"))
+            else:
+                # Try as username
+                return await self.client.get_entity(f"@{channel_id}")
+        except Exception as e:
+            logger.error(f"[TelegramHandler] Failed to resolve {channel_id}: {e}")
+            return None
+
+    async def fetch_latest_messages(self):
+        """Fetch latest message from each channel for connection proof."""
+        for channel_id, entity in self.channels.items():
+            channel_name = self.config.channel_names.get(channel_id, f"Channel-{channel_id}")
+            try:
+                async for message in self.client.iter_messages(entity, limit=1):
+                    if message and self.msg_callback:
+                        msg_data = await self._create_message_data(message, channel_id)
+                        await self.msg_callback(msg_data, is_latest=True)
+                    break
+            except Exception as e:
+                logger.error(f"[TelegramHandler] Error fetching from {channel_name}: {e}")
+    
+    def setup_handlers(self, callback):
+        """Setup message event handlers."""
+        self.msg_callback = callback
+        
+        # Register handle_message with telethon
+        @self.client.on(events.NewMessage(chats=list(self.channels.values())))
+        async def handle_message(event):
+            try:
+                channel_id = str(event.chat_id)
+                msg_data = await self._create_message_data(event.message, channel_id)
+                await callback(msg_data, is_latest=False)
+            except Exception as e:
+                channel_name = self.config.channel_names.get(channel_id, f"Channel-{channel_id}")
+                logger.error(f"[TelegramHandler] Error handling message from {channel_name}: {e}")
+        
+        logger.info("[TelegramHandler] Event handlers configured")
+    
+    async def _create_message_data(self, message, channel_id: str) -> MessageData:
+        """Create MessageData from Telegram message."""
+        self._msg_counter += 1
+        
+        # Get username
+        username = "Unknown"
+        if message.sender:
+            if hasattr(message.sender, 'username'):
+                username = f"@{message.sender.username}"
+            elif hasattr(message.sender, 'first_name'):
+                username = message.sender.first_name
+        
+        # Get media type
+        media_type = None
+        if message.media:
+            if isinstance(message.media, MessageMediaPhoto):
+                media_type = "Photo"
+            elif isinstance(message.media, MessageMediaDocument):
+                media_type = "Document"
+            else:
+                media_type = "Other"
+        
+        # Get reply context if this is a reply
+        reply_context = None
+        if message.reply_to:
+            reply_context = await self._get_reply_context(message)
         
         return MessageData(
+            msg_id=self._msg_counter,
+            channel_id=channel_id,
+            channel_name=self.config.channel_names.get(channel_id, f"Channel-{channel_id}"),
             username=username,
-            timestamp=timestamp,
-            text=text,
+            timestamp=message.date,
+            text=message.text or "",
+            has_media=bool(media_type),
             media_type=media_type,
-            has_media=has_media
+            reply_context=reply_context,
+            original_message=message
         )
     
-    def _extract_username(self, sender) -> str:
-        """Extract username from sender"""
-        if not sender:
-            return "Unknown"
-        
-        if hasattr(sender, 'username') and sender.username:
-            return f"@{sender.username}"
-        elif hasattr(sender, 'first_name') and sender.first_name:
-            username = sender.first_name
-            if hasattr(sender, 'last_name') and sender.last_name:
-                username += f" {sender.last_name}"
-            return username
-        return "Unknown"
-    
-    def _get_media_type(self, message) -> Optional[str]:
-        """Get media type from message"""
-        if not message.media:
-            return None
+    async def _get_reply_context(self, message) -> Optional[Dict]:
+        """Extract context about what message this is replying to."""
+        try:
+            # Get the message being replied to
+            replied_msg = await self.client.get_messages(
+                message.chat_id,
+                ids=message.reply_to.reply_to_msg_id
+            )
             
-        if isinstance(message.media, MessageMediaPhoto):
-            return "Photo"
-        elif isinstance(message.media, MessageMediaDocument):
-            return "Document"
-        elif isinstance(message.media, MessageMediaWebPage):
-            return "Web Page"
-        else:
-            return "Other Media"
-    
-    async def get_reply_context(self, message) -> Optional[Dict]:
-        """Get reply context if message is a reply"""
-        try:
-            if hasattr(message, 'reply_to') and message.reply_to:
-                replied_message = await self.client.get_messages(
-                    message.chat_id, 
-                    ids=message.reply_to.reply_to_msg_id
-                )
+            if replied_msg:
+                # Extract author info
+                author = "Unknown"
+                if replied_msg.sender:
+                    if hasattr(replied_msg.sender, 'username'):
+                        author = f"@{replied_msg.sender.username}"
+                    elif hasattr(replied_msg.sender, 'first_name'):
+                        author = replied_msg.sender.first_name
                 
-                if replied_message:
-                    return {
-                        'author': self._extract_username(replied_message.sender),
-                        'text': replied_message.text or "",
-                        'time': replied_message.date.strftime('%Y-%m-%d %H:%M:%S UTC') if replied_message.date else ""
-                    }
+                # Get media type if present
+                media_type = None
+                if replied_msg.media:
+                    if isinstance(replied_msg.media, MessageMediaPhoto):
+                        media_type = "Photo"
+                    elif isinstance(replied_msg.media, MessageMediaDocument):
+                        media_type = "Document"
+                    else:
+                        media_type = "Other"
+                
+                # Build context
+                context = {
+                    'message_id': replied_msg.id,
+                    'author': author,
+                    'text': replied_msg.text or "",
+                    'time': replied_msg.date.strftime('%Y-%m-%d %H:%M:%S UTC') if replied_msg.date else "",
+                    'media_type': media_type,
+                    'has_media': bool(media_type)
+                }
+                
+                return context
+                
         except Exception as e:
-            logger.error(f"Error getting reply context: {e}")
+            logger.error(f"[TelegramHandler] Error getting reply context: {e}")
         
         return None
     
-    async def download_media(self, message) -> Optional[str]:
-        """Download media from message"""
+    async def download_media(self, msg_data: MessageData) -> Optional[str]:
+        """Download attached media from message."""
         try:
-            if message.media:
-                file_path = await message.download_media()
-                logger.info(f"Downloaded media: {file_path}")
-                return file_path
+            if msg_data.original_message and msg_data.original_message.media:
+                return await msg_data.original_message.download_media()
         except Exception as e:
-            logger.error(f"Error downloading media: {e}")
+            logger.error(f"[TelegramHandler] Media download failed: {e}")
         return None
     
-    async def get_latest_message(self, channel):
-        """Get most recent message from channel"""
-        async for message in self.client.iter_messages(channel, limit=1):
-            return message
-        return None
-    
-    async def run_until_disconnected(self):
-        """Keep client running"""
+    async def run(self):
+        """Keep client running."""
         await self.client.run_until_disconnected()
 
-    async def resolve_channel_username(self, channel_id: str) -> str:
-        """Convert numeric channel ID to @username format if possible"""
+class DiscordHandler:
+    """Handles Discord webhook operations."""
+    
+    MAX_LENGTH = 2000
+    
+    def send_message(self, content: str, url: str, media_path: Optional[str] = None) -> bool:
+        """Send message to Discord webhook."""
         try:
-            # If it's already a username format, return as is
-            if channel_id.startswith('@'):
-                return channel_id
+            chunks = self._chunk_text(content)
+            chunks_sent = 0
             
-            # If it's numeric, try to resolve to username
-            if channel_id.lstrip('-').isdigit():
-                channel_id_int = int(channel_id)
-                channel = await self.client.get_entity(channel_id_int)
-                if hasattr(channel, 'username') and channel.username:
-                    return f"@{channel.username}"
+            if media_path and os.path.exists(media_path):
+                # Send first chunk with media
+                with open(media_path, 'rb') as f:
+                    files = {'file': f}
+                    data = {'username': 'Telecord', 'content': chunks[0]}
+                    response = requests.post(url, files=files, data=data, timeout=15)
+                    if response.status_code not in [200, 204]:
+                        return False
+                    chunks_sent = 1
+
+                # Clean up file
+                try:
+                    os.remove(media_path)
+                except:
+                    pass
+
+            # Send text content
+            for chunk in chunks[chunks_sent:]:
+                payload = {"username": "Telecord", "content": chunk}
+                response = requests.post(url, json=payload, timeout=5)
+                if response.status_code not in [200, 204]:
+                    return False
+                chunks_sent += 1
             
-            # Fallback to original ID
-            return channel_id
+            return True
+            
         except Exception as e:
-            logger.error(f"Error resolving channel ID {channel_id}: {e}")
-            return channel_id
+            logger.error(f"[DiscordHandler] Discord send failed: {e}")
+            return False
+    
+    def _chunk_text(self, text: str) -> List[str]:
+        """Split text into Discord compatible chunks."""
+        if len(text) <= self.MAX_LENGTH:
+            return [text]
+        
+        chunks = []
+        while text:
+            if len(text) <= self.MAX_LENGTH:
+                chunks.append(text)
+                break
+            
+            # Split on newlines where possible
+            split_point = text.rfind('\n', 0, self.MAX_LENGTH)
+            if split_point == -1:
+                split_point = self.MAX_LENGTH
+            
+            chunks.append(text[:split_point])
+            text = text[split_point:].lstrip('\n')
+        
+        return chunks
+    
+    def format_message(self, msg: MessageData, dest: Dict, is_latest: bool) -> str:
+        """Format message for Discord."""
+        if is_latest:
+            # Connection proof format
+            return (
+                f"**[+] CONNECTION ESTABLISHED**\n"
+                f"**Channel:** {msg.channel_name}\n"
+                f"**Latest message by:** {msg.username}\n"
+                f"**Time:** {msg.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+                f"*Monitoring active - messages matching your filters will be forwarded.*"
+            )
+        
+        # Regular message format
+        lines = [
+            f"**New message from:** {msg.channel_name}",
+            f"**By:** {msg.username}",
+            f"**Time:** {msg.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        ]
+        
+        if msg.has_media:
+            lines.append(f"**Content:** {msg.media_type}")
+        
+        if dest['keywords']:
+            lines.append(f"**Matched:** {', '.join(f'`{keyword}`' for keyword in dest['keywords'])}")
+        
+        if msg.reply_context:
+            lines.append(self._format_reply_context(msg.reply_context))
+        
+        if msg.text:
+            lines.append(f"**Message:**\n{msg.text}")
+        
+        return '\n'.join(lines)
+    
+    def _format_reply_context(self, reply_context: Dict) -> str:
+        """Format reply context for Discord display."""
+        parts = []
+        
+        parts.append(f"**  Replying to:** {reply_context['author']} ({reply_context['time']})")
+        
+        if reply_context.get('has_media'):
+            media_type = reply_context.get('media_type', 'Other')
+            parts.append(f"**  Original content:** {media_type}")
+        
+        # Original message text (truncate if too long)
+        original_text = reply_context.get('text', '')
+        if original_text:
+            if len(original_text) > 200:
+                original_text = original_text[:200] + "..."
+            parts.append(f"**  Original message:** {original_text}")
+        elif reply_context.get('has_media'):
+            parts.append("**  Original message:** [Media only, no caption]")
+        
+        return '\n'.join(parts)
 
 class Telecord:
-    """Main Telecord orchestrator - simplified and focused"""
+    """Main application coordinating all components."""
     
     def __init__(self):
         self.config = ConfigManager()
-        self.telegram = TelegramHandler(
-            self.config.api_id, 
-            self.config.api_hash, 
-            self.config.telegram_channel_ids
-        )
-        self.discord = DiscordHandler(self.config.default_webhook_url)
-        self.router = MessageRouter(self.config.webhook_config)
+        self.telegram = TelegramHandler(self.config)
+        self.router = MessageRouter(self.config)
+        self.discord = DiscordHandler()
+        
+        logger.info("[Telecord] Initialized")
     
     async def start(self):
-        """Start Telecord service"""
+        """Start the service."""
+        
         await self.telegram.start()
-        logger.info("Starting Telecord...")
-        logger.info(f"Monitoring channels: {', '.join(self.config.telegram_channel_ids)}")
         
-        self._log_configuration()
-        await self._post_startup_messages()
-        await self._setup_message_handler()
-        await self.telegram.run_until_disconnected()
-    
-    def _log_configuration(self):
-        """Log current configuration"""
-        if self.config.has_advanced_routing():
-            webhook_count = len(self.router.get_all_webhook_urls())
-            logger.info(f"Advanced routing enabled with {webhook_count} webhooks")
-        elif self.config.has_default_webhook():
-            logger.info("Simple routing enabled with default webhook")
-    
-    async def _post_startup_messages(self):
-        """Post latest messages and startup notification"""
-        seen_channels = set()
+        # Setup message handler
+        self.telegram.setup_handlers(self._handle_message)
         
-        for channel_id in self.config.telegram_channel_ids:
-            if not channel_id or channel_id in seen_channels:
-                continue
-            seen_channels.add(channel_id)
+        # Send connection proofs
+        await self.telegram.fetch_latest_messages()
+        
+        # Notify of channels being watched
+        startup_msg = "**Telecord is now monitoring for new messages.**"
+        urls = {webhook['url'] for webhook in self.config.webhooks}
+        for url in urls:
+            self.discord.send_message(startup_msg, url)
+        
+        logger.info("[Telecord] Now monitoring for new messages...")
+        
+        # Run forever
+        await self.telegram.run()
+    
+    async def _handle_message(self, msg: MessageData, is_latest: bool):
+        """Process incoming message."""
+        try:
+            # Get destinations
+            destinations = self.router.get_destinations(msg, connection_proof=is_latest)
             
-            try:
-                channel, title = await self.telegram.get_channel_info(channel_id)
-                logger.info(f"Processing channel: {channel_id} (resolved as: {title})")
+            if not destinations:
+                logger.info(f"[Telecord] Message from {msg.channel_name} by {msg.username} has no destinations")
+                return
+            
+            # Download media if needed
+            if msg.has_media and not is_latest:
+                msg.media_path = await self.telegram.download_media(msg)
+            
+            # Send to each destination
+            for dest in destinations:
+                content = self.discord.format_message(msg, dest, is_latest)
+                success = self.discord.send_message(content, dest['url'], msg.media_path)
                 
-                latest_message = await self.telegram.get_latest_message(channel)
-                if latest_message:
-                    await self._process_message(latest_message, title, channel_id, is_latest=True)
-                    
-            except Exception as e:
-                logger.error(f"Error fetching latest message from {channel_id}: {e}")
-        
-        await self._send_startup_notification()
-        logger.info("Telecord is now monitoring for new messages.")
-    
-    async def _send_startup_notification(self):
-        """Send startup notification to all webhooks"""
-        message = "**Telecord is now monitoring for new messages.**"
-        
-        if self.config.has_advanced_routing():
-            webhook_urls = self.router.get_all_webhook_urls()
-            self.discord.send_to_webhooks(message, webhook_urls)
-        elif self.config.has_default_webhook():
-            self.discord.send_to_default(message)
-    
-    async def _setup_message_handler(self):
-        """Setup Telegram message event handler"""
-        # Convert channel IDs to proper format for Telethon
-        processed_channels = []
-        for channel_id in self.config.telegram_channel_ids:
-            if isinstance(channel_id, str) and channel_id.lstrip('-').isdigit():
-                processed_channels.append(int(channel_id))
-            else:
-                processed_channels.append(channel_id)
-        
-        @self.telegram.client.on(events.NewMessage(chats=processed_channels))
-        async def handle_message(event):
-            try:
-                message = event.message
-                channel = await event.get_chat()
-                title = getattr(channel, 'title', None) or getattr(channel, 'username', str(channel.id))
-                await self._process_message(message, title, str(channel.id))
-            except Exception as e:
-                logger.error(f"Error handling new message: {e}")
-    
-    async def _process_message(self, message, channel_title: str, channel_id: str, is_latest: bool = False):
-        """Main message processing pipeline"""
-        # Extract message data
-        msg_data = self.telegram.extract_message_data(message)
-        msg_data.reply_context = await self.telegram.get_reply_context(message)
-        
-        # Resolve channel ID to username format for proper routing
-        resolved_channel_id = await self.telegram.resolve_channel_username(channel_id)
-        logger.info(f"Resolved channel ID: {channel_id} -> {resolved_channel_id}")
-        
-        # Route message
-        routing = self.router.route_message(resolved_channel_id, msg_data.text)
-        
-        # Fallback to default webhook if advanced routing didn't match
-        if not routing.should_send and self.config.has_default_webhook():
-            routing = RoutingResult(
-                webhook_urls=[self.config.default_webhook_url],
-                matched_keywords=[],
-                should_send=True
-            )
-        
-        # Log message info
-        self._log_message(channel_title, msg_data, routing.matched_keywords, is_latest)
-        
-        if not routing.should_send:
-            # Only log if we have advanced routing (don't spam for missing default webhook)
-            if self.config.has_advanced_routing():
-                logger.info(f"Message filtered out - no keyword matches")
-            return
-        
-        # Send message
-        await self._send_message(message, msg_data, routing, channel_title, is_latest)
-    
-    def _log_message(self, channel_title: str, msg_data: MessageData, matched_keywords: List[str], is_latest: bool):
-        """Log message information"""
-        prefix = "CONNECTION ESTABLISHED - Latest message" if is_latest else "New message"
-        logger.info("=" * 60)
-        logger.info(f"{prefix} from {channel_title}:")
-        logger.info(f"By: {msg_data.username}")
-        logger.info(f"Time: {msg_data.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
-        if matched_keywords:
-            logger.info(f"Matched keywords: {', '.join(matched_keywords)}")
-        if msg_data.text:
-            logger.info(f"Message: {msg_data.text}")
-        if msg_data.media_type:
-            logger.info(f"Media: {msg_data.media_type}")
-        logger.info("=" * 60)
-    
-    async def _send_message(self, message, msg_data: MessageData, routing: RoutingResult, 
-                          channel_title: str, is_latest: bool):
-        """Send message to Discord based on content type"""
-        if msg_data.has_media:
-            await self._send_media_message(message, msg_data, routing, channel_title, is_latest)
-        else:
-            await self._send_text_message(msg_data, routing, channel_title, is_latest)
-    
-    async def _send_media_message(self, message, msg_data: MessageData, routing: RoutingResult,
-                                channel_title: str, is_latest: bool):
-        """Send media message to Discord"""
-        # Download media from the original message
-        file_path = await self.telegram.download_media(message)
-        
-        if file_path:
-            # Send media to webhooks
-            if routing.webhook_urls:
-                await self.discord.send_media_to_webhooks(
-                    file_path, msg_data.media_type, channel_title, msg_data.username,
-                    msg_data.timestamp, routing.webhook_urls, msg_data.text, is_latest,
-                    msg_data.reply_context, routing.matched_keywords
-                )
-            else:
-                await self.discord.send_media_to_default(
-                    file_path, msg_data.media_type, channel_title, msg_data.username,
-                    msg_data.timestamp, msg_data.text, is_latest,
-                    msg_data.reply_context, routing.matched_keywords
-                )
-        else:
-            # Fallback to text message if download fails
-            content_type = f"{msg_data.media_type} with caption" if msg_data.text else f"{msg_data.media_type} (download failed)"
-            discord_message = format_message_content(
-                channel_title, msg_data.username, msg_data.timestamp, content_type,
-                msg_data.text, is_latest, msg_data.reply_context, routing.matched_keywords
-            )
+                status = "sent" if success else "failed"
+                logger.info(f"[Telecord] Message from {msg.channel_name} by {msg.username} {status} to {dest['name']}")
             
-            if routing.webhook_urls:
-                self.discord.send_to_webhooks(discord_message, routing.webhook_urls)
-            else:
-                self.discord.send_to_default(discord_message)
-    
-    async def _send_text_message(self, msg_data: MessageData, routing: RoutingResult,
-                               channel_title: str, is_latest: bool):
-        """Send text message to Discord"""
-        discord_message = format_message_content(
-            channel_title, msg_data.username, msg_data.timestamp, "Text",
-            msg_data.text, is_latest, msg_data.reply_context, routing.matched_keywords
-        )
-        
-        if routing.webhook_urls:
-            self.discord.send_to_webhooks(discord_message, routing.webhook_urls)
-        else:
-            self.discord.send_to_default(discord_message)
+        except Exception as e:
+            logger.error(f"[Telecord] Error processing message from {msg.channel_name} by {msg.username}: {e}")
 
 def main():
-    """Application entry point"""
+    """Application entry point."""
     try:
-        telecord = Telecord()
-        asyncio.run(telecord.start())
+        app = Telecord()
+        asyncio.run(app.start())
     except KeyboardInterrupt:
-        logger.info("Telecord stopped by user")
+        logger.info("[main] Stopped by user")
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
+        logger.error(f"[main] Fatal error: {e}")
         raise
 
 if __name__ == "__main__":
-    main() 
+    main()

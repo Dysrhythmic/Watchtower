@@ -2,7 +2,7 @@
     "webhooks": [
       {
         "name": "cyber_news",
-        "url": "webhook_url_1",
+        "env_key": "DISCORD_WEBHOOK_CYBER_NEWS",
         "channels": [
           {
             "id": "@threat_research_news"

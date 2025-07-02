@@ -32,7 +32,7 @@ A simple Python app to forward messages from Telegram channels to Discord channe
    ```bash
    python telecord.py
    ```
-   - On first run, you will be prompted to log in to Telegram (phone number and code) to create you Telethon session.
+   - On first run, you will be prompted to log in to Telegram (phone number and code) to create your Telethon session.
    - The session will be saved in `telecord_session.session` for future runs.
 
 ## Keyword Filtering

@@ -279,9 +279,9 @@ class TelegramHandler:
         # Get username
         username = "Unknown"
         if message.sender:
-            if hasattr(message.sender, 'username'):
+            if message.sender.username:
                 username = f"@{message.sender.username}"
-            elif hasattr(message.sender, 'first_name'):
+            elif message.sender.first_name:
                 username = message.sender.first_name
         
         # Get media type
@@ -325,9 +325,9 @@ class TelegramHandler:
                 # Extract author info
                 author = "Unknown"
                 if replied_msg.sender:
-                    if hasattr(replied_msg.sender, 'username'):
+                    if replied_msg.sender.username:
                         author = f"@{replied_msg.sender.username}"
-                    elif hasattr(replied_msg.sender, 'first_name'):
+                    elif replied_msg.sender.first_name:
                         author = replied_msg.sender.first_name
                 
                 # Get media type if present

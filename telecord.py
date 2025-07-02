@@ -123,7 +123,7 @@ class MessageRouter:
         """Store mapping between configured ID and actual channel ID."""
         self.channel_mappings[config_id] = actual_id
     
-    def get_destinations(self, msg: MessageData, connection_proof=False) -> List[Dict]:
+    def get_destinations(self, msg: MessageData) -> List[Dict]:
         """Get list of webhooks that should receive this message."""
         destinations = []
         
@@ -136,16 +136,6 @@ class MessageRouter:
                     break
             
             if not channel_config:
-                continue
-            
-            # Always send metadata for proof of connection
-            if connection_proof:
-                destinations.append({
-                    'name': webhook['name'],
-                    'url': webhook['url'],
-                    'keywords': ['CONNECTION_PROOF'],
-                    'restricted_mode': channel_config.get('restricted_mode', False)
-                })
                 continue
             
             # Check keywords
@@ -471,19 +461,8 @@ class DiscordHandler:
         
         return chunks
     
-    def format_message(self, msg: MessageData, dest: Dict, is_latest: bool) -> str:
+    def format_message(self, msg: MessageData, dest: Dict) -> str:
         """Format message for Discord."""
-        if is_latest:
-            # Connection proof format
-            return (
-                f"**[+] CONNECTION ESTABLISHED**\n"
-                f"**Channel:** {msg.channel_name}\n"
-                f"**Latest message by:** {msg.username}\n"
-                f"**Time:** {msg.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
-                f"*Monitoring active - messages matching your filters will be forwarded.*"
-            )
-        
-        # Regular message format
         lines = [
             f"**New message from:** {msg.channel_name}",
             f"**By:** {msg.username}",
@@ -544,25 +523,26 @@ class Telecord:
         # Setup message handler
         self.telegram.setup_handlers(self._handle_message)
         
-        # Send connection proofs
+        # Log connection proofs
         await self.telegram.fetch_latest_messages()
-        
-        # Notify of channels being watched
-        startup_msg = "**Telecord is now monitoring for new messages.**"
-        urls = {webhook['url'] for webhook in self.config.webhooks}
-        for url in urls:
-            self.discord.send_message(startup_msg, url)
         
         logger.info("[Telecord] Now monitoring for new messages...")
         
-        # Run forever
         await self.telegram.run()
     
     async def _handle_message(self, msg: MessageData, is_latest: bool):
         """Process incoming message."""
         try:
+            # If this is a connection proof message, just log it instead of sending to Discord
+            if is_latest:
+                logger.info(f"\n[Telecord] CONNECTION ESTABLISHED\n"
+                        f"  Channel: {msg.channel_name}\n"
+                        f"  Latest message by: {msg.username}\n"
+                        f"  Time: {msg.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}\n")
+                return
+            
             # Get destinations
-            destinations = self.router.get_destinations(msg, connection_proof=is_latest)
+            destinations = self.router.get_destinations(msg)
             
             if not destinations:
                 logger.info(f"[Telecord] Message from {msg.channel_name} by {msg.username} has no destinations")
@@ -570,7 +550,7 @@ class Telecord:
             
             # Determine if media should be downloaded
             should_download = False
-            if msg.has_media and not is_latest:
+            if msg.has_media:
                 # Check if media passes restricted mode checks without downloading
                 media_passes_restrictions = self.telegram._is_media_restricted(msg.original_message)
                 
@@ -597,9 +577,9 @@ class Telecord:
                     elif media_passes_restrictions:
                         include_media = True  # Restricted destinations get allowed media types
                 
-                content = self.discord.format_message(msg, dest, is_latest)
+                content = self.discord.format_message(msg, dest)
                 
-                if msg.has_media and not include_media and not is_latest:
+                if msg.has_media and not include_media:
                     content += "\n*[Media attachment filtered due to restricted mode]*"
                 
                 # Send with or without media based on this destination's rules
@@ -620,7 +600,6 @@ class Telecord:
                 pass
 
 def main():
-    """Application entry point."""
     try:
         app = Telecord()
         asyncio.run(app.start())

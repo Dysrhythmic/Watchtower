@@ -79,6 +79,11 @@ class ConfigManager:
                 logger.warning(f"[ConfigManager] Invalid channels for webhook {name}")
                 continue
             
+            # Log restricted mode settings for channels
+            for channel in channels:
+                if channel.get('restricted_mode', False):
+                    logger.info(f"[ConfigManager] Restricted mode enabled for channel {channel['id']}")
+            
             webhooks.append({
                 'name': name,
                 'url': url,
@@ -105,6 +110,15 @@ class MessageRouter:
         self.config = config
         self.channel_mappings = {}
     
+    def is_channel_restricted(self, channel_id: str, channel_name: str) -> bool:
+        """Check if any webhook has restricted mode enabled for this channel."""
+        for webhook in self.config.webhooks:
+            for channel in webhook['channels']:
+                if self._channel_matches(channel_id, channel_name, channel['id']):
+                    if channel.get('restricted_mode', False):
+                        return True
+        return False
+    
     def add_channel_mapping(self, config_id: str, actual_id: str):
         """Store mapping between configured ID and actual channel ID."""
         self.channel_mappings[config_id] = actual_id
@@ -129,7 +143,8 @@ class MessageRouter:
                 destinations.append({
                     'name': webhook['name'],
                     'url': webhook['url'],
-                    'keywords': ['CONNECTION_PROOF']
+                    'keywords': ['CONNECTION_PROOF'],
+                    'restricted_mode': channel_config.get('restricted_mode', False)
                 })
                 continue
             
@@ -140,7 +155,8 @@ class MessageRouter:
                 destinations.append({
                     'name': webhook['name'],
                     'url': webhook['url'],
-                    'keywords': []
+                    'keywords': [],
+                    'restricted_mode': channel_config.get('restricted_mode', False)
                 })
             elif keywords and msg.text:
                 # Check for keyword matches
@@ -149,7 +165,8 @@ class MessageRouter:
                     destinations.append({
                         'name': webhook['name'],
                         'url': webhook['url'],
-                        'keywords': matched
+                        'keywords': matched,
+                        'restricted_mode': channel_config.get('restricted_mode', False)
                     })
         
         return destinations
@@ -173,13 +190,23 @@ class MessageRouter:
 class TelegramHandler:
     """Handles all Telegram operations."""
     
+    # Define allowed file types for restricted mode
+    ALLOWED_MIME_TYPES = {
+        "text/plain", "text/csv", "text/xml", "application/sql",
+        "application/octet-stream", "application/x-sql", "application/x-msaccess"
+    }
+    
+    ALLOWED_EXTENSIONS = {
+        '.txt', '.csv', '.log', '.sql', '.xml', '.dat', '.db', '.mdb'
+    }
+    
     def __init__(self, config: ConfigManager):
         self.config = config
         self.client = TelegramClient('telecord_session', config.api_id, config.api_hash)
         self.channels = {}  # channel_id -> entity mapping for Telegram API
         self.msg_callback = None
         self._msg_counter = 0
-    
+
     async def start(self):
         """Start client and resolve channels."""
         await self.client.start()
@@ -340,10 +367,45 @@ class TelegramHandler:
         
         return None
     
-    async def download_media(self, msg_data: MessageData) -> Optional[str]:
+    def _is_media_restricted(self, message) -> bool:
+        """Check if media is allowed under restricted mode rules."""
+        if not message.media:
+            return True
+        
+        if not isinstance(message.media, MessageMediaDocument):
+            # Photos are blocked in restricted mode
+            return False
+        
+        document = message.media.document
+        
+        extension_allowed = False
+        mime_allowed = False
+        
+        # Check file extension
+        if hasattr(document, 'attributes'):
+            for attr in document.attributes:
+                if hasattr(attr, 'file_name') and attr.file_name:
+                    ext = os.path.splitext(attr.file_name.lower())[1]
+                    if ext in self.ALLOWED_EXTENSIONS:
+                        extension_allowed = True
+                        break
+        
+        # Check MIME type
+        if hasattr(document, 'mime_type') and document.mime_type:
+            if document.mime_type in self.ALLOWED_MIME_TYPES:
+                mime_allowed = True
+        
+        return extension_allowed and mime_allowed
+    
+    async def download_media(self, msg_data: MessageData, restricted_mode: bool = False) -> Optional[str]:
         """Download attached media from message."""
         try:
             if msg_data.original_message and msg_data.original_message.media:
+                # Check restrictions if in restricted mode
+                if restricted_mode and not self._is_media_restricted(msg_data.original_message):
+                    logger.info(f"[TelegramHandler] Media blocked by restricted mode: {msg_data.media_type}")
+                    return None
+                
                 return await msg_data.original_message.download_media()
         except Exception as e:
             logger.error(f"[TelegramHandler] Media download failed: {e}")
@@ -373,12 +435,6 @@ class DiscordHandler:
                     if response.status_code not in [200, 204]:
                         return False
                     chunks_sent = 1
-
-                # Clean up file
-                try:
-                    os.remove(media_path)
-                except:
-                    pass
 
             # Send text content
             for chunk in chunks[chunks_sent:]:
@@ -512,20 +568,56 @@ class Telecord:
                 logger.info(f"[Telecord] Message from {msg.channel_name} by {msg.username} has no destinations")
                 return
             
-            # Download media if needed
+            # Determine if media should be downloaded
+            should_download = False
             if msg.has_media and not is_latest:
-                msg.media_path = await self.telegram.download_media(msg)
+                # Check if media passes restricted mode checks without downloading
+                media_passes_restrictions = self.telegram._is_media_restricted(msg.original_message)
+                
+                # Set flag to download if at least one destination would accept it
+                for dest in destinations:
+                    if not dest.get('restricted_mode', False):  # Unrestricted always accepts
+                        should_download = True
+                        break
+                    elif media_passes_restrictions:  # Restricted but media is allowed type
+                        should_download = True
+                        break
+            
+            # Download media if needed
+            if should_download:
+                msg.media_path = await self.telegram.download_media(msg, restricted_mode=False)
             
             # Send to each destination
             for dest in destinations:
+                # Determine if this destination gets the media
+                include_media = False
+                if msg.media_path:
+                    if not dest.get('restricted_mode', False):
+                        include_media = True  # Unrestricted destinations always get media
+                    elif media_passes_restrictions:
+                        include_media = True  # Restricted destinations get allowed media types
+                
                 content = self.discord.format_message(msg, dest, is_latest)
-                success = self.discord.send_message(content, dest['url'], msg.media_path)
+                
+                if msg.has_media and not include_media and not is_latest:
+                    content += "\n*[Media attachment filtered due to restricted mode]*"
+                
+                # Send with or without media based on this destination's rules
+                media_to_send = msg.media_path if include_media else None
+                success = self.discord.send_message(content, dest['url'], media_to_send)
                 
                 status = "sent" if success else "failed"
                 logger.info(f"[Telecord] Message from {msg.channel_name} by {msg.username} {status} to {dest['name']}")
-            
+        
         except Exception as e:
             logger.error(f"[Telecord] Error processing message from {msg.channel_name} by {msg.username}: {e}")
+        
+        # Clean up media file after all destinations have been processed
+        if msg.media_path and os.path.exists(msg.media_path):
+            try:
+                os.remove(msg.media_path)
+            except:
+                pass
 
 def main():
     """Application entry point."""

@@ -27,7 +27,8 @@ DISCORD_WEBHOOK_CYBER_NEWS=webhook_url_1
 
 # See webhook_config_ex_2.json for an example that:
 # - Routes messages from "@threat_research_news" to the "cyber_news" webhook
-# - Routes messages from "@new_vulnerabilities" to the "cyber_news" webhook (only if they contain "PoC", "0 day", or "CVE") and all messages to the "cyber_news" webhook
+# - Routes messages from "-1001234567890" to the "cyber_news" webhook (only if they contain "PoC", "0 day", or "CVE" and restricts attached media to text types)
+# - Routes messages from "@new_vulnerabilities" to the "cyber_news" webhook
 # - Routes messages from "@tech_news" to the "tech_updates" webhook (only if they contain "technology", "software", "AI", or "machine learning")
 # - Routes messages from "@startup_news" to the "tech_updates" webhook
 # - Routes messages from "@general_news", "@breaking_news", and "@local_news" to the "general_feed" webhook

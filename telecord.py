@@ -4,7 +4,7 @@ import logging
 import requests
 import json
 from telethon import TelegramClient, events, utils
-from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, Channel, User
 from dotenv import load_dotenv
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Set
@@ -171,7 +171,7 @@ class MessageRouter:
         if f"-100{channel_id}" == config_id:
             return True
         
-        # Handle numeric config without -100 prefix
+        # Handle numeric IDs without -100 prefix
         if config_id.isdigit() and channel_id == f"-100{config_id}":
             return True
         
@@ -206,7 +206,7 @@ class TelegramHandler:
         for channel_id in self.config.get_all_channel_ids():
             entity = await self._resolve_channel(channel_id)
             if entity:
-                # Use telethon utils to get the correct peer ID to ensure we get the same ID format as events
+                # Use telethon utils to get the correct peer ID to ensure it's the same ID format that events use
                 entity_id = str(utils.get_peer_id(entity))
                 
                 self.channels[entity_id] = entity
@@ -260,29 +260,38 @@ class TelegramHandler:
         self.msg_callback = callback
         
         # Register handle_message with telethon
-        @self.client.on(events.NewMessage(chats=list(self.channels.values())))
+        channel_ids = list(map(int, self.channels.keys()))
+        
+        @self.client.on(events.NewMessage(chats=channel_ids))
         async def handle_message(event):
             try:
                 channel_id = str(event.chat_id)
                 msg_data = await self._create_message_data(event.message, channel_id)
                 await callback(msg_data, is_latest=False)
             except Exception as e:
-                channel_name = self.config.channel_names.get(channel_id, f"Channel-{channel_id}")
-                logger.error(f"[TelegramHandler] Error handling message from {channel_name}: {e}")
+                channel_name = self.config.channel_names.get(str(event.chat_id), f"Channel-{event.chat_id}")
+                logger.error(f"[TelegramHandler] Error handling message from {channel_name}: {e}", exc_info=True)
         
-        logger.info("[TelegramHandler] Event handlers configured")
+        logger.info(f"[TelegramHandler] Event handlers configured for {len(channel_ids)} channels")
     
     async def _create_message_data(self, message, channel_id: str) -> MessageData:
         """Create MessageData from Telegram message."""
         self._msg_counter += 1
         
-        # Get username
+        # Get username/display name
         username = "Unknown"
         if message.sender:
-            if message.sender.username:
-                username = f"@{message.sender.username}"
-            elif message.sender.first_name:
-                username = message.sender.first_name
+            if isinstance(message.sender, User):
+                if message.sender.username:
+                    username = f"@{message.sender.username}"
+                elif message.sender.first_name:
+                    username = message.sender.first_name
+                    if message.sender.last_name:
+                        username += f" {message.sender.last_name}"
+            elif isinstance(message.sender, Channel):
+                username = f"@{message.sender.username}" if message.sender.username else "Channel"
+            else:
+                username = f"@{getattr(message.sender, 'username', 'Unknown')}"
         
         # Get media type
         media_type = None
@@ -325,10 +334,17 @@ class TelegramHandler:
                 # Extract author info
                 author = "Unknown"
                 if replied_msg.sender:
-                    if replied_msg.sender.username:
-                        author = f"@{replied_msg.sender.username}"
-                    elif replied_msg.sender.first_name:
-                        author = replied_msg.sender.first_name
+                    if isinstance(replied_msg.sender, User):
+                        if replied_msg.sender.username:
+                            author = f"@{replied_msg.sender.username}"
+                        elif replied_msg.sender.first_name:
+                            author = replied_msg.sender.first_name
+                            if replied_msg.sender.last_name:
+                                author += f" {replied_msg.sender.last_name}"
+                    elif isinstance(replied_msg.sender, Channel):
+                        author = f"@{replied_msg.sender.username}" if replied_msg.sender.username else "Channel"
+                    else:
+                        author = f"@{getattr(replied_msg.sender, 'username', 'Unknown')}"
                 
                 # Get media type if present
                 media_type = None
@@ -353,7 +369,7 @@ class TelegramHandler:
                 return context
                 
         except Exception as e:
-            logger.error(f"[TelegramHandler] Error getting reply context: {e}")
+            logger.error(f"[TelegramHandler] Error getting reply context: {e}", exc_info=True)
         
         return None
     
@@ -590,7 +606,7 @@ class Telecord:
                 logger.info(f"[Telecord] Message from {msg.channel_name} by {msg.username} {status} to {dest['name']}")
         
         except Exception as e:
-            logger.error(f"[Telecord] Error processing message from {msg.channel_name} by {msg.username}: {e}")
+            logger.error(f"[Telecord] Error processing message from {msg.channel_name} by {msg.username}: {e}", exc_info=True)
         
         # Clean up media file after all destinations have been processed
         if msg.media_path and os.path.exists(msg.media_path):

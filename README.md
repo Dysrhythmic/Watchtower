@@ -51,3 +51,6 @@ A simple Python app to forward messages from Telegram channels to Discord channe
 - Check the logs for errors if messages are not being forwarded.
 - Verify that your Discord webhook URLs are correct and the webhooks are active.
 - Ensure channel IDs in your JSON config match the actual Telegram channel identifiers.
+
+## Example Output
+<img width="625" height="669" alt="image" src="https://github.com/user-attachments/assets/fe1f2d60-ae6d-4003-8e40-d57523313c0e" />

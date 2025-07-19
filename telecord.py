@@ -513,7 +513,7 @@ class DiscordHandler:
         original_text = reply_context.get('text', '')
         if original_text:
             if len(original_text) > 200:
-                original_text = original_text[:200] + "..."
+                original_text = original_text[:200] + " ..."
             parts.append(f"**  Original message:** {original_text}")
         elif reply_context.get('has_media'):
             parts.append("**  Original message:** [Media only, no caption]")
@@ -588,15 +588,18 @@ class Telecord:
                 # Determine if this destination gets the media
                 include_media = False
                 if msg.media_path:
-                    if not dest.get('restricted_mode', False):
-                        include_media = True  # Unrestricted destinations always get media
-                    elif media_passes_restrictions:
-                        include_media = True  # Restricted destinations get allowed media types
+                    # Unrestricted destinations always get media
+                    # Restricted destinations get allowed media types
+                    if not dest.get('restricted_mode', False) or media_passes_restrictions:
+                        include_media = True  
                 
                 content = self.discord.format_message(msg, dest)
                 
                 if msg.has_media and not include_media:
-                    content += "\n*[Media attachment filtered due to restricted mode]*"
+                    if dest.get('restricted_mode', False):
+                        content += "\n*[Media attachment filtered due to restricted mode]*"
+                    else:
+                        content += f"\n*[Media type {msg.media_type} could not be forwarded to Discord]*"
                 
                 # Send with or without media based on this destination's rules
                 media_to_send = msg.media_path if include_media else None

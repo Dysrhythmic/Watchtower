@@ -221,11 +221,12 @@ class TelegramHandler:
     # Define allowed file types for restricted mode
     ALLOWED_MIME_TYPES = {
         "text/plain", "text/csv", "text/xml", "application/sql",
-        "application/octet-stream", "application/x-sql", "application/x-msaccess"
+        "application/octet-stream", "application/x-sql", "application/x-msaccess",
+        "application/json"
     }
     
     ALLOWED_EXTENSIONS = {
-        '.txt', '.csv', '.log', '.sql', '.xml', '.dat', '.db', '.mdb'
+        '.txt', '.csv', '.log', '.sql', '.xml', '.dat', '.db', '.mdb', '.json'
     }
     
     def __init__(self, config: ConfigManager):

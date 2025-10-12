@@ -13,6 +13,7 @@ A simple Python app to forward messages from Telegram channels to Discord channe
 - Allows multiple webhooks with channel specific routing
 - Keyword filtering per channel per webhook for flexible message routing based on content
 - Routing configuration controlled with a JSON file for easy use
+- Remove indicated number of lines from beginning (use positive numbers) or end (use negative numbers) of messages with the `parser` field in the configuration
 
 ## Requirements
 - Python 3.8+
@@ -43,12 +44,12 @@ A simple Python app to forward messages from Telegram channels to Discord channe
 - The same channel can have different keyword filters for different webhooks
 
 ## Security
-- Keep your `.env` and `telecord_session.session` files private! They contain sensitive credentials.
+- Keep your `.env` and `telecord_session.session` files private.
 
 ## Troubleshooting
 - If you change your Telegram account or channels, delete `telecord_session.session` and restart the bot.
 - Make sure your Telegram account can access all the channels you want to monitor.
-- Check the logs for errors if messages are not being forwarded.
+- Check the CLI logs for errors if messages are not being forwarded.
 - Verify that your Discord webhook URLs are correct and the webhooks are active.
 - Ensure channel IDs in your JSON config match the actual Telegram channel identifiers.
 

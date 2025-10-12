@@ -146,7 +146,8 @@ class MessageRouter:
                     'name': webhook['name'],
                     'url': webhook['url'],
                     'keywords': [],
-                    'restricted_mode': channel_config.get('restricted_mode', False)
+                    'restricted_mode': channel_config.get('restricted_mode', False),
+                    'parser': channel_config.get('parser', 0)
                 })
             elif keywords and msg.text:
                 # Check for keyword matches
@@ -156,10 +157,47 @@ class MessageRouter:
                         'name': webhook['name'],
                         'url': webhook['url'],
                         'keywords': matched,
-                        'restricted_mode': channel_config.get('restricted_mode', False)
+                        'restricted_mode': channel_config.get('restricted_mode', False),
+                        'parser': channel_config.get('parser', 0)
                     })
         
         return destinations
+    
+    def parse_msg(self, msg: MessageData, line_slice: int) -> MessageData:
+        """Applies parsing to a message, currently just handles line removal"""
+        if line_slice == 0 or not msg.text:
+            return msg
+
+        lines = msg.text.split('\n')
+        # remove from start
+        if line_slice > 0:
+            lines = lines[line_slice:]
+        # remove from end
+        else:
+            lines = lines[:line_slice]
+        parsed_text = '\n'.join(lines)
+
+        # Indicate if parsing removed all content
+        if not parsed_text:
+            if line_slice > 0:
+                parsed_text = f"*[Message content removed by parser: first {line_slice} line(s) stripped]*"
+            else:
+                parsed_text = f"*[Message content removed by parser: last {abs(line_slice)} line(s) stripped]*"
+
+        # return new msg object with parsed text and reference to original text
+        return MessageData(
+            msg_id=msg.msg_id,
+            channel_id=msg.channel_id,
+            channel_name=msg.channel_name,
+            username=msg.username,
+            timestamp=msg.timestamp,
+            text=parsed_text,
+            has_media=msg.has_media,
+            media_type=msg.media_type,
+            media_path=msg.media_path,
+            reply_context=msg.reply_context,
+            original_message=msg.original_message
+        )
     
     def _channel_matches(self, channel_id: str, channel_name: str, config_id: str) -> bool:
         """Check if channel matches configuration."""
@@ -585,6 +623,8 @@ class Telecord:
             
             # Send to each destination
             for dest in destinations:
+                # Parse msg for this specific destination
+                parsed_msg = self.router.parse_msg(msg, dest['parser'])
                 # Determine if this destination gets the media
                 include_media = False
                 if msg.media_path:
@@ -593,7 +633,7 @@ class Telecord:
                     if not dest.get('restricted_mode', False) or media_passes_restrictions:
                         include_media = True  
                 
-                content = self.discord.format_message(msg, dest)
+                content = self.discord.format_message(parsed_msg, dest)
                 
                 if msg.has_media and not include_media:
                     if dest.get('restricted_mode', False):

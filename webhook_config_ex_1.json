@@ -5,8 +5,7 @@
         "env_key": "DISCORD_WEBHOOK_CYBER_NEWS",
         "channels": [
           {
-            "id": "@threat_research_news",
-            "restricted_mode": false
+            "id": "@threat_research_news"
           }
         ]
       }

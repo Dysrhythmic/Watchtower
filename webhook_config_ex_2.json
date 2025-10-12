@@ -5,17 +5,17 @@
         "env_key": "DISCORD_WEBHOOK_CYBER_NEWS",
         "channels": [
           {
-            "id": "@threat_research_news",
-            "restricted_mode": false
+            "id": "@threat_research_news"
           },
           {
             "id": "-1001234567890",
             "keywords": ["PoC", "0 day", "CVE"],
-            "restricted_mode": true
+            "restricted_mode": true,
+            "parser": -2
           },
           {
             "id": "@tech_news",
-            "restricted_mode": false
+            "parser": 1
           }
         ]
       },
@@ -25,12 +25,10 @@
         "channels": [
           {
             "id": "@tech_news",
-            "keywords": ["technology", "software", "AI", "machine learning"],
-            "restricted_mode": false
+            "keywords": ["technology", "software", "AI", "machine learning"]
           },
           {
-            "id": "@startup_news",
-            "restricted_mode": false
+            "id": "@startup_news"
           }
         ]
       },
@@ -39,16 +37,13 @@
         "env_key": "DISCORD_WEBHOOK_GENERAL_FEED",
         "channels": [
           {
-            "id": "@general_news",
-            "restricted_mode": false
+            "id": "@general_news"
           },
           {
-            "id": "@breaking_news",
-            "restricted_mode": false
+            "id": "@breaking_news"
           },
           {
-            "id": "@local_news",
-            "restricted_mode": false
+            "id": "@local_news"
           }
         ]
       }

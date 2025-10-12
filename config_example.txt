@@ -8,7 +8,7 @@ TELEGRAM_API_HASH=your_telegram_api_hash_here
 
 # Required: Telegram channels to monitor (comma-separated)
 # Can be channel IDs, usernames, or invite links
-TELEGRAM_CHANNEL_IDS=@tech_news,@general_news,@breaking_news,@startup_news,@local_news
+TELEGRAM_CHANNEL_IDS=@threat_research_news,-1001234567890,@new_vulnerabilities,@tech_news,@startup_news,@general_news
 
 
 # === Discord Webhook Configuration ===
@@ -27,8 +27,8 @@ DISCORD_WEBHOOK_CYBER_NEWS=webhook_url_1
 
 # See webhook_config_ex_2.json for an example that:
 # - Routes messages from "@threat_research_news" to the "cyber_news" webhook
-# - Routes messages from "-1001234567890" to the "cyber_news" webhook (only if they contain "PoC", "0 day", or "CVE" and restricts attached media to text types)
-# - Routes messages from "@new_vulnerabilities" to the "cyber_news" webhook
+# - Routes messages from "-1001234567890" to the "cyber_news" webhook (only if they contain "PoC", "0 day", or "CVE" and restricts attached media to text types and trims the last 2 lines off the messages)
+# - Routes messages from "@new_vulnerabilities" to the "cyber_news" webhook (and trims the first line off the message)
 # - Routes messages from "@tech_news" to the "tech_updates" webhook (only if they contain "technology", "software", "AI", or "machine learning")
 # - Routes messages from "@startup_news" to the "tech_updates" webhook
 # - Routes messages from "@general_news", "@breaking_news", and "@local_news" to the "general_feed" webhook

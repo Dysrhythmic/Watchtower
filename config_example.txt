@@ -1,13 +1,14 @@
-# === Telegram Configuration ===
 # Copy this to a .env file in the same directory as telecord.py
 
-# Required: Telegram API credentials
+
+# === Telegram Configuration ===
+# Telegram API credentials
 # Get these from https://my.telegram.org/apps
 TELEGRAM_API_ID=your_telegram_api_id_here
 TELEGRAM_API_HASH=your_telegram_api_hash_here
 
-# Required: Telegram channels to monitor (comma-separated)
-# Can be channel IDs, usernames, or invite links
+# Telegram channels to monitor (comma-separated)
+# Can be numeric channel IDs or usernames
 TELEGRAM_CHANNEL_IDS=@threat_research_news,-1001234567890,@new_vulnerabilities,@tech_news,@startup_news,@general_news
 
 
@@ -21,6 +22,7 @@ DISCORD_WEBHOOK_CYBER_NEWS=webhook_url_1
 # DISCORD_WEBHOOK_GENERAL_FEED=webhook_url_3
 
 # Add those environment variable names to your JSON configuraiton file
+
 
 # See webhook_config_ex_1.json for an example that:
 # - Routes messages from the "@threat_research_news" Telecord channel to the "cyber_news" webhook

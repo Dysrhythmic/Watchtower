@@ -69,4 +69,6 @@ Destinations:
 - Ensure channel IDs in your JSON config match the actual Telegram channel identifiers.
 
 ## Example Output
-<img width="625" height="669" alt="image" src="https://github.com/user-attachments/assets/fe1f2d60-ae6d-4003-8e40-d57523313c0e" />
+<img width="607" height="187" alt="2025-10-27_18-50" src="https://github.com/user-attachments/assets/f4c80b89-0b92-485b-975e-66687ba33b6e" />
+
+

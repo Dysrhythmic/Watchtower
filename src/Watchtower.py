@@ -111,7 +111,7 @@ class Watchtower:
             try:
                 os.remove(msg.media_path)
             except:
-                pass
+                logger.error(f"[Watchtower] Error remove media at {msg.media_path}")
 
 def main():
     try:

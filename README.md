@@ -47,10 +47,10 @@ Destinations:
 
 5. **Run the bot:**
    ```bash
-   python watchtower.py
+   python3 src/watchtower.py
    ```
    - On first run, you will be prompted to log in to Telegram (phone number and code) to create your Telethon session.
-   - The session will be saved in `watchtower_session.session` for future runs.
+   - The session will be saved in `confg/watchtower_session.session` for future runs.
 
 ## Keyword Filtering
 - Keywords are case-insensitive

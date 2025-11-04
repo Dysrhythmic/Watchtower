@@ -1,24 +1,20 @@
-# Copy this to a .env file in the same directory as telecord.py
-
-
 # === Telegram Configuration ===
 # Telegram API credentials
 # Get these from https://my.telegram.org/apps
 TELEGRAM_API_ID=your_telegram_api_id_here
 TELEGRAM_API_HASH=your_telegram_api_hash_here
 
-# Telegram channels to monitor (comma-separated)
-# Can be numeric channel IDs or usernames
-TELEGRAM_CHANNEL_IDS=@threat_research_news,-1001234567890,@new_vulnerabilities,@tech_news,@startup_news,@general_news
+# Add your Telegram destination channels as environment variables, e.g.:
+TELEGRAM_CHANNEL_GENERAL=-1001234567890
 
 
-# === Discord Webhook Configuration ===
-# Create a json configuration file with routing rules (two examples are provided) and specify it as an environment variable, e.g.:
-CONFIG_FILE=config.json
-
-# Then add your webhook URLs as environment variables, e.g.:
+# === Discord  Configuration ===
+# Add your webhook URLs as environment variables, e.g.:
 DISCORD_WEBHOOK_CYBER_NEWS=webhook_url_1
-# DISCORD_WEBHOOK_TECH_UPDATES=webhook_url_2
-# DISCORD_WEBHOOK_GENERAL_FEED=webhook_url_3
+DISCORD_WEBHOOK_TECH_UPDATES=webhook_url_2
+DISCORD_WEBHOOK_GENERAL_FEED=webhook_url_3
 
-# Add those environment variable names to your JSON configuraiton file
+
+# === General Configuration ===
+CONFIG_FILE=config.json
+# Add the discord webhook and Telegram channel environment variable names to your specified JSON configuration file

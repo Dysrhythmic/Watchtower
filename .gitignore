@@ -1,3 +1,4 @@
 .env
 *.session
-attachments/
+tmp/
+__pycache__

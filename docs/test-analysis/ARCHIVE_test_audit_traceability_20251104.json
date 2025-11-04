@@ -1,0 +1,425 @@
+[
+  {
+    "feature": "Message Routing",
+    "source_refs": [
+      "src/MessageRouter.py:41..95",
+      "src/MessageRouter.py:178..196"
+    ],
+    "tests": [
+      {"file": "tests/test_core.py", "method": "test_match_keywords_case_insensitive", "line": null},
+      {"file": "tests/test_core.py", "method": "test_empty_keywords_forwards_all", "line": null},
+      {"file": "tests/test_core.py", "method": "test_channel_match_numeric_id", "line": null},
+      {"file": "tests/test_core.py", "method": "test_keyword_matching_ocr_text", "line": null},
+      {"file": "tests/test_core.py", "method": "test_no_match_wrong_channel", "line": null},
+      {"file": "tests/test_core.py", "method": "test_multiple_keyword_matches", "line": null},
+      {"file": "tests/test_core.py", "method": "test_rss_source_routing", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_keyword_matching_forwards_correctly", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_same_channel_multiple_destinations", "line": null}
+    ],
+    "metrics_touched": ["messages_no_destination"],
+    "gaps": [
+      "is_channel_restricted() function never tested",
+      "is_ocr_enabled_for_channel() function never tested",
+      "-100 prefix handling for supergroups not tested"
+    ],
+    "risk": "M"
+  },
+  {
+    "feature": "Keyword Filtering",
+    "source_refs": [
+      "src/ConfigManager.py:204..245",
+      "src/ConfigManager.py:247..291"
+    ],
+    "tests": [
+      {"file": "tests/test_core.py", "method": "test_combine_keyword_files_and_inline", "line": null}
+    ],
+    "metrics_touched": [],
+    "gaps": [
+      "None/null keywords → forward all not tested",
+      "Duplicate keyword deduplication not tested",
+      "Missing keyword file error handling not tested",
+      "Invalid JSON in keyword file not tested"
+    ],
+    "risk": "M"
+  },
+  {
+    "feature": "OCR Text Extraction",
+    "source_refs": [
+      "src/OCRHandler.py:17..55"
+    ],
+    "tests": [
+      {"file": "tests/test_handlers.py", "method": "test_is_available_false_when_no_easyocr", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_extract_text_success", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_extract_text_empty_result", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_extract_text_when_unavailable", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_extract_text_handles_error", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_reader_initialization_once", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_media_with_ocr_extraction", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_ocr_sent_metric_tracked", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_ocr_sent_not_tracked_without_ocr", "line": null}
+    ],
+    "metrics_touched": ["ocr_processed", "ocr_sent"],
+    "gaps": [
+      "Integration with message pipeline not tested (is_ocr_enabled_for_channel trigger logic)",
+      "Media download → OCR → keyword matching flow not tested"
+    ],
+    "risk": "M"
+  },
+  {
+    "feature": "RSS Feed Polling",
+    "source_refs": [
+      "src/RSSHandler.py:17..189"
+    ],
+    "tests": [
+      {"file": "tests/test_handlers.py", "method": "test_strip_html_tags", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_strip_html_entities", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_format_entry_truncate_summary", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_strip_html_nested_tags", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_strip_html_preserves_newlines", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_format_entry_no_summary", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_format_entry_with_html_in_title", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_format_entry_special_characters", "line": null}
+    ],
+    "metrics_touched": ["messages_received_rss"],
+    "gaps": [
+      "run_feed() polling loop COMPLETELY UNTESTED (CRITICAL)",
+      "_process_entry() entry processing COMPLETELY UNTESTED (CRITICAL)",
+      "_read_last_ts() / _write_last_ts() persistence COMPLETELY UNTESTED",
+      "MAX_ENTRY_AGE_DAYS filtering not tested",
+      "Parse error (bozo) handling not tested",
+      "First run initialization not tested"
+    ],
+    "risk": "H"
+  },
+  {
+    "feature": "Parser Rules (Line Trimming)",
+    "source_refs": [
+      "src/MessageRouter.py:97..161"
+    ],
+    "tests": [
+      {"file": "tests/test_core.py", "method": "test_parser_trim_front_lines", "line": null},
+      {"file": "tests/test_core.py", "method": "test_parser_trim_back_lines", "line": null},
+      {"file": "tests/test_core.py", "method": "test_parser_both_trim_directions", "line": null},
+      {"file": "tests/test_core.py", "method": "test_parser_no_trimming", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_parser_trims_lines", "line": null}
+    ],
+    "metrics_touched": [],
+    "gaps": [
+      "Negative values → warning not tested",
+      "All lines removed → placeholder not tested",
+      "Invalid config type → warning not tested"
+    ],
+    "risk": "L"
+  },
+  {
+    "feature": "Restricted Mode (Media Filtering)",
+    "source_refs": [
+      "src/TelegramHandler.py:209..248"
+    ],
+    "tests": [
+      {"file": "tests/test_handlers.py", "method": "test_restricted_mode_blocks_photo", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_no_media_is_allowed", "line": null}
+    ],
+    "metrics_touched": [],
+    "gaps": [
+      "Document with extension + MIME match → allowed NOT TESTED (SECURITY)",
+      "Document with extension but wrong MIME → blocked NOT TESTED (SECURITY)",
+      "Document with MIME but wrong extension → blocked NOT TESTED (SECURITY)",
+      "Document without filename → blocked NOT TESTED",
+      "Document without MIME type → blocked NOT TESTED"
+    ],
+    "risk": "H"
+  },
+  {
+    "feature": "Rate Limiting",
+    "source_refs": [
+      "src/DestinationHandler.py:32..66",
+      "src/DiscordHandler.py:81..90",
+      "src/TelegramHandler.py:396..399"
+    ],
+    "tests": [
+      {"file": "tests/test_handlers.py", "method": "test_rate_limit_ceiling_rounding", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_rate_limit_multiple_destinations", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_rate_limit_expiry_check", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_handle_429_response", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_discord_429_enqueue", "line": null}
+    ],
+    "metrics_touched": [],
+    "gaps": [
+      "Discord 429 parse failure → 1.0s fallback not tested",
+      "Telegram FloodWaitError handling NOT TESTED (CRITICAL)"
+    ],
+    "risk": "M"
+  },
+  {
+    "feature": "Message Chunking",
+    "source_refs": [
+      "src/DestinationHandler.py:68..95",
+      "src/DiscordHandler.py:18",
+      "src/TelegramHandler.py:21..22",
+      "src/TelegramHandler.py:371..384"
+    ],
+    "tests": [
+      {"file": "tests/test_handlers.py", "method": "test_chunk_text_under_limit", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_chunk_text_over_limit", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_chunk_text_exact_limit", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_chunk_text_preserves_newlines", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_chunk_text_empty_string", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_chunk_text_single_long_line", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_chunked_message_sends_multiple", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_no_content_loss_with_long_caption_and_media", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_chunking_respects_message_boundaries", "line": null}
+    ],
+    "metrics_touched": [],
+    "gaps": [
+      "Telegram caption > 1024 → captionless media + text chunks NOT TESTED (CRITICAL - CONTENT LOSS RISK)",
+      "Chunking with media (first chunk has media, rest text-only) not tested",
+      "Discord media + chunked text not tested"
+    ],
+    "risk": "H"
+  },
+  {
+    "feature": "Retry Queue",
+    "source_refs": [
+      "src/MessageQueue.py:25..150"
+    ],
+    "tests": [
+      {"file": "tests/test_core.py", "method": "test_enqueue_sets_5s_backoff", "line": null},
+      {"file": "tests/test_core.py", "method": "test_exponential_backoff", "line": null},
+      {"file": "tests/test_core.py", "method": "test_queue_size_tracking", "line": null},
+      {"file": "tests/test_core.py", "method": "test_clear_queue", "line": null},
+      {"file": "tests/test_core.py", "method": "test_enqueue_with_media_path", "line": null},
+      {"file": "tests/test_core.py", "method": "test_enqueue_multiple_items", "line": null},
+      {"file": "tests/test_core.py", "method": "test_max_retries_constant", "line": null},
+      {"file": "tests/test_core.py", "method": "test_initial_backoff_constant", "line": null},
+      {"file": "tests/test_core.py", "method": "test_retry_item_defaults", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_queue_backoff_progression", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_queue_drop_after_max_retries", "line": null}
+    ],
+    "metrics_touched": ["messages_queued_retry"],
+    "gaps": [
+      "process_queue() async background task COMPLETELY UNTESTED (CRITICAL)",
+      "_retry_send() Discord path COMPLETELY UNTESTED (CRITICAL)",
+      "_retry_send() Telegram path COMPLETELY UNTESTED (CRITICAL)",
+      "Max retries → drop message not tested in integration",
+      "Success → remove from queue not tested in integration"
+    ],
+    "risk": "H"
+  },
+  {
+    "feature": "Metrics Collection",
+    "source_refs": [
+      "src/MetricsCollector.py:13..106",
+      "src/Watchtower.py:145",
+      "src/Watchtower.py:183",
+      "src/Watchtower.py:190",
+      "src/Watchtower.py:202",
+      "src/Watchtower.py:204",
+      "src/Watchtower.py:241",
+      "src/Watchtower.py:348",
+      "src/Watchtower.py:350",
+      "src/Watchtower.py:360",
+      "src/Watchtower.py:389",
+      "src/Watchtower.py:391",
+      "src/Watchtower.py:401"
+    ],
+    "tests": [
+      {"file": "tests/test_core.py", "method": "test_increment_metric", "line": null},
+      {"file": "tests/test_core.py", "method": "test_increment_by_value", "line": null},
+      {"file": "tests/test_core.py", "method": "test_get_all_metrics", "line": null},
+      {"file": "tests/test_core.py", "method": "test_save_and_load_json", "line": null},
+      {"file": "tests/test_core.py", "method": "test_reset_all_metrics", "line": null},
+      {"file": "tests/test_core.py", "method": "test_get_nonexistent_metric", "line": null},
+      {"file": "tests/test_core.py", "method": "test_increment_creates_metric", "line": null},
+      {"file": "tests/test_core.py", "method": "test_persistence_after_reset", "line": null},
+      {"file": "tests/test_core.py", "method": "test_increment_large_value", "line": null},
+      {"file": "tests/test_core.py", "method": "test_multiple_increments_same_metric", "line": null},
+      {"file": "tests/test_core.py", "method": "test_concurrent_metrics", "line": null},
+      {"file": "tests/test_core.py", "method": "test_set_metric", "line": null},
+      {"file": "tests/test_core.py", "method": "test_set_vs_increment", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_metrics_increment_on_operations", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_ocr_sent_metric_tracked", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_ocr_sent_not_tracked_without_ocr", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_time_ran_metric_per_session", "line": null}
+    ],
+    "metrics_touched": [
+      "messages_received_telegram",
+      "messages_received_rss",
+      "messages_no_destination",
+      "messages_routed_success",
+      "messages_routed_failed",
+      "messages_sent_discord",
+      "messages_sent_telegram",
+      "messages_queued_retry",
+      "ocr_processed",
+      "ocr_sent",
+      "time_ran"
+    ],
+    "gaps": [
+      "reset_metric(metric_name) method not tested",
+      "Most metrics only tested in unit tests, not in integration (except ocr_sent, time_ran)"
+    ],
+    "risk": "L"
+  },
+  {
+    "feature": "Configuration Loading",
+    "source_refs": [
+      "src/ConfigManager.py:21..302"
+    ],
+    "tests": [
+      {"file": "tests/test_core.py", "method": "test_load_config_destinations_key", "line": null},
+      {"file": "tests/test_core.py", "method": "test_combine_keyword_files_and_inline", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_malformed_config_handling", "line": null}
+    ],
+    "metrics_touched": [],
+    "gaps": [
+      "RSS deduplication (lines 75-76, 189-193) NOT TESTED",
+      "Missing API credentials → ValueError NOT TESTED",
+      "Config file not found → ValueError NOT TESTED",
+      "Invalid JSON handling NOT TESTED",
+      "Missing env_key → skip destination NOT TESTED",
+      "No valid destinations → ValueError NOT TESTED",
+      "Multiple destinations NOT TESTED"
+    ],
+    "risk": "M"
+  },
+  {
+    "feature": "Media Handling",
+    "source_refs": [
+      "src/TelegramHandler.py:250..258",
+      "src/Watchtower.py:87..101",
+      "src/Watchtower.py:213..219",
+      "src/Watchtower.py:253..286"
+    ],
+    "tests": [],
+    "metrics_touched": [],
+    "gaps": [
+      "download_media() COMPLETELY UNTESTED (CRITICAL)",
+      "Media download failures NOT TESTED",
+      "Cleanup after message processing NOT TESTED",
+      "Startup cleanup of leftover files NOT TESTED",
+      "Media already downloaded → reuse logic NOT TESTED",
+      "Media restriction decision logic NOT TESTED"
+    ],
+    "risk": "H"
+  },
+  {
+    "feature": "Reply Context Extraction",
+    "source_refs": [
+      "src/TelegramHandler.py:182..207",
+      "src/DiscordHandler.py:123..140",
+      "src/TelegramHandler.py:448..469"
+    ],
+    "tests": [],
+    "metrics_touched": [],
+    "gaps": [
+      "_get_reply_context() COMPLETELY UNTESTED (CRITICAL)",
+      "Reply fetch success NOT TESTED",
+      "Reply fetch failure → None NOT TESTED",
+      "Text > 200 chars → truncation NOT TESTED",
+      "Media only → placeholder NOT TESTED",
+      "Reply context formatting in Discord NOT TESTED",
+      "Reply context formatting in Telegram NOT TESTED"
+    ],
+    "risk": "M"
+  },
+  {
+    "feature": "URL Defanging",
+    "source_refs": [
+      "src/TelegramHandler.py:261..301",
+      "src/Watchtower.py:243..251"
+    ],
+    "tests": [
+      {"file": "tests/test_handlers.py", "method": "test_defang_url", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_build_message_url_public", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_build_message_url_private", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_defang_multiple_protocols", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_build_message_url_numeric_public", "line": null}
+    ],
+    "metrics_touched": [],
+    "gaps": [
+      "Defanged URL display in messages NOT TESTED (lines DiscordHandler:100-102, TelegramHandler:422-424)"
+    ],
+    "risk": "L"
+  },
+  {
+    "feature": "Message Formatting",
+    "source_refs": [
+      "src/DiscordHandler.py:92..141",
+      "src/TelegramHandler.py:405..469"
+    ],
+    "tests": [
+      {"file": "tests/test_handlers.py", "method": "test_format_message_markdown", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_format_message_with_keywords", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_format_message_html", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_format_message_includes_all_fields", "line": null},
+      {"file": "tests/test_handlers.py", "method": "test_format_message_escapes_html", "line": null}
+    ],
+    "metrics_touched": [],
+    "gaps": [
+      "Reply context formatting NOT TESTED (Discord:123-140, Telegram:448-469)",
+      "OCR text formatting NOT TESTED (Discord:116-119, Telegram:439-443)",
+      "Defanged URL display NOT TESTED (Discord:100-102, Telegram:422-424)",
+      "Media type display NOT TESTED (Discord:104-105, Telegram:426-427)"
+    ],
+    "risk": "L"
+  },
+  {
+    "feature": "Multiple Destinations",
+    "source_refs": [
+      "src/MessageRouter.py:41..95",
+      "src/Watchtower.py:196..206"
+    ],
+    "tests": [
+      {"file": "tests/test_integration.py", "method": "test_same_channel_multiple_destinations", "line": null},
+      {"file": "tests/test_integration.py", "method": "test_multiple_channels_same_destination", "line": null}
+    ],
+    "metrics_touched": ["messages_routed_success", "messages_routed_failed"],
+    "gaps": [
+      "One destination fails → others still attempted NOT TESTED",
+      "Media downloaded once, used by all destinations NOT TESTED"
+    ],
+    "risk": "M"
+  },
+  {
+    "feature": "Message Pipeline",
+    "source_refs": [
+      "src/Watchtower.py:165..220"
+    ],
+    "tests": [
+      {"file": "tests/test_integration.py", "method": "test_full_pipeline_text_only", "line": null}
+    ],
+    "metrics_touched": [
+      "messages_received_telegram",
+      "messages_received_rss",
+      "messages_no_destination",
+      "messages_routed_success",
+      "messages_routed_failed"
+    ],
+    "gaps": [
+      "_handle_message() async flow COMPLETELY UNTESTED (CRITICAL)",
+      "_preprocess_message() OCR + defanging COMPLETELY UNTESTED",
+      "_handle_media_restrictions() logic COMPLETELY UNTESTED",
+      "_dispatch_to_destination() COMPLETELY UNTESTED",
+      "_send_to_discord() COMPLETELY UNTESTED",
+      "_send_to_telegram() COMPLETELY UNTESTED",
+      "is_latest=True → skip logic NOT TESTED",
+      "No destinations → log and return NOT TESTED",
+      "Error → cleanup still runs NOT TESTED"
+    ],
+    "risk": "H"
+  },
+  {
+    "feature": "Channel Discovery",
+    "source_refs": [
+      "src/Watchtower.py:585..687"
+    ],
+    "tests": [],
+    "metrics_touched": [],
+    "gaps": [
+      "discover_channels() COMPLETELY UNTESTED (CLI command)",
+      "All modes (list, diff, generate) NOT TESTED"
+    ],
+    "risk": "L"
+  }
+]

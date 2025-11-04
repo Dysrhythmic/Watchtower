@@ -1,0 +1,344 @@
+{
+  "overall": {
+    "total_source_files": 11,
+    "total_source_loc": 2514,
+    "total_test_files": 3,
+    "total_test_methods": 82,
+    "estimated_coverage_percent": 55,
+    "confidence_level": "Medium (65%)",
+    "date_analyzed": "2025-11-04"
+  },
+  "by_module": {
+    "MessageData": {
+      "file": "src/MessageData.py",
+      "loc": 38,
+      "coverage_percent": 100,
+      "test_count": 6,
+      "risk_level": "Low",
+      "critical_gaps": []
+    },
+    "MetricsCollector": {
+      "file": "src/MetricsCollector.py",
+      "loc": 106,
+      "coverage_percent": 95,
+      "test_count": 13,
+      "risk_level": "Low",
+      "critical_gaps": [
+        "reset_metric(metric_name) method not tested"
+      ]
+    },
+    "OCRHandler": {
+      "file": "src/OCRHandler.py",
+      "loc": 55,
+      "coverage_percent": 95,
+      "test_count": 6,
+      "risk_level": "Low",
+      "critical_gaps": [
+        "Integration with message pipeline trigger logic (is_ocr_enabled_for_channel)"
+      ]
+    },
+    "DestinationHandler": {
+      "file": "src/DestinationHandler.py",
+      "loc": 123,
+      "coverage_percent": 90,
+      "test_count": 9,
+      "risk_level": "Low",
+      "critical_gaps": []
+    },
+    "MessageRouter": {
+      "file": "src/MessageRouter.py",
+      "loc": 197,
+      "coverage_percent": 85,
+      "test_count": 11,
+      "risk_level": "Medium",
+      "critical_gaps": [
+        "is_channel_restricted() never tested",
+        "is_ocr_enabled_for_channel() never tested"
+      ]
+    },
+    "DiscordHandler": {
+      "file": "src/DiscordHandler.py",
+      "loc": 141,
+      "coverage_percent": 75,
+      "test_count": 10,
+      "risk_level": "Medium",
+      "critical_gaps": [
+        "Reply context formatting not tested",
+        "OCR text formatting not tested",
+        "Defanged URL display not tested"
+      ]
+    },
+    "MessageQueue": {
+      "file": "src/MessageQueue.py",
+      "loc": 150,
+      "coverage_percent": 60,
+      "test_count": 9,
+      "risk_level": "High",
+      "critical_gaps": [
+        "process_queue() async background task COMPLETELY UNTESTED",
+        "_retry_send() Discord path COMPLETELY UNTESTED",
+        "_retry_send() Telegram path COMPLETELY UNTESTED"
+      ]
+    },
+    "TelegramHandler": {
+      "file": "src/TelegramHandler.py",
+      "loc": 474,
+      "coverage_percent": 40,
+      "test_count": 14,
+      "risk_level": "Critical",
+      "critical_gaps": [
+        "send_copy() main send path COMPLETELY UNTESTED",
+        "Caption > 1024 handling COMPLETELY UNTESTED (content loss risk)",
+        "FloodWaitError handling COMPLETELY UNTESTED",
+        "download_media() COMPLETELY UNTESTED",
+        "_get_reply_context() COMPLETELY UNTESTED",
+        "Restricted mode document validation INCOMPLETE"
+      ]
+    },
+    "ConfigManager": {
+      "file": "src/ConfigManager.py",
+      "loc": 302,
+      "coverage_percent": 30,
+      "test_count": 2,
+      "risk_level": "Medium",
+      "critical_gaps": [
+        "RSS deduplication not tested",
+        "Invalid JSON handling not tested",
+        "Missing env vars handling not tested",
+        "Error paths not tested"
+      ]
+    },
+    "RSSHandler": {
+      "file": "src/RSSHandler.py",
+      "loc": 189,
+      "coverage_percent": 30,
+      "test_count": 8,
+      "risk_level": "Critical",
+      "critical_gaps": [
+        "run_feed() polling loop COMPLETELY UNTESTED",
+        "_process_entry() COMPLETELY UNTESTED",
+        "Timestamp persistence (_read_last_ts, _write_last_ts) COMPLETELY UNTESTED",
+        "MAX_ENTRY_AGE_DAYS filtering not tested",
+        "Parse error handling not tested"
+      ]
+    },
+    "Watchtower": {
+      "file": "src/Watchtower.py",
+      "loc": 739,
+      "coverage_percent": 20,
+      "test_count": 2,
+      "risk_level": "Critical",
+      "critical_gaps": [
+        "_handle_message() COMPLETELY UNTESTED",
+        "_preprocess_message() COMPLETELY UNTESTED",
+        "_handle_media_restrictions() COMPLETELY UNTESTED",
+        "_dispatch_to_destination() COMPLETELY UNTESTED",
+        "_send_to_discord() COMPLETELY UNTESTED",
+        "_send_to_telegram() COMPLETELY UNTESTED",
+        "start() COMPLETELY UNTESTED",
+        "shutdown() COMPLETELY UNTESTED",
+        "Entire async message pipeline COMPLETELY UNTESTED"
+      ]
+    }
+  },
+  "by_risk_level": {
+    "critical": {
+      "modules": ["Watchtower", "RSSHandler", "TelegramHandler"],
+      "total_loc": 1402,
+      "avg_coverage_percent": 30,
+      "priority": 1,
+      "impact": "Application failure, message loss, content loss"
+    },
+    "high": {
+      "modules": ["MessageQueue"],
+      "total_loc": 150,
+      "avg_coverage_percent": 60,
+      "priority": 1,
+      "impact": "Failed messages lost, retry queue broken"
+    },
+    "medium": {
+      "modules": ["MessageRouter", "DiscordHandler", "ConfigManager"],
+      "total_loc": 640,
+      "avg_coverage_percent": 63,
+      "priority": 2,
+      "impact": "Missing features, configuration errors"
+    },
+    "low": {
+      "modules": ["MessageData", "MetricsCollector", "OCRHandler", "DestinationHandler"],
+      "total_loc": 322,
+      "avg_coverage_percent": 95,
+      "priority": 3,
+      "impact": "Minor edge cases, observability gaps"
+    }
+  },
+  "test_distribution": {
+    "test_core.py": {
+      "test_count": 43,
+      "coverage_areas": [
+        "ConfigManager (2 tests)",
+        "MessageRouter (11 tests)",
+        "MessageData (6 tests)",
+        "MessageQueue (9 tests)",
+        "MetricsCollector (13 tests)",
+        "Watchtower (2 tests)"
+      ]
+    },
+    "test_handlers.py": {
+      "test_count": 26,
+      "coverage_areas": [
+        "DestinationHandler (9 tests)",
+        "DiscordHandler (10 tests)",
+        "TelegramHandler (14 tests - but only formatting, not send operations)",
+        "OCRHandler (6 tests)",
+        "RSSHandler (8 tests - but only formatting, not polling)"
+      ]
+    },
+    "test_integration.py": {
+      "test_count": 13,
+      "coverage_areas": [
+        "Basic Telegram → Discord flow (1 test)",
+        "Discord 429 handling (1 test)",
+        "Metrics tracking (4 tests)",
+        "Keyword matching (1 test)",
+        "Multiple destinations (2 tests)",
+        "Parser integration (1 test)",
+        "Error handling (2 tests)",
+        "Chunking validation (2 tests)"
+      ]
+    }
+  },
+  "untested_critical_paths": [
+    {
+      "path": "Async Message Pipeline",
+      "module": "Watchtower",
+      "functions": [
+        "_handle_message()",
+        "_preprocess_message()",
+        "_handle_media_restrictions()",
+        "_dispatch_to_destination()",
+        "_send_to_discord()",
+        "_send_to_telegram()"
+      ],
+      "risk": "CRITICAL",
+      "impact": "Complete message routing failure"
+    },
+    {
+      "path": "RSS Feed Polling",
+      "module": "RSSHandler",
+      "functions": [
+        "run_feed()",
+        "_process_entry()",
+        "_read_last_ts()",
+        "_write_last_ts()"
+      ],
+      "risk": "CRITICAL",
+      "impact": "RSS feeds fail silently or flood messages"
+    },
+    {
+      "path": "Retry Queue Processing",
+      "module": "MessageQueue",
+      "functions": [
+        "process_queue()",
+        "_retry_send()"
+      ],
+      "risk": "CRITICAL",
+      "impact": "Failed messages lost forever"
+    },
+    {
+      "path": "Telegram Send Operations",
+      "module": "TelegramHandler",
+      "functions": [
+        "send_copy()"
+      ],
+      "risk": "CRITICAL",
+      "impact": "Content loss on caption overflow, messages truncated"
+    },
+    {
+      "path": "Media Download",
+      "module": "TelegramHandler",
+      "functions": [
+        "download_media()"
+      ],
+      "risk": "HIGH",
+      "impact": "OCR fails, media forwarding broken"
+    },
+    {
+      "path": "Reply Context Extraction",
+      "module": "TelegramHandler",
+      "functions": [
+        "_get_reply_context()"
+      ],
+      "risk": "MEDIUM",
+      "impact": "Missing reply context information"
+    },
+    {
+      "path": "Restricted Mode Document Validation",
+      "module": "TelegramHandler",
+      "functions": [
+        "_is_media_restricted() - document validation"
+      ],
+      "risk": "HIGH (Security)",
+      "impact": "Security bypass - malicious media allowed"
+    }
+  ],
+  "recommended_new_tests": {
+    "priority_1_critical": {
+      "count": 40,
+      "effort_weeks": "2-3",
+      "areas": [
+        "Async message pipeline integration (15 tests)",
+        "RSS feed polling (10 tests)",
+        "Retry queue processing (8 tests)",
+        "Telegram send operations (8 tests)",
+        "Media download (6 tests)"
+      ]
+    },
+    "priority_2_security": {
+      "count": 23,
+      "effort_weeks": "1-2",
+      "areas": [
+        "Restricted mode complete validation (5 tests)",
+        "Configuration loading edge cases (6 tests)",
+        "Error handling paths (12 tests)"
+      ]
+    },
+    "priority_3_completeness": {
+      "count": 12,
+      "effort_weeks": "1",
+      "areas": [
+        "Integration tests (6 tests)",
+        "Reply context and formatting (6 tests)"
+      ]
+    }
+  },
+  "mutation_testing": {
+    "status": "Not configured",
+    "recommendation": "Install mutmut and run on critical modules after adding Priority 1 tests",
+    "expected_mutation_score": "75-80% (after test additions)"
+  },
+  "roadmap_to_90_percent": {
+    "phase_1": {
+      "name": "Critical Paths",
+      "duration_weeks": "2-3",
+      "new_tests": 40,
+      "expected_coverage_after": "75%"
+    },
+    "phase_2": {
+      "name": "Security and Error Handling",
+      "duration_weeks": "1-2",
+      "new_tests": 23,
+      "expected_coverage_after": "82%"
+    },
+    "phase_3": {
+      "name": "Completeness",
+      "duration_weeks": "1",
+      "new_tests": 12,
+      "expected_coverage_after": "90%"
+    },
+    "total": {
+      "duration_weeks": "4-6",
+      "new_tests": 75,
+      "final_coverage": "90%"
+    }
+  }
+}

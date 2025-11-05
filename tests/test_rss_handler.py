@@ -407,7 +407,35 @@ class TestRSSHandlerHTMLStripping(unittest.TestCase):
 
         result = self.handler._strip_html_tags(html_text)
 
-        self.assertEqual(result, "Test <tag> & \"quotes\"  ")
+        # &nbsp; decodes to \xa0 (non-breaking space Unicode character)
+        self.assertEqual(result, "Test <tag> & \"quotes\" \xa0")
+
+    def test_strip_html_numeric_entities(self):
+        """
+        Given: Text with numeric HTML entities from RSS feeds
+        When: _strip_html_tags() called
+        Then: All numeric entities decoded to Unicode characters
+
+        Tests: Bug #1 - Numeric entity decoding
+        Reproduces: [&#8230;] &#8211; &#8217; &#8220; &#8221;
+
+        This test should FAIL before fix and PASS after fix.
+        """
+        html_text = "Test [&#8230;] and &#8211; also &#8217;quote&#8217; &#8220;double&#8221;"
+
+        result = self.handler._strip_html_tags(html_text)
+
+        # Should decode all numeric entities
+        # Note: &#8217; decodes to RIGHT SINGLE QUOTATION MARK (U+2019)
+        # &#8220; and &#8221; decode to LEFT/RIGHT DOUBLE QUOTATION MARKS (U+201C, U+201D)
+        expected = "Test […] and – also \u2019quote\u2019 \u201cdouble\u201d"
+        self.assertEqual(result, expected)
+        # Should NOT contain raw entity codes
+        self.assertNotIn('&#8230;', result)
+        self.assertNotIn('&#8211;', result)
+        self.assertNotIn('&#8217;', result)
+        self.assertNotIn('&#8220;', result)
+        self.assertNotIn('&#8221;', result)
 
     def test_format_entry_text_truncates_long_summary(self):
         """

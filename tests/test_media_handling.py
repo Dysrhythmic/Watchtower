@@ -8,7 +8,7 @@ Tests cover:
 """
 
 import unittest
-from unittest.mock import patch, Mock, AsyncMock, MagicMock, call
+from unittest.mock import patch, Mock, AsyncMock, call
 from pathlib import Path
 import asyncio
 import os

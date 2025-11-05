@@ -2,8 +2,7 @@ import unittest
 import sys
 import os
 import json
-import tempfile
-from unittest.mock import Mock, patch, mock_open, MagicMock
+from unittest.mock import patch, mock_open
 from pathlib import Path
 
 # Add src to path

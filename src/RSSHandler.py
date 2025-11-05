@@ -2,6 +2,7 @@ import logging
 import time
 import asyncio
 import re
+import html
 import feedparser
 from datetime import datetime, timezone
 from typing import Callable, Dict, Any, Optional
@@ -33,9 +34,25 @@ class RSSHandler:
         self._running = False
 
     def _log_path(self, rss_name: str):
+        """Get the path to the RSS feed's timestamp log file.
+
+        Args:
+            rss_name: Name of the RSS feed.
+
+        Returns:
+            Path: Path object for the RSS feed's log file.
+        """
         return self.config.rsslog_dir / f"{rss_name}.txt"
 
     def _read_last_ts(self, rss_name: str) -> Optional[float]:
+        """Read the last processed timestamp for an RSS feed.
+
+        Args:
+            rss_name: Name of the RSS feed.
+
+        Returns:
+            Optional[float]: Unix timestamp of last processed entry, or None if new feed.
+        """
         log_file_path = self._log_path(rss_name)
         if not log_file_path.exists():
             # Create with current time and emit nothing on first run
@@ -53,6 +70,15 @@ class RSSHandler:
             return None
 
     def _write_last_ts(self, rss_name: str, timestamp: float):
+        """Write the last processed timestamp for an RSS feed.
+
+        Args:
+            rss_name: Name of the RSS feed.
+            timestamp: Unix timestamp to save.
+
+        Returns:
+            None
+        """
         log_file_path = self._log_path(rss_name)
         dt = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
         log_file_path.write_text(dt, encoding='utf-8')
@@ -75,9 +101,8 @@ class RSSHandler:
         """
         # Remove HTML tags
         text = re.sub(r'<[^>]+>', '', text)
-        # Decode common HTML entities
-        text = text.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
-        text = text.replace('&quot;', '"').replace('&#39;', "'").replace('&nbsp;', ' ')
+        # Decode ALL HTML entities (named and numeric like &#8230;, &#8211;, etc.)
+        text = html.unescape(text)
         return text
 
     def _format_entry_text(self, entry) -> str:

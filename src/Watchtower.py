@@ -77,6 +77,7 @@ class Watchtower:
         self.sources = sources
         self.rss = None  # created only if RSS is enabled
         self._shutdown_requested = False
+        self._shutdown_complete = False  # Prevent duplicate shutdown
         self._start_time = None  # Track application runtime
 
         # Clean up any leftover media files from previous runs
@@ -101,7 +102,14 @@ class Watchtower:
                 logger.info(f"[Watchtower] Cleaned up {len(files)} leftover media files from attachments directory")
 
     async def start(self) -> None:
-        """Start the service."""
+        """Start the Watchtower service.
+
+        Initializes all configured sources (Telegram, RSS) and their handlers,
+        starts the message queue processor for retries, and keeps the service running.
+
+        Returns:
+            None
+        """
         import time
         self._start_time = time.time()
         tasks = []
@@ -134,7 +142,18 @@ class Watchtower:
                 await self.shutdown()
 
     async def shutdown(self):
-        """Gracefully shutdown the application."""
+        """Gracefully shutdown the application.
+
+        Stops all sources (Telegram, RSS), disconnects clients, saves metrics,
+        and ensures idempotent shutdown (safe to call multiple times).
+
+        Returns:
+            None
+        """
+        # Idempotency guard: prevent duplicate shutdown
+        if self._shutdown_complete:
+            return
+
         import time
         logger.info("[Watchtower] Initiating graceful shutdown...")
         self._shutdown_requested = True
@@ -161,6 +180,7 @@ class Watchtower:
             logger.info("[Watchtower] Telegram client disconnected")
 
         logger.info("[Watchtower] Shutdown complete")
+        self._shutdown_complete = True
 
     async def _handle_message(self, message_data: 'MessageData', is_latest: bool) -> bool:
         """Process incoming message from any source (Telegram, RSS).
@@ -268,7 +288,8 @@ class Watchtower:
 
         media_passes_restrictions = True
         if any_destination_has_restricted_mode and message_data.source_type == "telegram" and message_data.has_media and message_data.original_message:
-            media_passes_restrictions = self.telegram._is_media_restricted(message_data.original_message)
+            # _is_media_restricted returns True if media IS restricted, so invert for "passes" check
+            media_passes_restrictions = not self.telegram._is_media_restricted(message_data.original_message)
 
         if message_data.source_type == "telegram" and message_data.has_media and not message_data.media_path:
             should_download_media = False

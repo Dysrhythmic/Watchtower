@@ -1,14 +1,17 @@
 import unittest
 import sys
 import os
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from datetime import datetime, timezone
+from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from MessageRouter import MessageRouter
 from MessageData import MessageData
+from TelegramHandler import TelegramHandler
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 
 
 class TestMessageRouter(unittest.TestCase):
@@ -346,6 +349,196 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
 
         # Should return False
         self.assertFalse(result)
+
+
+class TestParserPlaceholder(unittest.TestCase):
+    """
+    Tests for parser placeholder behavior.
+
+    These tests cover Bug #3: RSS parser posting original + stripped message.
+    """
+
+    def setUp(self):
+        """Create MessageRouter with mocked config."""
+        self.mock_config = Mock()
+        self.router = MessageRouter(self.mock_config)
+
+    def test_parser_strips_all_content_shows_placeholder(self):
+        """
+        Given: Message with 2 lines and parser that strips both lines
+        When: parse_msg() called
+        Then: Returns placeholder message (not original content)
+
+        Tests: Bug #3 - Parser placeholder behavior
+        Reproduces: Both original and stripped message posted separately
+
+        This test verifies only the placeholder is returned when all content is stripped.
+        """
+        msg = MessageData(
+            source_type="rss",
+            channel_id="https://example.com/feed",
+            channel_name="RSS Feed",
+            username="RSS",
+            timestamp=datetime.now(timezone.utc),
+            text="Line 1\nLine 2"
+        )
+
+        # Parser that strips all content (both lines)
+        parser_config = {
+            'trim_front_lines': 1,
+            'trim_back_lines': 1
+        }
+
+        parsed = self.router.parse_msg(msg, parser_config)
+
+        # Should return placeholder message
+        self.assertIn("[Message content removed by parser:", parsed.text)
+        self.assertIn("first 1", parsed.text)
+        self.assertIn("last 1", parsed.text)
+
+        # Should NOT contain original content
+        self.assertNotIn("Line 1", parsed.text)
+        self.assertNotIn("Line 2", parsed.text)
+
+    def test_parser_strips_single_line_shows_placeholder(self):
+        """
+        Given: Message with single line and parser that strips it
+        When: parse_msg() called
+        Then: Returns placeholder message
+
+        Tests: Bug #3 - Parser placeholder for single-line messages
+        """
+        msg = MessageData(
+            source_type="telegram",
+            channel_id="@test",
+            channel_name="Test",
+            username="@user",
+            timestamp=datetime.now(timezone.utc),
+            text="Only line"
+        )
+
+        # Parser that strips the only line
+        parser_config = {'trim_front_lines': 1, 'trim_back_lines': 0}
+
+        parsed = self.router.parse_msg(msg, parser_config)
+
+        # Should show placeholder
+        self.assertIn("[Message content removed by parser:", parsed.text)
+        self.assertIn("first 1", parsed.text)
+
+        # Should NOT contain original
+        self.assertNotIn("Only line", parsed.text)
+
+class TestIsMediaRestrictedBugFix(unittest.TestCase):
+    """Test that _is_media_restricted() returns True when media IS restricted."""
+
+    def setUp(self):
+        """Set up test handler."""
+        mock_config = Mock()
+        mock_config.project_root = Path("/tmp")
+        mock_config.api_id = "123"
+        mock_config.api_hash = "abc"
+
+        with patch('TelegramHandler.TelegramClient'):
+            self.handler = TelegramHandler(mock_config)
+
+    def test_photo_should_be_restricted(self):
+        """
+        Test that _is_media_restricted() returns TRUE when a photo is restricted.
+
+        Expected behavior:
+        - Photo media is NOT allowed in restricted mode
+        - Therefore, _is_media_restricted() should return True (media IS restricted)
+
+        This test will FAIL with current implementation (currently returns False).
+        """
+        mock_msg = Mock()
+        mock_msg.media = MessageMediaPhoto()
+
+        is_restricted = self.handler._is_media_restricted(mock_msg)
+
+        # Photo should be restricted, so function should return True
+        self.assertTrue(
+            is_restricted,
+            "Photo media should be restricted - function should return True"
+        )
+
+    def test_no_media_should_not_be_restricted(self):
+        """
+        Test that _is_media_restricted() returns FALSE when no media (not restricted).
+
+        Expected behavior:
+        - Messages without media are allowed
+        - Therefore, _is_media_restricted() should return False (media is NOT restricted)
+
+        This test will FAIL with current implementation (currently returns True).
+        """
+        mock_msg = Mock()
+        mock_msg.media = None
+
+        is_restricted = self.handler._is_media_restricted(mock_msg)
+
+        # No media should NOT be restricted, so function should return False
+        self.assertFalse(
+            is_restricted,
+            "No media should NOT be restricted - function should return False"
+        )
+
+    def test_allowed_document_should_not_be_restricted(self):
+        """
+        Test that _is_media_restricted() returns FALSE for allowed documents.
+
+        Expected behavior:
+        - CSV document with correct MIME is allowed
+        - Therefore, _is_media_restricted() should return False (media is NOT restricted)
+
+        This test will FAIL with current implementation (currently returns True).
+        """
+        # Create mock message with allowed CSV document
+        message = Mock()
+        message.media = Mock(spec=MessageMediaDocument)
+        message.media.document = Mock()
+        message.media.document.mime_type = "text/csv"
+
+        mock_attr = Mock()
+        mock_attr.file_name = "data.csv"
+        message.media.document.attributes = [mock_attr]
+
+        is_restricted = self.handler._is_media_restricted(message)
+
+        # Allowed CSV should NOT be restricted, so function should return False
+        self.assertFalse(
+            is_restricted,
+            "Allowed CSV document should NOT be restricted - function should return False"
+        )
+
+    def test_malware_document_should_be_restricted(self):
+        """
+        Test that _is_media_restricted() returns TRUE for malware documents.
+
+        Expected behavior:
+        - Document with .csv extension but executable MIME is blocked
+        - Therefore, _is_media_restricted() should return True (media IS restricted)
+
+        This test will FAIL with current implementation (currently returns False).
+        """
+        # Create mock message with malware (safe extension, malicious MIME)
+        message = Mock()
+        message.media = Mock(spec=MessageMediaDocument)
+        message.media.document = Mock()
+        message.media.document.mime_type = "application/x-msdownload"  # Executable!
+
+        mock_attr = Mock()
+        mock_attr.file_name = "malware.csv"  # Looks safe but isn't
+        message.media.document.attributes = [mock_attr]
+
+        is_restricted = self.handler._is_media_restricted(message)
+
+        # Malware should be restricted, so function should return True
+        self.assertTrue(
+            is_restricted,
+            "Malware document should be restricted - function should return True"
+        )
 
 
 if __name__ == '__main__':

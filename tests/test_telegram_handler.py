@@ -1,7 +1,7 @@
 import unittest
 import sys
 import os
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from unittest.mock import Mock, patch, AsyncMock
 from pathlib import Path
 
 # Add src to path
@@ -68,16 +68,16 @@ class TestTelegramHandler(unittest.TestCase):
         mock_msg = Mock()
         mock_msg.media = MessageMediaPhoto()
 
-        allowed = self.handler._is_media_restricted(mock_msg)
-        self.assertFalse(allowed)
+        is_restricted = self.handler._is_media_restricted(mock_msg)
+        self.assertTrue(is_restricted)  # Photo is restricted, should return True
 
     def test_no_media_is_allowed(self):
         """Test messages without media are allowed."""
         mock_msg = Mock()
         mock_msg.media = None
 
-        allowed = self.handler._is_media_restricted(mock_msg)
-        self.assertTrue(allowed)
+        is_restricted = self.handler._is_media_restricted(mock_msg)
+        self.assertFalse(is_restricted)  # No media is not restricted, should return False
 
     def test_format_message_with_keywords(self):
         """Test formatted message displays matched keywords."""
@@ -468,7 +468,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
         """
         Given: Document with filename="data.csv", mime_type="text/csv"
         When: _is_media_restricted() called
-        Then: Returns True (allowed - function returns True for allowed, False for blocked)
+        Then: Returns False (not restricted - function returns False when allowed)
 
         Tests: src/TelegramHandler.py:224-248 (document validation)
         """
@@ -485,17 +485,17 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = "text/csv"
 
         # Test
-        is_allowed = handler._is_media_restricted(message)
+        is_restricted = handler._is_media_restricted(message)
 
-        # Should be allowed (function returns True when allowed)
-        self.assertTrue(is_allowed)
+        # Should be allowed (function returns False when not restricted)
+        self.assertFalse(is_restricted)
 
     @patch('TelegramHandler.TelegramClient')
     def test_document_with_extension_match_mime_mismatch_blocked(self, MockClient):
         """
         Given: Document with filename="malware.csv", mime_type="application/x-msdownload"
         When: _is_media_restricted() called
-        Then: Returns False (blocked - function returns False for blocked)
+        Then: Returns True (restricted - function returns True when blocked)
 
         Tests: src/TelegramHandler.py:242 (SECURITY: extension match but MIME mismatch)
 
@@ -514,17 +514,17 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = "application/x-msdownload"  # Executable!
 
         # Test
-        is_allowed = handler._is_media_restricted(message)
+        is_restricted = handler._is_media_restricted(message)
 
-        # Should be BLOCKED (function returns False when blocked)
-        self.assertFalse(is_allowed)
+        # Should be BLOCKED (function returns True when restricted)
+        self.assertTrue(is_restricted)
 
     @patch('TelegramHandler.TelegramClient')
     def test_document_with_mime_match_extension_mismatch_blocked(self, MockClient):
         """
         Given: Document with filename="data.exe", mime_type="text/csv"
         When: _is_media_restricted() called
-        Then: Returns False (blocked - function returns False for blocked)
+        Then: Returns True (restricted - function returns True when blocked)
 
         Tests: src/TelegramHandler.py:242 (SECURITY: MIME match but extension mismatch)
 
@@ -543,17 +543,17 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = "text/csv"
 
         # Test
-        is_allowed = handler._is_media_restricted(message)
+        is_restricted = handler._is_media_restricted(message)
 
-        # Should be BLOCKED (function returns False when blocked)
-        self.assertFalse(is_allowed)
+        # Should be BLOCKED (function returns True when restricted)
+        self.assertTrue(is_restricted)
 
     @patch('TelegramHandler.TelegramClient')
     def test_document_without_filename_attribute_blocked(self, MockClient):
         """
         Given: Document without file_name attribute
         When: _is_media_restricted() called
-        Then: Returns False (blocked - function returns False for blocked)
+        Then: Returns True (restricted - function returns True when blocked)
 
         Tests: src/TelegramHandler.py:231-237 (missing filename handling)
         """
@@ -568,17 +568,17 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = "text/csv"
 
         # Test
-        is_allowed = handler._is_media_restricted(message)
+        is_restricted = handler._is_media_restricted(message)
 
-        # Should be BLOCKED (function returns False when blocked)
-        self.assertFalse(is_allowed)
+        # Should be BLOCKED (function returns True when restricted)
+        self.assertTrue(is_restricted)
 
     @patch('TelegramHandler.TelegramClient')
     def test_document_without_mime_type_blocked(self, MockClient):
         """
         Given: Document with filename but no mime_type attribute
         When: _is_media_restricted() called
-        Then: Returns False (blocked - function returns False for blocked)
+        Then: Returns True (restricted - function returns True when blocked)
 
         Tests: src/TelegramHandler.py:239-240 (missing MIME handling)
         """
@@ -595,10 +595,10 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = None
 
         # Test
-        is_allowed = handler._is_media_restricted(message)
+        is_restricted = handler._is_media_restricted(message)
 
-        # Should be BLOCKED (function returns False when blocked)
-        self.assertFalse(is_allowed)
+        # Should be BLOCKED (function returns True when restricted)
+        self.assertTrue(is_restricted)
 
 
 class TestTelegramReplyContext(unittest.TestCase):

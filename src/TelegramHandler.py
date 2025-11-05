@@ -207,7 +207,13 @@ class TelegramHandler(DestinationHandler):
         return None
 
     def _is_media_restricted(self, message) -> bool:
-        """Check if media is allowed under restricted mode rules.
+        """Check if media is restricted under restricted mode rules.
+
+        Args:
+            message: The Telegram message object to check for restricted media.
+
+        Returns:
+            bool: True if media is RESTRICTED (blocked), False if media is allowed.
 
         Restricted mode is a security feature for CTI workflows that only allows
         specific document types (text files, logs, DBs) and blocks photos/videos.
@@ -216,11 +222,11 @@ class TelegramHandler(DestinationHandler):
         Both extension AND MIME type must match allowed lists for safety.
         """
         if not message.media:
-            return True
+            return False  # No media = not restricted
 
         if not isinstance(message.media, MessageMediaDocument):
             logger.info("[TelegramHandler] Media blocked by restricted mode: only documents are allowed in restricted mode")
-            return False
+            return True  # Non-document media = restricted
 
         document = message.media.document
         extension_allowed = False
@@ -245,10 +251,17 @@ class TelegramHandler(DestinationHandler):
                 f"[TelegramHandler] Media blocked by restricted mode: "
                 f"type={type(message.media).__name__}, ext={file_extension}, mime={mime_type}"
             )
-        return allowed
+        return not allowed  # Return True if restricted (not allowed), False if allowed
 
     async def download_media(self, message_data: MessageData) -> Optional[str]:
-        """Download attached media from message into tmp/attachments/."""
+        """Download attached media from message into tmp/attachments/.
+
+        Args:
+            message_data: MessageData object containing the original Telegram message with media.
+
+        Returns:
+            Optional[str]: Path to the downloaded media file if successful, None otherwise.
+        """
         try:
             if message_data.original_message and message_data.original_message.media:
                 target_dir = str(self.config.attachments_dir) + os.sep
@@ -296,6 +309,16 @@ class TelegramHandler(DestinationHandler):
 
     @staticmethod
     def build_defanged_tg_url(channel_id: str, channel_username_or_name: str, message_id: Optional[int]) -> Optional[str]:
+        """Build a defanged Telegram URL for threat intelligence workflows.
+
+        Args:
+            channel_id: Numeric channel ID (e.g., "-1001234567890").
+            channel_username_or_name: Channel username (with/without @) or display name.
+            message_id: Message ID number, or None.
+
+        Returns:
+            Optional[str]: Defanged URL (hxxps://t[.]me/...) if successful, None otherwise.
+        """
         url = TelegramHandler.build_message_url(channel_id, channel_username_or_name, message_id)
         return TelegramHandler._defang_tme(url) if url else None
 
@@ -404,6 +427,13 @@ class TelegramHandler(DestinationHandler):
 
     def format_message(self, message_data: MessageData, destination: Dict) -> str:
         """Format message for Telegram using HTML markup.
+
+        Args:
+            message_data: MessageData object containing message content and metadata.
+            destination: Destination configuration dictionary.
+
+        Returns:
+            str: Formatted message string using Telegram HTML markup.
 
         Mirrors Discord formatting but uses Telegram's HTML syntax:
         - Bold: <b>text</b>

@@ -2,7 +2,7 @@ import unittest
 import sys
 import os
 import tempfile
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from pathlib import Path
 from datetime import datetime, timezone
 

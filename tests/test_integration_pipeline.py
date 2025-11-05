@@ -16,7 +16,7 @@ Tests:
 """
 
 import unittest
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import Mock, AsyncMock, patch
 import asyncio
 import sys
 import os

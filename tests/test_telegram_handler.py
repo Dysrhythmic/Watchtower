@@ -1194,12 +1194,14 @@ class TestTelegramLogCleanup(unittest.TestCase):
         shutil.rmtree(self.telegramlog_dir)
 
         # When: Clearing telegram logs
-        # Then: Should complete without errors (just logs error)
-        with self.assertLogs(level='ERROR') as log_context:
+        # Then: Should complete without errors (silently skips if directory doesn't exist)
+        try:
             self.watchtower._clear_telegram_logs()
+        except Exception as e:
+            self.fail(f"_clear_telegram_logs raised an exception: {e}")
 
-        # Should log error about clearing telegram logs
-        self.assertTrue(any("Error clearing telegram logs" in msg for msg in log_context.output))
+        # Verify directory still doesn't exist
+        self.assertFalse(self.telegramlog_dir.exists())
 
     def test_clear_telegram_logs_preserves_other_files(self):
         """Test _clear_telegram_logs only removes .txt files."""

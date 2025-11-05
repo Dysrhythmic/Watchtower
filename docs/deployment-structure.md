@@ -4,6 +4,66 @@ This document describes the project directory structure and deployment architect
 
 ## Project Directory Structure
 
+### ASCII Tree View
+
+```
+Watchtower/
+├── src/                          # Source code
+│   ├── Watchtower.py             # Main orchestrator (751 lines)
+│   ├── ConfigManager.py          # Configuration loading (360 lines)
+│   ├── MessageRouter.py          # Routing logic (~200 lines)
+│   ├── MessageData.py            # Data structure (~50 lines)
+│   ├── TelegramHandler.py        # Telegram operations (503 lines)
+│   ├── DiscordHandler.py         # Discord webhooks (~150 lines)
+│   ├── RSSHandler.py             # RSS polling (~200 lines)
+│   ├── OCRHandler.py             # OCR extraction (~100 lines)
+│   ├── DestinationHandler.py    # Base class (~100 lines)
+│   ├── MessageQueue.py           # Retry queue (~150 lines)
+│   ├── MetricsCollector.py       # Statistics (~100 lines)
+│   └── logger_setup.py           # Logging config (~20 lines)
+│
+├── tests/                        # Test suite
+│   ├── test_config.py            # Configuration tests
+│   ├── test_message_router.py   # Routing tests
+│   ├── test_destination_handler.py
+│   ├── test_discord_handler.py
+│   ├── test_telegram_handler.py
+│   ├── test_ocr_handler.py
+│   ├── test_rss_handler.py
+│   ├── test_message_queue.py
+│   ├── test_message_data.py
+│   ├── test_metrics.py
+│   ├── test_integration_*.py    # Integration tests
+│   └── test-img.jpg              # OCR test image
+│
+├── config/                       # Configuration files
+│   ├── .env                      # API keys (git-ignored)
+│   ├── config.json               # Main configuration
+│   ├── kw-general.json           # Keyword files
+│   ├── kw-work.json
+│   ├── kw-*.json                 # Custom keyword files
+│   └── watchtower_session.session # Telegram session (git-ignored)
+│
+├── tmp/                          # Temporary files
+│   ├── attachments/              # Downloaded media (cleaned up)
+│   └── metrics.json              # Statistics (persistent)
+│
+├── docs/                         # Architecture documentation
+│   ├── README.md                 # Documentation hub
+│   ├── architecture-overview.md # Component diagram
+│   ├── data-flow.md              # Message flow diagram
+│   ├── class-diagram.md          # Class relationships
+│   ├── message-processing-sequence.md # Sequence diagrams
+│   ├── configuration-structure.md # Config format
+│   └── deployment-structure.md   # This file
+│
+├── .gitignore                    # Git ignore rules
+├── README.md                     # Project README
+└── requirements.txt              # Python dependencies
+```
+
+### Interactive Diagram (Mermaid)
+
 ```mermaid
 graph TB
     ROOT[Watchtower/]
@@ -135,6 +195,76 @@ graph TB
 | `deployment-structure.md` | This file - directory structure, deployment |
 
 ## Deployment Architecture
+
+### ASCII Deployment View
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                            HOST SYSTEM                                 │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐ │
+│  │              WATCHTOWER APPLICATION                              │ │
+│  │                                                                  │ │
+│  │  ┌────────────────┐                                             │ │
+│  │  │  Watchtower    │  (Main Python Process)                      │ │
+│  │  │   Process      │                                             │ │
+│  │  └────┬───────────┘                                             │ │
+│  │       │                                                          │ │
+│  │       ├──────┬──────────┬──────────┬──────────┐                 │ │
+│  │       │      │          │          │          │                 │ │
+│  │       ▼      ▼          ▼          ▼          ▼                 │ │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐ │ │
+│  │  │Telegram│ │RSS Feed│ │RSS Feed│ │RSS Feed│ │ Retry Queue  │ │ │
+│  │  │ Client │ │Poll #1 │ │Poll #2 │ │Poll #N │ │  Processor   │ │ │
+│  │  │  Task  │ │  Task  │ │  Task  │ │  Task  │ │     Task     │ │ │
+│  │  └────┬───┘ └────┬───┘ └────┬───┘ └────┬───┘ └──────┬───────┘ │ │
+│  │       │          │          │          │             │          │ │
+│  └───────┼──────────┼──────────┼──────────┼─────────────┼──────────┘ │
+│          │          │          │          │             │            │
+│  ┌───────┼──────────┴──────────┴──────────┘             │            │
+│  │       │                                               │            │
+│  │  ┌────▼───────┐                                  ┌────▼────────┐  │
+│  │  │  config/   │                                  │    tmp/     │  │
+│  │  │ .env       │◄──Read                  Write───►│ attachments/│  │
+│  │  │ config.json│                                  │ metrics.json│  │
+│  │  │ *.session  │                                  └─────────────┘  │
+│  │  └────────────┘                                                   │
+│  │                                                                    │
+└──┼────────────────────────────────────────────────────────────────────┘
+   │
+   │ ┌─────────────────── NETWORK BOUNDARY ───────────────────────┐
+   │ │                                                             │
+   ├─┼──► Telegram API (api.telegram.org:443)                     │
+   │ │    • Monitor channels (persistent connection)              │
+   │ │    • Send messages to destinations                         │
+   │ │                                                             │
+   ├─┼──► RSS Feed Servers (https://...)                          │
+   │ │    • Poll every 5 minutes per feed                         │
+   │ │    • HTTP GET requests                                     │
+   │ │                                                             │
+   ├─┼──► Discord Webhooks (discord.com:443)                      │
+   │ │    • HTTP POST with JSON payload                           │
+   │ │    • Per-webhook rate limiting                             │
+   │ │                                                             │
+   └─┴────────────────────────────────────────────────────────────┘
+
+Network Flow:
+  Inbound:  None (client-only application)
+  Outbound: HTTPS (443) to Telegram, Discord, RSS feeds
+
+Resource Requirements:
+  CPU:  < 5% idle, 10-30% during OCR
+  RAM:  ~100 MB base, ~800 MB with OCR
+  Disk: ~100 MB application + temporary media storage
+
+Async Task Architecture:
+  • Single-threaded async event loop
+  • Each source runs as independent async task
+  • Concurrent processing via asyncio
+  • No thread synchronization needed
+```
+
+### Interactive Diagram (Mermaid)
 
 ```mermaid
 graph TB

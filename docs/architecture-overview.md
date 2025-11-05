@@ -4,6 +4,8 @@ This document provides a high-level overview of the Watchtower architecture and 
 
 ## Component Diagram
 
+### Interactive Diagram (Mermaid)
+
 ```mermaid
 graph TB
     subgraph Sources["Message Sources"]
@@ -77,6 +79,70 @@ graph TB
     style DH fill:#000,stroke:#fff,color:#fff
     style RSSH fill:#000,stroke:#fff,color:#fff
 ```
+
+### ASCII Diagram (Plain Text View)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          WATCHTOWER ARCHITECTURE                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────┐         ┌──────────────┐
+    │  TELEGRAM    │         │  RSS FEEDS   │
+    │  Channels    │         │              │
+    └──────┬───────┘         └──────┬───────┘
+           │                        │
+           │ New Messages     RSS Entries
+           │                        │
+           ▼                        ▼
+    ┌──────────────┐         ┌──────────────┐
+    │  TELEGRAM    │         │ RSS HANDLER  │
+    │  HANDLER     │◄────────┤              │
+    │ (Src + Dest) │         │ (Source)     │
+    └──────┬───────┘         └──────┬───────┘
+           │                        │
+           │ MessageData    MessageData
+           │                        │
+           └────────────┬───────────┘
+                        │
+                        ▼
+           ┌────────────────────────┐
+           │    WATCHTOWER CORE     │
+           │  ┌──────────────────┐  │
+           │  │  Watchtower      │  │◄─────── ConfigManager
+           │  │  Orchestrator    │  │         (config.json, .env)
+           │  └────┬─────────────┘  │
+           │       │                │
+           │       ├──► MessageRouter (keyword matching)
+           │       ├──► MessageQueue (retry handler)
+           │       ├──► MetricsCollector (statistics)
+           │       └──► OCRHandler (text extraction)
+           │                        │
+           └────────────┬───────────┘
+                        │
+           ┌────────────┴───────────┐
+           │                        │
+           ▼                        ▼
+    ┌──────────────┐         ┌──────────────┐
+    │   DISCORD    │         │  TELEGRAM    │
+    │   HANDLER    │         │  HANDLER     │
+    │ (Destination)│         │ (Destination)│
+    └──────┬───────┘         └──────┬───────┘
+           │                        │
+           │ HTTP POST     Telethon API
+           │                        │
+           ▼                        ▼
+    ┌──────────────┐         ┌──────────────┐
+    │   DISCORD    │         │  TELEGRAM    │
+    │   Webhooks   │         │  Channels    │
+    └──────────────┘         └──────────────┘
+
+    Legend:
+    ──►  Data flow
+    ◄──  Configuration/control
+    │    Connection
+```
+
 
 ## Key Components
 

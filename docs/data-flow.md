@@ -4,6 +4,84 @@ This document illustrates the detailed flow of messages through the Watchtower s
 
 ## End-to-End Message Flow
 
+### Simplified ASCII Flow
+
+```
+                    NEW MESSAGE EVENT
+                           │
+                           ▼
+                    ┌──────────────┐
+                    │ Source Type? │
+                    └──┬────────┬──┘
+                       │        │
+           Telegram ───┘        └─── RSS
+                │                    │
+                ▼                    ▼
+         ┌─────────────┐      ┌─────────────┐
+         │  Telegram   │      │ RSS Handler │
+         │   Handler   │      │  Poll Feed  │
+         └──────┬──────┘      └──────┬──────┘
+                │                    │
+                │ Convert to MessageData
+                │                    │
+                └──────────┬─────────┘
+                           │
+                           ▼
+                   ┌───────────────┐
+                   │  PREPROCESS   │
+                   │ ┌───────────┐ │
+                   │ │ OCR Check │ │ (if media + OCR enabled)
+                   │ └─────┬─────┘ │
+                   │       │       │
+                   │ ┌─────▼─────┐ │
+                   │ │  Defang   │ │ (if Telegram)
+                   │ │   URLs    │ │
+                   │ └───────────┘ │
+                   └───────┬───────┘
+                           │
+                           ▼
+                   ┌───────────────┐
+                   │ MessageRouter │
+                   │ Match Keywords│
+                   └───────┬───────┘
+                           │
+                    Matched Destinations
+                           │
+                ┌──────────┴──────────┐
+                │                     │
+                ▼                     ▼
+         ┌─────────────┐       ┌─────────────┐
+         │   Discord   │       │  Telegram   │
+         │   Handler   │       │   Handler   │
+         │   Format    │       │   Format    │
+         │  (Markdown) │       │   (HTML)    │
+         └──────┬──────┘       └──────┬──────┘
+                │                     │
+                ▼                     ▼
+         ┌─────────────┐       ┌─────────────┐
+         │   Discord   │       │  Telegram   │
+         │   Webhook   │       │   Channel   │
+         └─────────────┘       └─────────────┘
+                │                     │
+                └──────────┬──────────┘
+                           │
+                      SUCCESS? ────► No ──► MessageQueue
+                           │                (Retry: 5s, 10s, 20s)
+                           │
+                          Yes
+                           │
+                           ▼
+                   ┌───────────────┐
+                   │ Track Metrics │
+                   │  Cleanup Media│
+                   └───────────────┘
+                           │
+                           ▼
+                         [END]
+```
+
+### Detailed Interactive Diagram (Mermaid)
+
 ```mermaid
 flowchart TD
     Start([New Message Event])

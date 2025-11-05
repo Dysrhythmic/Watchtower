@@ -35,9 +35,9 @@ class TestMultipleDestinationsMismatchedConfigs(unittest.TestCase):
         # Create mock config with two destinations, one with OCR
         mock_config = Mock()
         mock_config.tmp_dir = Path("/tmp")
-        mock_config.attachments_dir = Path("/tmp/attachments")
-        mock_config.attachments_dir.exists = Mock(return_value=True)
-        mock_config.attachments_dir.glob = Mock(return_value=[])
+        mock_config.attachments_dir = Mock()
+        mock_config.attachments_dir.exists.return_value = True
+        mock_config.attachments_dir.glob.return_value = []
 
         mock_config.webhooks = [
             {
@@ -143,9 +143,9 @@ class TestMultipleDestinationsMismatchedConfigs(unittest.TestCase):
         # Create mock config
         mock_config = Mock()
         mock_config.tmp_dir = Path("/tmp")
-        mock_config.attachments_dir = Path("/tmp/attachments")
-        mock_config.attachments_dir.exists = Mock(return_value=True)
-        mock_config.attachments_dir.glob = Mock(return_value=[])
+        mock_config.attachments_dir = Mock()
+        mock_config.attachments_dir.exists.return_value = True
+        mock_config.attachments_dir.glob.return_value = []
 
         mock_config.webhooks = [
             {
@@ -259,9 +259,9 @@ class TestMultipleDestinationsMismatchedConfigs(unittest.TestCase):
         # Create mock config
         mock_config = Mock()
         mock_config.tmp_dir = Path("/tmp")
-        mock_config.attachments_dir = Path("/tmp/attachments")
-        mock_config.attachments_dir.exists = Mock(return_value=True)
-        mock_config.attachments_dir.glob = Mock(return_value=[])
+        mock_config.attachments_dir = Mock()
+        mock_config.attachments_dir.exists.return_value = True
+        mock_config.attachments_dir.glob.return_value = []
 
         # Create mocks
         mock_telegram = Mock()

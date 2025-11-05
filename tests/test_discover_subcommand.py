@@ -34,8 +34,8 @@ class TestDiscoverSubcommand(unittest.TestCase):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     @patch('telethon.TelegramClient')
-    @patch('Watchtower.Path')
-    def test_discover_generate_creates_config_file(self, mock_path_class, mock_telegram_client):
+    @patch('os.getenv')
+    def test_discover_generate_creates_config_file(self, mock_getenv, mock_telegram_client):
         """
         Test that discover --generate properly creates config_discovered.json.
 
@@ -45,9 +45,14 @@ class TestDiscoverSubcommand(unittest.TestCase):
         - Contains discovered channels
         - Has proper default settings per channel
         """
-        # Setup path mocking
-        mock_path_class.return_value.resolve.return_value.parents = [self.test_dir]
-        config_dir = self.config_dir
+        # Mock environment variables
+        def getenv_side_effect(key):
+            if key == 'TELEGRAM_API_ID':
+                return '123456'
+            elif key == 'TELEGRAM_API_HASH':
+                return 'abc123def456'
+            return None
+        mock_getenv.side_effect = getenv_side_effect
 
         # Mock TelegramClient
         mock_client = MagicMock()
@@ -103,17 +108,20 @@ class TestDiscoverSubcommand(unittest.TestCase):
 
         mock_client.get_dialogs = mock_get_dialogs
 
-        # Patch the config directory resolution
-        with patch('Watchtower.Path') as mock_path:
-            # Make Path(__file__).resolve().parents[1] return our test directory
-            mock_file_path = Mock()
-            mock_file_path.resolve.return_value.parents = {1: self.test_dir}
-            mock_path.return_value = mock_file_path
+        # Patch the Path resolution to use test directory
+        # discover_channels does: project_root = Path(__file__).resolve().parents[1]
+        # We need to make Path(__file__).resolve().parents[1] return our test_dir
+        with patch('Watchtower.Path') as mock_path_cls:
+            # When Path(__file__) is called, return a mock with proper chaining
+            mock_instance = Mock()
+            mock_resolved = Mock()
+            # parents should be indexable and return actual Path objects
+            mock_resolved.parents = {0: Path(self.test_dir) / "src", 1: Path(self.test_dir)}
+            mock_instance.resolve.return_value = mock_resolved
+            mock_path_cls.return_value = mock_instance
 
-            # Also patch the config_dir used in the function
-            with patch.object(Path, '__truediv__', return_value=self.config_dir):
-                # Run discover with generate flag
-                asyncio.run(discover_channels(diff_mode=False, generate_config=True))
+            # Run discover with generate flag
+            asyncio.run(discover_channels(diff_mode=False, generate_config=True))
 
         # Verify config file was created
         config_file = self.config_dir / "config_discovered.json"
@@ -169,16 +177,22 @@ class TestDiscoverSubcommand(unittest.TestCase):
                 "Default parser trim_back_lines should be 0")
 
     @patch('telethon.TelegramClient')
-    @patch('Watchtower.Path')
-    def test_discover_without_generate_no_file_created(self, mock_path_class, mock_telegram_client):
+    @patch('os.getenv')
+    def test_discover_without_generate_no_file_created(self, mock_getenv, mock_telegram_client):
         """
         Test that discover without --generate flag does NOT create config file.
 
         This ensures the flag is respected and users aren't surprised by
         unwanted file creation.
         """
-        # Setup path mocking
-        mock_path_class.return_value.resolve.return_value.parents = [self.test_dir]
+        # Mock environment variables
+        def getenv_side_effect(key):
+            if key == 'TELEGRAM_API_ID':
+                return '123456'
+            elif key == 'TELEGRAM_API_HASH':
+                return 'abc123def456'
+            return None
+        mock_getenv.side_effect = getenv_side_effect
 
         # Mock TelegramClient
         mock_client = MagicMock()
@@ -198,15 +212,18 @@ class TestDiscoverSubcommand(unittest.TestCase):
             return []
         mock_client.get_dialogs = mock_get_dialogs
 
-        # Patch Path resolution
-        with patch('Watchtower.Path') as mock_path:
-            mock_file_path = Mock()
-            mock_file_path.resolve.return_value.parents = {1: self.test_dir}
-            mock_path.return_value = mock_file_path
+        # Patch the Path resolution to use test directory
+        with patch('Watchtower.Path') as mock_path_cls:
+            # When Path(__file__) is called, return a mock with proper chaining
+            mock_instance = Mock()
+            mock_resolved = Mock()
+            # parents should be indexable and return actual Path objects
+            mock_resolved.parents = {0: Path(self.test_dir) / "src", 1: Path(self.test_dir)}
+            mock_instance.resolve.return_value = mock_resolved
+            mock_path_cls.return_value = mock_instance
 
-            with patch.object(Path, '__truediv__', return_value=self.config_dir):
-                # Run discover WITHOUT generate flag
-                asyncio.run(discover_channels(diff_mode=False, generate_config=False))
+            # Run discover WITHOUT generate flag
+            asyncio.run(discover_channels(diff_mode=False, generate_config=False))
 
         # Verify config file was NOT created
         config_file = self.config_dir / "config_discovered.json"

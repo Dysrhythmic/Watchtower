@@ -1,3 +1,69 @@
+"""
+Test MetricsCollector - Usage statistics tracking and persistence
+
+This module tests the MetricsCollector component which tracks application
+metrics (messages received, sent, OCR processed, etc.) and persists them
+to a JSON file for analysis.
+
+What This Tests:
+    - Metric incrementing (messages_received, messages_sent, ocr_processed, etc.)
+    - Metric setting (time_ran, session data)
+    - Metric retrieval (get(), get_all())
+    - JSON persistence (save() to file)
+    - Metrics reset/initialization
+
+Test Pattern - Incrementing:
+    1. Create MetricsCollector with temp file path
+    2. Call collector.increment("metric_name")
+    3. Assert collector.get("metric_name") equals expected count
+    4. Call increment multiple times to test accumulation
+
+Test Pattern - Setting:
+    1. Call collector.set("metric_name", value)
+    2. Assert collector.get("metric_name") equals value
+    3. For time_ran: use integer seconds value
+
+Test Pattern - Persistence:
+    1. Create MetricsCollector with temp file
+    2. Increment/set various metrics
+    3. Check temp file exists and contains valid JSON
+    4. Load file and verify metric values persisted
+
+Mock Setup Template:
+    # Use tempfile for test isolation
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    metrics_path = Path(temp_file.name)
+    temp_file.close()
+
+    collector = MetricsCollector(metrics_path)
+    collector.increment("messages_received_telegram")
+    collector.set("time_ran", 3600)
+
+    # Cleanup
+    metrics_path.unlink()
+
+Common Metrics:
+    - messages_received_telegram: Total messages from Telegram
+    - messages_received_rss: Total messages from RSS feeds
+    - messages_routed_success: Successfully delivered messages
+    - messages_routed_failed: Failed delivery attempts
+    - messages_no_destination: Messages with no matching destinations
+    - messages_sent_discord: Messages delivered to Discord
+    - messages_sent_telegram: Messages delivered to Telegram
+    - messages_queued_retry: Messages added to retry queue
+    - ocr_processed: OCR extractions performed
+    - ocr_sent: Messages with OCR text delivered
+    - time_ran: Application runtime in seconds
+
+How to Add New Tests:
+    1. Add test method starting with test_
+    2. Use descriptive docstring: """Test <what metric behavior>."""
+    3. Create MetricsCollector with temp file in setUp()
+    4. Call increment/set methods
+    5. Assert get() returns expected values
+    6. For persistence tests: check file contents
+    7. Clean up temp files in tearDown()
+"""
 import unittest
 import sys
 import os
@@ -14,7 +80,7 @@ from MessageData import MessageData
 
 
 class TestMetricsCollector(unittest.TestCase):
-    """Test MetricsCollector."""
+    """Test MetricsCollector statistics tracking and persistence."""
 
     def setUp(self):
         """Create MetricsCollector with temp file."""

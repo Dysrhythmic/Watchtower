@@ -1,3 +1,58 @@
+"""
+Test DiscordHandler - Discord webhook message delivery
+
+This module tests the DiscordHandler component which formats and sends
+messages to Discord webhooks using markdown formatting.
+
+What This Tests:
+    - Message formatting (markdown bold, italic, code blocks, blockquotes)
+    - Keyword display in formatted messages
+    - Reply context formatting
+    - OCR text formatting (blockquote style)
+    - HTTP request construction for Discord API
+    - Rate limit detection (429 responses)
+    - Media attachment handling
+    - Chunking for 2000-character Discord limit
+
+Test Pattern - Message Formatting:
+    1. Create MessageData with various content (text, OCR, reply context)
+    2. Create destination dict with keywords
+    3. Call handler.format_message(msg, destination)
+    4. Assert output contains expected markdown formatting
+    5. Check for **bold**, *italic*, `code`, and > blockquotes
+
+Test Pattern - Sending:
+    1. Mock requests.post to return success/failure responses
+    2. Call handler.send_message(content, webhook_url, media_path)
+    3. Check requests.post was called with correct parameters
+    4. For rate limit tests: return Mock response with status_code=429
+
+Mock Setup Template:
+    msg = MessageData(
+        source_type="telegram",
+        channel_name="Test Channel",
+        username="@testuser",
+        timestamp=datetime.now(timezone.utc),
+        text="Test message",
+        ocr_raw="OCR text here"  # optional
+    )
+
+    destination = {
+        'name': 'Test Dest',
+        'keywords': ['keyword1', 'keyword2']
+    }
+
+    formatted = handler.format_message(msg, destination)
+
+How to Add New Tests:
+    1. Add test method starting with test_
+    2. Use descriptive docstring: """Test <what Discord feature>."""
+    3. Create MessageData with relevant content
+    4. For formatting tests: assert string contains expected markdown
+    5. For sending tests: use @patch('requests.post')
+    6. For rate limit tests: mock 429 response with retry_after header
+    7. Use self.assertIn/assertEqual for verification
+"""
 import unittest
 import sys
 import os
@@ -13,7 +68,7 @@ from datetime import datetime, timezone
 
 
 class TestDiscordHandler(unittest.TestCase):
-    """Test DiscordHandler."""
+    """Test DiscordHandler Discord webhook delivery and formatting."""
 
     def setUp(self):
         """Create DiscordHandler instance."""

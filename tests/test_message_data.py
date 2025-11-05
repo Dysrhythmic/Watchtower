@@ -1,3 +1,60 @@
+"""
+Test MessageData - Generic message container dataclass
+
+This module tests the MessageData dataclass which provides a source-agnostic
+message representation for cross-platform message handling (Telegram, RSS, etc.).
+
+What This Tests:
+    - MessageData creation with required fields
+    - Default values for optional fields
+    - Metadata dict extensibility
+    - OCR fields (ocr_enabled, ocr_raw)
+    - Media handling fields (media_path, has_media, media_type)
+    - Reply context structure
+    - Source type handling (telegram, rss)
+
+Test Pattern - Basic Creation:
+    1. Create MessageData with required fields:
+       - source_type, channel_id, channel_name
+       - username, timestamp, text
+    2. Assert all fields populated correctly
+    3. Check default values for optional fields
+    4. Verify metadata is empty dict by default
+
+Test Pattern - Optional Fields:
+    1. Create MessageData with optional fields:
+       - has_media, media_type, media_path
+       - ocr_enabled, ocr_raw
+       - reply_context, original_message
+    2. Assert optional fields set correctly
+    3. Test None/False defaults
+
+MessageData Structure:
+    Required:
+        source_type: "telegram" or "rss"
+        channel_id: Source channel identifier
+        channel_name: Human-readable channel name
+        username: Message author
+        timestamp: datetime in UTC
+        text: Message content
+
+    Optional:
+        has_media: bool - Whether message has attachments
+        media_type: str - "Photo", "Document", "Other"
+        media_path: str - Path to downloaded media file
+        ocr_enabled: bool - Whether OCR was used
+        ocr_raw: str - Extracted OCR text
+        reply_context: dict - Original message being replied to
+        original_message: object - Source-specific message object
+        metadata: dict - Extensible metadata (src_url_defanged, etc.)
+
+How to Add New Tests:
+    1. Add test method starting with test_
+    2. Use descriptive docstring: """Test <what MessageData feature>."""
+    3. Create MessageData with datetime.now(timezone.utc)
+    4. Use self.assertEqual/assertIsNone for field verification
+    5. For metadata tests: populate metadata dict and assert keys
+"""
 import unittest
 import sys
 import os
@@ -10,7 +67,7 @@ from MessageData import MessageData
 
 
 class TestMessageData(unittest.TestCase):
-    """Test MessageData dataclass."""
+    """Test MessageData generic message container dataclass."""
 
     def test_create_from_telegram(self):
         """Test creating MessageData from Telegram source."""

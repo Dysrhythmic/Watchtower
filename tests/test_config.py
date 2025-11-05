@@ -1,3 +1,72 @@
+"""
+Test ConfigManager - Configuration loading and validation
+
+This module tests the ConfigManager component which loads config.json,
+resolves environment variables, loads keyword files, and builds internal
+data structures for routing.
+
+What This Tests:
+    - Loading config with 'destinations' array format
+    - Environment variable resolution (Discord webhooks, Telegram channels)
+    - Keyword file loading and caching
+    - Keyword resolution (files + inline keywords)
+    - Invalid config handling (missing keys, bad JSON, missing env vars)
+    - RSS feed configuration loading
+    - Channel deduplication
+
+Test Pattern - Config Loading:
+    1. Create config_data dict with expected structure
+    2. Use @patch('builtins.open', mock_open(read_data=json.dumps(config_data)))
+    3. Patch os.getenv to return environment variable values
+    4. Patch Path.exists to return True for required files
+    5. Create ConfigManager() instance
+    6. Assert webhooks, rss_feeds populated correctly
+
+Test Pattern - Keyword Files:
+    1. Create keyword file content: {"keywords": ["word1", "word2"]}
+    2. Mock file system with multiple patches
+    3. Create ConfigManager and access keyword resolution
+    4. Assert keywords loaded and cached correctly
+
+Mock Setup Template:
+    config_data = {
+        "destinations": [{
+            "name": "Test Destination",
+            "type": "discord",  # or "telegram"
+            "env_key": "DISCORD_WEBHOOK_URL",
+            "channels": [{
+                "id": "@channel_name",
+                "keywords": {
+                    "files": ["kw-general.json"],
+                    "inline": ["keyword1", "keyword2"]
+                },
+                "restricted_mode": False,
+                "parser": {"trim_front_lines": 0, "trim_back_lines": 0},
+                "ocr": False
+            }],
+            "rss": [{
+                "url": "https://example.com/feed.xml",
+                "name": "Example Feed",
+                "keywords": {"inline": ["security"]}
+            }]
+        }]
+    }
+
+    with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+        with patch('os.getenv', return_value="https://webhook.url"):
+            with patch.object(Path, 'exists', return_value=True):
+                config = ConfigManager()
+                # Assertions
+
+How to Add New Tests:
+    1. Add test method starting with test_
+    2. Use descriptive docstring: """Test <what config aspect>."""
+    3. Create config_data dict with test case structure
+    4. Use nested with statements for all required patches
+    5. Create ConfigManager() and assert expected behavior
+    6. For error tests: use self.assertRaises or check warning logs
+    7. For keyword tests: mock keyword file contents
+"""
 import unittest
 import sys
 import os
@@ -12,7 +81,7 @@ from ConfigManager import ConfigManager
 
 
 class TestConfigManager(unittest.TestCase):
-    """Test ConfigManager."""
+    """Test ConfigManager configuration loading and validation."""
 
     def test_load_config_destinations_key(self):
         """Test loading config with 'destinations' key."""

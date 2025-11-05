@@ -1,3 +1,65 @@
+"""
+Test TelegramHandler - Telegram client operations and message handling
+
+This module tests the TelegramHandler component which handles both Telegram
+source monitoring and Telegram destination delivery using Telethon library.
+
+What This Tests:
+    - Message formatting (HTML markup: <b>, <i>, <code>, <blockquote>)
+    - Restricted mode media filtering (file type and MIME type checks)
+    - URL defanging for CTI workflows (hxxps://t[.]me format)
+    - URL building (public @username and private /c/ formats)
+    - Rate limit tracking
+    - Media type detection (Photo, Document, Other)
+    - Username extraction from senders (User, Channel)
+
+Test Pattern - Restricted Mode:
+    1. Create mock Telegram message with MessageMediaDocument
+    2. Configure document with attributes (file_name, mime_type)
+    3. Call handler._is_media_restricted(message)
+    4. Assert True (restricted) or False (allowed) based on file type
+    5. Check ALLOWED_EXTENSIONS and ALLOWED_MIME_TYPES
+
+Test Pattern - Message Formatting:
+    1. Create MessageData with text, OCR, keywords
+    2. Create destination dict
+    3. Call handler.format_message(msg, destination)
+    4. Assert HTML markup is present: <b>bold</b>, <i>italic</i>
+    5. Check OCR text uses <blockquote> tags
+
+Test Pattern - URL Building:
+    1. Call build_message_url(channel_id, channel_name, msg_id)
+    2. For public channels: assert URL uses @username format
+    3. For private channels: assert URL uses /c/<id> format with -100 stripped
+    4. For defanged URLs: assert hxxps://t[.]me format
+
+Mock Setup Template:
+    mock_config = Mock()
+    mock_config.project_root = Path("/tmp")
+    mock_config.api_id = "123456"
+    mock_config.api_hash = "abc123hash"
+
+    with patch('TelegramHandler.TelegramClient'):
+        handler = TelegramHandler(mock_config)
+
+    # For restricted mode testing:
+    mock_message = Mock()
+    mock_message.media = MessageMediaDocument()
+    mock_doc = Mock()
+    mock_doc.mime_type = "application/pdf"  # or allowed type
+    mock_attr = Mock()
+    mock_attr.file_name = "file.pdf"
+    mock_doc.attributes = [mock_attr]
+    mock_message.media.document = mock_doc
+
+How to Add New Tests:
+    1. Add test method starting with test_
+    2. Use descriptive docstring: """Test <what Telegram feature>."""
+    3. For formatting tests: create MessageData and assert HTML markup
+    4. For URL tests: use static methods directly (no handler instance needed)
+    5. For restricted mode: mock MessageMediaDocument with attributes
+    6. Use self.assertIn/assertEqual/assertTrue for verification
+"""
 import unittest
 import sys
 import os
@@ -15,7 +77,7 @@ from telethon.tl.types import MessageMediaDocument
 
 
 class TestTelegramHandler(unittest.TestCase):
-    """Test TelegramHandler."""
+    """Test TelegramHandler Telegram operations and formatting."""
 
     def setUp(self):
         """Create TelegramHandler with mocked config."""

@@ -108,18 +108,11 @@ class TestDiscoverSubcommand(unittest.TestCase):
 
         mock_client.get_dialogs = mock_get_dialogs
 
-        # Patch the Path resolution to use test directory
-        # discover_channels does: project_root = Path(__file__).resolve().parents[1]
-        # We need to make Path(__file__).resolve().parents[1] return our test_dir
-        with patch('Watchtower.Path') as mock_path_cls:
-            # When Path(__file__) is called, return a mock with proper chaining
-            mock_instance = Mock()
-            mock_resolved = Mock()
-            # parents should be indexable and return actual Path objects
-            mock_resolved.parents = {0: Path(self.test_dir) / "src", 1: Path(self.test_dir)}
-            mock_instance.resolve.return_value = mock_resolved
-            mock_path_cls.return_value = mock_instance
+        # Patch __file__ in Watchtower module to point to our test directory
+        # This makes Path(__file__).resolve().parents[1] naturally resolve to test_dir
+        fake_watchtower_path = str(Path(self.test_dir) / "src" / "Watchtower.py")
 
+        with patch('Watchtower.__file__', fake_watchtower_path):
             # Run discover with generate flag
             asyncio.run(discover_channels(diff_mode=False, generate_config=True))
 
@@ -212,16 +205,10 @@ class TestDiscoverSubcommand(unittest.TestCase):
             return []
         mock_client.get_dialogs = mock_get_dialogs
 
-        # Patch the Path resolution to use test directory
-        with patch('Watchtower.Path') as mock_path_cls:
-            # When Path(__file__) is called, return a mock with proper chaining
-            mock_instance = Mock()
-            mock_resolved = Mock()
-            # parents should be indexable and return actual Path objects
-            mock_resolved.parents = {0: Path(self.test_dir) / "src", 1: Path(self.test_dir)}
-            mock_instance.resolve.return_value = mock_resolved
-            mock_path_cls.return_value = mock_instance
+        # Patch __file__ in Watchtower module to point to our test directory
+        fake_watchtower_path = str(Path(self.test_dir) / "src" / "Watchtower.py")
 
+        with patch('Watchtower.__file__', fake_watchtower_path):
             # Run discover WITHOUT generate flag
             asyncio.run(discover_channels(diff_mode=False, generate_config=False))
 

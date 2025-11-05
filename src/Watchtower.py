@@ -793,9 +793,6 @@ async def discover_channels(diff_mode=False, generate_config=False):
     for dialog in dialogs:
         telegram_entity = dialog.entity
 
-        if isinstance(telegram_entity, User) and telegram_entity.is_self:
-            continue
-
         if isinstance(telegram_entity, (Channel, Chat, User)):
             entity_type, entity_name = _get_entity_type_and_name(telegram_entity)
             channel_id = _get_channel_identifier(telegram_entity, dialog.id)

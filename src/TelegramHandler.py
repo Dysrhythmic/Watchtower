@@ -33,6 +33,7 @@ URL Defanging:
     - Used in threat intelligence workflows to prevent accidental clicks
 """
 import os
+from pathlib import Path
 from typing import Optional, Dict, List
 from telethon import TelegramClient, events, utils
 from telethon.errors import ChatAdminRequiredError, FloodWaitError
@@ -64,6 +65,9 @@ class TelegramHandler(DestinationHandler):
     # Telegram limits
     TELEGRAM_CAPTION_LIMIT = 1024  # Maximum caption length for media
     TELEGRAM_MESSAGE_LIMIT = 4096  # Maximum message length
+
+    # Polling configuration
+    DEFAULT_POLL_INTERVAL = 300  # seconds (5 minutes) - check for missed messages
 
     # Define allowed file types for restricted mode
     ALLOWED_MIME_TYPES = {
@@ -162,23 +166,213 @@ class TelegramHandler(DestinationHandler):
             logger.error(f"[TelegramHandler] Failed to resolve {channel_id}: {e}")
             return None
 
+    def _telegram_log_path(self, channel_id: str):
+        """Get path to telegram log file for a channel.
+
+        Converts channel ID to a safe filename by stripping prefixes:
+        - Removes -100 prefix from numeric IDs (supergroup format)
+        - Removes @ prefix from username IDs
+
+        Args:
+            channel_id: Channel ID (e.g., '-100123456789', '@channelname', '123456789')
+
+        Returns:
+            Path: Path object to the log file
+
+        Examples:
+            >>> handler._telegram_log_path('-100123456789')
+            Path('/tmp/telegramlog/123456789.txt')
+            >>> handler._telegram_log_path('@channelname')
+            Path('/tmp/telegramlog/channelname.txt')
+            >>> handler._telegram_log_path('123456789')
+            Path('/tmp/telegramlog/123456789.txt')
+        """
+        clean_id = channel_id.lstrip('-100').lstrip('@')
+        return self.config.telegramlog_dir / f"{clean_id}.txt"
+
+    def _create_telegram_log(self, channel_id: str, msg_id: int) -> None:
+        """Create telegram log file with channel name and message ID.
+
+        Creates a two-line text file:
+        Line 1: Human-readable channel name (for manual inspection)
+        Line 2: Last processed message ID (integer)
+
+        Called during connection proof to initialize tracking for each channel.
+
+        Args:
+            channel_id: Channel ID from config
+            msg_id: Message ID to record as last processed
+
+        Returns:
+            None
+
+        Example file content:
+            My Channel Name
+            12345
+        """
+        log_path = self._telegram_log_path(channel_id)
+        channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
+
+        content = f"{channel_name}\n{msg_id}\n"
+        log_path.write_text(content, encoding='utf-8')
+        logger.info(f"[TelegramHandler] Created log for {channel_name}: msg_id={msg_id}")
+
+    def _read_telegram_log(self, channel_id: str) -> Optional[int]:
+        """Read last processed message ID from telegram log.
+
+        Reads the message ID from line 2 of the log file. Returns None if
+        the log doesn't exist or is corrupted.
+
+        Args:
+            channel_id: Channel ID to read log for
+
+        Returns:
+            Optional[int]: Last processed message ID, or None if log doesn't exist
+                          or cannot be parsed
+
+        Examples:
+            >>> handler._read_telegram_log('-100123456789')
+            12345
+            >>> handler._read_telegram_log('new_channel')
+            None
+        """
+        log_path = self._telegram_log_path(channel_id)
+        if not log_path.exists():
+            return None
+
+        try:
+            lines = log_path.read_text(encoding='utf-8').strip().split('\n')
+            if len(lines) >= 2:
+                return int(lines[1])
+        except Exception as e:
+            logger.error(f"[TelegramHandler] Error reading log for {channel_id}: {e}")
+        return None
+
+    def _update_telegram_log(self, channel_id: str, msg_id: int) -> None:
+        """Update telegram log with new message ID.
+
+        Overwrites the log file with updated message ID while preserving
+        the channel name on line 1.
+
+        Called after processing each message to track progress and prevent
+        duplicate processing on restart.
+
+        Args:
+            channel_id: Channel ID to update log for
+            msg_id: New message ID to record
+
+        Returns:
+            None
+
+        Note:
+            Logs at debug level to avoid spam since this is called for every message.
+        """
+        log_path = self._telegram_log_path(channel_id)
+        channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
+
+        content = f"{channel_name}\n{msg_id}\n"
+        log_path.write_text(content, encoding='utf-8')
+        # Only log at debug level to avoid spam
+        logger.debug(f"[TelegramHandler] Updated log for {channel_name}: msg_id={msg_id}")
+
     async def fetch_latest_messages(self):
         """Fetch latest message from each channel for connection proof.
 
         Retrieves the most recent message from each monitored channel and passes
         it to the message callback with is_latest=True flag. Used during startup
         to verify channel connectivity and permissions.
+
+        Also creates telegram log files with the latest message ID for each channel,
+        enabling missed message detection during polling.
         """
         for channel_id, telegram_entity in self.channels.items():
             channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
             try:
                 async for message in self.client.iter_messages(telegram_entity, limit=1):
-                    if message and self.msg_callback:
-                        message_data = await self._create_message_data(message, channel_id)
-                        await self.msg_callback(message_data, is_latest=True)
+                    if message:
+                        # Create telegram log with latest message ID
+                        self._create_telegram_log(channel_id, message.id)
+
+                        if self.msg_callback:
+                            message_data = await self._create_message_data(message, channel_id)
+                            await self.msg_callback(message_data, is_latest=True)
                     break
             except Exception as e:
                 logger.error(f"[TelegramHandler] Error fetching from {channel_name}: {e}")
+
+    async def poll_missed_messages(self, metrics_collector=None):
+        """Poll for messages that may have been missed during downtime.
+
+        Checks all connected channels for messages with IDs greater than the last
+        processed ID stored in telegram logs. Processes any missed messages and
+        updates the logs accordingly.
+
+        This runs continuously in a loop with DEFAULT_POLL_INTERVAL delay between
+        iterations. Should be run as a background task.
+
+        Args:
+            metrics_collector: Optional MetricsCollector instance for tracking
+                              missed message counts
+
+        Returns:
+            None
+
+        Example:
+            >>> await telegram_handler.poll_missed_messages(metrics)
+            # Polls every 300 seconds, processing any missed messages
+
+        Note:
+            - Logs warnings when missed messages are detected
+            - Updates telegram logs after processing each message
+            - Increments 'telegram_missed_messages' metric when applicable
+        """
+        import asyncio
+
+        while True:
+            try:
+                await asyncio.sleep(self.DEFAULT_POLL_INTERVAL)
+
+                for channel_id, telegram_entity in self.channels.items():
+                    channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
+                    last_processed_id = self._read_telegram_log(channel_id)
+
+                    if not last_processed_id:
+                        continue
+
+                    try:
+                        missed_count = 0
+                        # Fetch messages newer than last processed ID
+                        async for message in self.client.iter_messages(
+                            telegram_entity,
+                            min_id=last_processed_id
+                        ):
+                            if message.id > last_processed_id:
+                                # Found a missed message
+                                missed_count += 1
+                                logger.warning(
+                                    f"[TelegramHandler] Missed message detected: "
+                                    f"{channel_name} msg_id={message.id}"
+                                )
+
+                                if self.msg_callback:
+                                    message_data = await self._create_message_data(message, channel_id)
+                                    await self.msg_callback(message_data, is_latest=False)
+
+                                self._update_telegram_log(channel_id, message.id)
+
+                        if missed_count > 0:
+                            if metrics_collector:
+                                metrics_collector.increment("telegram_missed_messages", missed_count)
+                            logger.warning(
+                                f"[TelegramHandler] Processed {missed_count} missed messages "
+                                f"from {channel_name}"
+                            )
+
+                    except Exception as e:
+                        logger.error(f"[TelegramHandler] Error polling {channel_name}: {e}")
+
+            except Exception as e:
+                logger.error(f"[TelegramHandler] Error in poll loop: {e}", exc_info=True)
 
     def setup_handlers(self, callback) -> None:
         """Setup message event handlers for monitoring new messages.
@@ -204,6 +398,10 @@ class TelegramHandler(DestinationHandler):
                 message_data = await self._create_message_data(event.message, channel_id)
                 telegram_msg_id = getattr(message_data.original_message, "id", None)
                 logger.info(f"[TelegramHandler] Received message tg_id={telegram_msg_id} from {channel_name}")
+
+                # Update telegram log BEFORE processing to prevent duplicates if processing fails
+                if telegram_msg_id:
+                    self._update_telegram_log(channel_id, telegram_msg_id)
 
                 await callback(message_data, is_latest=False)
 

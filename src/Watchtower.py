@@ -185,6 +185,8 @@ class Watchtower:
             # connection proofs
             await self.telegram.fetch_latest_messages()
             tasks.append(asyncio.create_task(self.telegram.run()))
+            # Start polling for missed messages
+            tasks.append(asyncio.create_task(self.telegram.poll_missed_messages(self.metrics)))
 
         # RSS source
         if 'rss' in self.sources and self.config.rss_feeds:
@@ -229,12 +231,42 @@ class Watchtower:
         if queue_size > 0:
             logger.warning(f"[Watchtower] Shutting down with {queue_size} messages in retry queue (will be lost)")
 
+        # Clear telegram logs (don't process messages sent during downtime)
+        if self.telegram:
+            self._clear_telegram_logs()
+
         # Disconnect Telegram client
         if self.telegram and self.telegram.client.is_connected():
             await self.telegram.client.disconnect()
             logger.info("[Watchtower] Telegram client disconnected")
 
         logger.info("[Watchtower] Shutdown complete")
+
+    def _clear_telegram_logs(self):
+        """Clear all telegram log files on shutdown.
+
+        Removes all .txt files in the telegramlog directory. Telegram logs are
+        not persistent across restarts since we don't want to process messages
+        sent during downtime.
+
+        Called during shutdown to prevent stale log files from affecting next startup.
+
+        Returns:
+            None
+
+        Note:
+            Errors during cleanup are logged but non-fatal (shutdown continues)
+        """
+        try:
+            telegramlog_dir = self.config.telegramlog_dir
+            if telegramlog_dir.exists():
+                count = 0
+                for log_file in telegramlog_dir.glob("*.txt"):
+                    log_file.unlink()
+                    count += 1
+                logger.info(f"[Watchtower] Cleared {count} telegram log file(s)")
+        except Exception as e:
+            logger.error(f"[Watchtower] Error clearing telegram logs: {e}")
 
     async def _handle_message(self, message_data: 'MessageData', is_latest: bool) -> bool:
         """Process incoming message from any source (Telegram, RSS).

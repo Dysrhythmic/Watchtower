@@ -4,6 +4,69 @@ This document shows the detailed sequence of operations when processing a messag
 
 ## Telegram Message Processing Sequence
 
+### ASCII Sequence Diagram (Simplified)
+
+```
+Telegram    Telegram    Watchtower    OCR       Message    Discord    Discord
+  API       Handler                  Handler    Router     Handler      API
+   │            │            │          │          │          │          │
+   ├─Message───►│            │          │          │          │          │
+   │            ├─Extract────┤          │          │          │          │
+   │            │  sender    │          │          │          │          │
+   │            │  & media   │          │          │          │          │
+   │            │            │          │          │          │          │
+   │            ├─Create─────┤          │          │          │          │
+   │            │ MessageData│          │          │          │          │
+   │            │            │          │          │          │          │
+   │            └──Forward───►          │          │          │          │
+   │                         │          │          │          │          │
+   │                  [PREPROCESSING]   │          │          │          │
+   │                         │          │          │          │          │
+   │                  ┌──OCR enabled?   │          │          │          │
+   │                  │      └─Yes──────►          │          │          │
+   │                  │                 │          │          │          │
+   │                  │      ┌─Extract──┤          │          │          │
+   │                  │      │  text    │          │          │          │
+   │                  │      └──────────►          │          │          │
+   │                  │   Add OCR text  │          │          │          │
+   │                  │                 │          │          │          │
+   │                  │      [ROUTING]  │          │          │          │
+   │                  │                 │          │          │          │
+   │                  └─────Match────────────────►  │          │          │
+   │                         │          │  keywords │          │          │
+   │                         │          │  return   │          │          │
+   │                         │          │   dests   │          │          │
+   │                         │◄─────────────────────┤          │          │
+   │                         │          │          │          │          │
+   │                  [FORMATTING & DISPATCH]       │          │          │
+   │                         │          │          │          │          │
+   │                         ├─Apply────┤          │          │          │
+   │                         │  parser  │          │          │          │
+   │                         │          │          │          │          │
+   │                         └─────Format─────────────────────►          │
+   │                         │          │          │  Markdown │          │
+   │                         │          │          │  headers  │          │
+   │                         │          │          │  & code   │          │
+   │                         │          │          │          │          │
+   │                         └─────Send────────────────────────┴─POST────►
+   │                         │          │          │          │  webhook │
+   │                         │          │          │          │          │
+   │                         │          │          │          │◄─200 OK──┤
+   │                         │          │          │          │          │
+   │                  [CLEANUP]         │          │          │          │
+   │                         │          │          │          │          │
+   │                  Delete media      │          │          │          │
+   │                  Update metrics    │          │          │          │
+   │                         │          │          │          │          │
+
+Legend:
+  ├─►  Function call/message
+  ◄──  Return/response
+  [ ]  Processing stage
+```
+
+### Detailed Interactive Diagram (Mermaid)
+
 ```mermaid
 sequenceDiagram
     participant TG as Telegram API
@@ -264,6 +327,76 @@ sequenceDiagram
 
 ## RSS Message Processing Sequence
 
+### ASCII Sequence Diagram (Simplified)
+
+```
+RSS Feed    RSS         Watchtower    Message    Discord    Discord
+ Server    Handler                     Router     Handler      API
+   │          │              │            │          │          │
+   │      [POLLING LOOP - Every 5 minutes]│          │          │
+   │          │              │            │          │          │
+   │◄─GET─────┤              │            │          │          │
+   │   feed   │              │            │          │          │
+   │   .xml   │              │            │          │          │
+   │          │              │            │          │          │
+   ├─RSS XML──►              │            │          │          │
+   │          │              │            │          │          │
+   │          ├─Parse XML────┤            │          │          │
+   │          │              │            │          │          │
+   │          ├─For each─────┤            │          │          │
+   │          │   entry      │            │          │          │
+   │          │              │            │          │          │
+   │          ├─Check age────┤            │          │          │
+   │          │  < 2 days?   │            │          │          │
+   │          │              │            │          │          │
+   │          ├─Strip HTML───┤            │          │          │
+   │          │              │            │          │          │
+   │          ├─Create───────┤            │          │          │
+   │          │ MessageData  │            │          │          │
+   │          │              │            │          │          │
+   │          └──Forward─────►            │          │          │
+   │                         │            │          │          │
+   │                  [ROUTING]           │          │          │
+   │                         │            │          │          │
+   │                         ├─Match──────────────►  │          │
+   │                         │            keywords   │          │
+   │                         │            │          │          │
+   │                         │◄───────────┤          │          │
+   │                         │   return   │          │          │
+   │                         │   dests    │          │          │
+   │                         │            │          │          │
+   │                  [DISPATCH]          │          │          │
+   │                         │            │          │          │
+   │                         ├─Apply──────┤          │          │
+   │                         │  parser    │          │          │
+   │                         │            │          │          │
+   │                         └─Format────────────────►          │
+   │                         │            │  Markdown │          │
+   │                         │            │          │          │
+   │                         └─Send──────────────────┴─POST────►
+   │                         │            │          │ webhook  │
+   │                         │            │          │          │
+   │                         │            │          │◄─200 OK──┤
+   │                         │            │          │          │
+   │                  [METRICS]           │          │          │
+   │                         │            │          │          │
+   │                  Update counters     │          │          │
+   │                         │            │          │          │
+   │          ├─Sleep 5 min──┤            │          │          │
+   │          │              │            │          │          │
+   │      [Loop continues]   │            │          │          │
+   │          │              │            │          │          │
+
+Legend:
+  ◄──  HTTP GET request
+  ├─►  Function call/message
+  [ ]  Processing stage
+
+Note: No OCR or media handling for RSS (text-only entries)
+```
+
+### Detailed Interactive Diagram (Mermaid)
+
 ```mermaid
 sequenceDiagram
     participant RSS as RSS Feed
@@ -343,6 +476,94 @@ sequenceDiagram
 ```
 
 ## Retry Queue Processing Sequence
+
+### ASCII Sequence Diagram (Simplified)
+
+```
+Message     Watchtower    Discord     Telegram
+ Queue                    Handler     Handler
+   │             │           │           │
+   │    [BACKGROUND TASK - Check every 2 seconds]
+   │             │           │           │
+   ├─Check queue─┤           │           │
+   │             │           │           │
+   ├─Has items?──►           │           │
+   │             │           │           │
+   ├─Time to─────┤           │           │
+   │  retry?     │           │           │
+   │             │           │           │
+   ├─Attempts────┤           │           │
+   │  < 3?       │           │           │
+   │             │           │           │
+   ├─Calculate───┤           │           │
+   │  backoff:   │           │           │
+   │  Attempt 1: +5s         │           │
+   │  Attempt 2: +10s        │           │
+   │  Attempt 3: +20s        │           │
+   │             │           │           │
+   │    [RETRY DISPATCH]     │           │
+   │             │           │           │
+   ├─Get handler─┤           │           │
+   │             │           │           │
+   │  (Discord)  │           │           │
+   │             └─send_msg──►           │
+   │             │           │           │
+   │             │    ┌──Success?        │
+   │             │    │      │           │
+   │             │    │  ┌─200 OK        │
+   │◄─Remove─────┤    │  │   │           │
+   │  from queue │◄───┘  │   │           │
+   │             │       │   │           │
+   │             │       │   │           │
+   │             │    ┌──Failed          │
+   │             │    │  │   │           │
+   │◄─Increment──┤    │  │   │           │
+   │  attempt    │◄───┘  │   │           │
+   │◄─Update─────┤       │   │           │
+   │  next_retry │       │   │           │
+   │             │       │   │           │
+   │             │       │   │           │
+   │  (Telegram) │       │   │           │
+   │             └─resolve────────────────►
+   │             │       │   │  channel   │
+   │             │       │   │           │
+   │             └─send_copy──────────────►
+   │             │       │   │           │
+   │             │       │   │  ┌─Success
+   │◄─Remove─────┤       │   │  │        │
+   │  from queue │◄──────────────┘        │
+   │             │       │   │           │
+   │             │       │   │           │
+   │             │       │   │  ┌─Failed │
+   │◄─Increment──┤       │   │  │        │
+   │  attempt    │◄──────────────┘        │
+   │◄─Update─────┤       │   │           │
+   │  next_retry │       │   │           │
+   │             │       │   │           │
+   │    [MAX RETRIES EXCEEDED]           │
+   │             │       │   │           │
+   ├─Drop msg────┤       │   │           │
+   ├─Log error───┤       │   │           │
+   │             │       │   │           │
+   │             │       │   │           │
+   ├─Sleep 2s────┤       │   │           │
+   │             │       │   │           │
+   │    [Loop continues] │   │           │
+   │             │       │   │           │
+
+Legend:
+  ├─►  Function call/check
+  ◄──  Update/response
+  [ ]  Processing stage
+
+Exponential Backoff Schedule:
+  Attempt 1: Wait 5 seconds
+  Attempt 2: Wait 10 seconds
+  Attempt 3: Wait 20 seconds
+  After 3 failures: Drop message
+```
+
+### Detailed Interactive Diagram (Mermaid)
 
 ```mermaid
 sequenceDiagram

@@ -50,7 +50,7 @@ MessageData Structure:
 
 How to Add New Tests:
     1. Add test method starting with test_
-    2. Use descriptive docstring: """Test <what MessageData feature>."""
+    2. Use descriptive docstring describing what MessageData feature is tested""
     3. Create MessageData with datetime.now(timezone.utc)
     4. Use self.assertEqual/assertIsNone for field verification
     5. For metadata tests: populate metadata dict and assert keys

@@ -57,7 +57,7 @@ Common Metrics:
 
 How to Add New Tests:
     1. Add test method starting with test_
-    2. Use descriptive docstring: """Test <what metric behavior>."""
+    2. Use descriptive docstring describing what metric behavior is tested""
     3. Create MetricsCollector with temp file in setUp()
     4. Call increment/set methods
     5. Assert get() returns expected values

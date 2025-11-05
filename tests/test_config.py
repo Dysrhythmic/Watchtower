@@ -60,7 +60,7 @@ Mock Setup Template:
 
 How to Add New Tests:
     1. Add test method starting with test_
-    2. Use descriptive docstring: """Test <what config aspect>."""
+    2. Use descriptive docstring describing what config aspect is tested""
     3. Create config_data dict with test case structure
     4. Use nested with statements for all required patches
     5. Create ConfigManager() and assert expected behavior

@@ -43,7 +43,7 @@ Mock Setup Template:
 
 How to Add New Tests:
     1. Add test method starting with test_
-    2. Use descriptive docstring: """Test <what OCR behavior>."""
+    2. Use descriptive docstring describing what OCR behavior is tested""
     3. Mock easyocr.Reader if testing extraction
     4. Patch _EASYOCR_AVAILABLE to control availability
     5. Use self.assertIn/assertIsNone for text verification

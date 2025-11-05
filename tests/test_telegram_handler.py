@@ -1126,7 +1126,6 @@ class TestTelegramLogCleanup(unittest.TestCase):
     def setUp(self):
         """Create Watchtower instance with mocked dependencies."""
         import tempfile
-        from unittest.mock import MagicMock
 
         # Create temporary directory for telegram logs
         self.temp_dir = Path(tempfile.mkdtemp())
@@ -1137,20 +1136,22 @@ class TestTelegramLogCleanup(unittest.TestCase):
         mock_config = Mock()
         mock_config.project_root = self.temp_dir
         mock_config.telegramlog_dir = self.telegramlog_dir
+        mock_config.tmp_dir = self.temp_dir
         mock_config.webhooks = []
         mock_config.rss_feeds = []
 
-        # Create Watchtower instance with mocked dependencies
-        with patch('Watchtower.ConfigManager', return_value=mock_config), \
-             patch('Watchtower.TelegramHandler'), \
-             patch('Watchtower.DiscordHandler'), \
-             patch('Watchtower.MessageRouter'), \
-             patch('Watchtower.MessageQueue'), \
-             patch('Watchtower.MetricsCollector'), \
-             patch('Watchtower.OCRHandler'):
-            from Watchtower import Watchtower
-            self.watchtower = Watchtower(sources=[])
-            self.watchtower.config = mock_config
+        # Create Watchtower instance using dependency injection
+        from Watchtower import Watchtower
+        self.watchtower = Watchtower(
+            sources=[],
+            config=mock_config,
+            telegram=Mock(),
+            discord=Mock(),
+            router=Mock(),
+            ocr=Mock(),
+            message_queue=Mock(),
+            metrics=Mock()
+        )
 
     def tearDown(self):
         """Clean up temporary directory."""

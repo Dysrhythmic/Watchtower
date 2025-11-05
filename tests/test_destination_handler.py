@@ -37,7 +37,7 @@ Concrete Handler Template (for testing abstract base):
 
 How to Add New Tests:
     1. Add test method starting with test_
-    2. Use descriptive docstring: """Test <what behavior>."""
+    2. Use descriptive docstring describing what behavior is tested""
     3. Create ConcreteHandler instance in setUp() or test method
     4. For rate limit tests: use import time and check timestamps
     5. For chunking tests: verify no chunk exceeds max_length

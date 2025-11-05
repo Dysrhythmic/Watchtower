@@ -541,5 +541,107 @@ class TestIsMediaRestrictedBugFix(unittest.TestCase):
         )
 
 
+class TestParserKeywordIndependence(unittest.TestCase):
+    """Test that parser does not affect keyword matching."""
+
+    def setUp(self):
+        """Create MessageRouter with mocked config."""
+        self.mock_config = Mock()
+        self.mock_config.webhooks = [{
+            'name': 'Test Dest',
+            'type': 'discord',
+            'webhook_url': 'https://discord.com/webhook',
+            'channels': [{
+                'id': '@test_channel',
+                'keywords': ['keyword'],
+                'restricted_mode': False,
+                'parser': {'trim_front_lines': 1, 'trim_back_lines': 0},
+                'ocr': False
+            }]
+        }]
+        self.router = MessageRouter(self.mock_config)
+
+    def test_parser_does_not_affect_keyword_matching(self):
+        """
+        Test that parser has no effect on keyword matching for any destinations.
+        Keyword matching should happen on original message text before parsing.
+        """
+        # Message where keyword is in line that will be trimmed
+        msg = MessageData(
+            source_type="telegram",
+            channel_id="@test_channel",
+            channel_name="Test",
+            username="@user",
+            timestamp=datetime.now(timezone.utc),
+            text="First line with keyword\nSecond line without it"
+        )
+
+        # Should match because keyword is in original text (before parsing)
+        destinations = self.router.get_destinations(msg)
+        self.assertEqual(len(destinations), 1,
+            "Should match keyword even though it will be trimmed by parser")
+
+        # Now test parsing - the keyword line should be removed
+        parsed = self.router.parse_msg(msg, destinations[0]['parser'])
+        self.assertNotIn("keyword", parsed.text,
+            "Parser should have removed the line with keyword from output")
+        self.assertIn("Second line", parsed.text,
+            "Parser should preserve non-trimmed lines")
+
+
+class TestParserEdgeCases(unittest.TestCase):
+    """Test parser edge cases with extreme values."""
+
+    def setUp(self):
+        """Create MessageRouter with mocked config."""
+        self.mock_config = Mock()
+        self.router = MessageRouter(self.mock_config)
+
+    def test_parser_strips_more_lines_than_exist(self):
+        """
+        Test when parser tries to remove more lines than exist in message.
+        Should return placeholder message.
+        """
+        msg = MessageData(
+            source_type="telegram",
+            channel_id="@test",
+            channel_name="Test",
+            username="@user",
+            timestamp=datetime.now(timezone.utc),
+            text="Line 1\nLine 2"
+        )
+
+        # Try to trim 5 front lines when only 2 exist
+        parser_config = {'trim_front_lines': 5, 'trim_back_lines': 0}
+        parsed = self.router.parse_msg(msg, parser_config)
+
+        # Should return placeholder
+        self.assertIn("[Message content removed by parser:", parsed.text)
+        self.assertNotIn("Line 1", parsed.text)
+        self.assertNotIn("Line 2", parsed.text)
+
+    def test_parser_with_negative_values(self):
+        """
+        Test parser with negative values for trim_front_lines and trim_back_lines.
+        Negative values should be treated as zero (no trimming).
+        """
+        msg = MessageData(
+            source_type="telegram",
+            channel_id="@test",
+            channel_name="Test",
+            username="@user",
+            timestamp=datetime.now(timezone.utc),
+            text="Line 1\nLine 2\nLine 3"
+        )
+
+        # Use negative values
+        parser_config = {'trim_front_lines': -2, 'trim_back_lines': -1}
+        parsed = self.router.parse_msg(msg, parser_config)
+
+        # Should return original text (negative treated as zero)
+        self.assertEqual(parsed.text, msg.text,
+            "Negative trim values should not affect the message")
+
+
 if __name__ == '__main__':
     unittest.main()

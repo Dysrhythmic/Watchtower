@@ -120,8 +120,10 @@ class TestMultipleDestinationsMismatchedConfigs(unittest.TestCase):
         )
         msg.original_message = Mock()
 
-        # Process message
-        asyncio.run(app._handle_message(msg, False))
+        # Mock os.path.exists so media file is considered to exist
+        with patch('os.path.exists', return_value=True):
+            # Process message
+            asyncio.run(app._handle_message(msg, False))
 
         # Verify OCR was called exactly once
         mock_ocr.extract_text.assert_called_once()

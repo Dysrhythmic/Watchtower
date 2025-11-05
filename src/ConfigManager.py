@@ -205,7 +205,18 @@ class ConfigManager:
             return None, None
 
     def _process_channel_sources(self, destination_config: Dict, name: str) -> Optional[List[Dict]]:
-        """Process Telegram channel sources."""
+        """Process Telegram channel sources and resolve their keywords.
+
+        For each channel source, resolves keyword configuration (files + inline),
+        and logs special settings like restricted_mode and OCR.
+
+        Args:
+            destination_config: Destination configuration dict with 'channels' key
+            name: Destination name (for logging)
+
+        Returns:
+            List of processed channel dicts with resolved keywords, or None if invalid
+        """
         channels = destination_config.get('channels', [])
         if not channels:
             return []
@@ -235,6 +246,12 @@ class ConfigManager:
 
         RSS feeds are deduplicated globally by URL. Each unique feed is polled once,
         then routed to all destinations that want it based on per-destination keywords/parser.
+
+        Args:
+            destination_config: Destination configuration dict with 'rss' key
+            dest_name: Destination name (for logging)
+            channels: Channel list to append RSS pseudo-channels to (modified in-place)
+            rss_feed_index: Global RSS feed deduplication index (modified in-place)
         """
         rss_sources = destination_config.get('rss', [])
         for rss_entry in rss_sources:
@@ -349,7 +366,14 @@ class ConfigManager:
         return keywords
 
     def get_all_channel_ids(self) -> Set[str]:
-        """Get all unique channel IDs from destination config (Telegram sources only)."""
+        """Get all unique channel IDs from destination config (Telegram sources only).
+
+        Collects all non-RSS channel IDs across all destinations. RSS feeds
+        are identified by URLs starting with 'http' and are excluded.
+
+        Returns:
+            Set[str]: Unique channel IDs (usernames like @channel or numeric IDs)
+        """
         ids = set()
         for webhook in self.webhooks:
             for channel in webhook['channels']:

@@ -187,7 +187,8 @@ class TelegramHandler(DestinationHandler):
             >>> handler._telegram_log_path('123456789')
             Path('/tmp/telegramlog/123456789.txt')
         """
-        clean_id = channel_id.lstrip('-100').lstrip('@')
+        # Use removeprefix (Python 3.9+) to properly strip prefixes
+        clean_id = channel_id.removeprefix('-100').removeprefix('@')
         return self.config.telegramlog_dir / f"{clean_id}.txt"
 
     def _create_telegram_log(self, channel_id: str, msg_id: int) -> None:

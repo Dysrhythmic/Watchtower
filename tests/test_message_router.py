@@ -43,7 +43,7 @@ Mock Setup Template:
 
 How to Add New Tests:
     1. Add test method starting with test_
-    2. Use descriptive docstring: """Test <what behavior>."""
+    2. Use descriptive docstring describing what behavior is tested""
     3. Create MessageData with relevant content
     4. Call router method being tested
     5. Use self.assertEqual/assertTrue/assertIn to verify behavior

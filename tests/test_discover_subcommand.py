@@ -108,11 +108,20 @@ class TestDiscoverSubcommand(unittest.TestCase):
 
         mock_client.get_dialogs = mock_get_dialogs
 
-        # Patch __file__ in Watchtower module to point to our test directory
-        # This makes Path(__file__).resolve().parents[1] naturally resolve to test_dir
-        fake_watchtower_path = str(Path(self.test_dir) / "src" / "Watchtower.py")
+        # Patch Path in Watchtower module to return test directory structure
+        # We need to intercept Path(__file__) and make it resolve to our test_dir
+        from pathlib import Path as RealPath
 
-        with patch('Watchtower.__file__', fake_watchtower_path):
+        def mock_path_side_effect(path_arg):
+            # If this is the __file__ path, return our test structure
+            if isinstance(path_arg, str) and 'Watchtower.py' in path_arg:
+                # Create a mock path that resolves correctly
+                test_file_path = RealPath(self.test_dir) / "src" / "Watchtower.py"
+                return test_file_path
+            # Otherwise use real Path
+            return RealPath(path_arg)
+
+        with patch('Watchtower.Path', side_effect=mock_path_side_effect):
             # Run discover with generate flag
             asyncio.run(discover_channels(diff_mode=False, generate_config=True))
 
@@ -205,10 +214,17 @@ class TestDiscoverSubcommand(unittest.TestCase):
             return []
         mock_client.get_dialogs = mock_get_dialogs
 
-        # Patch __file__ in Watchtower module to point to our test directory
-        fake_watchtower_path = str(Path(self.test_dir) / "src" / "Watchtower.py")
+        # Patch Path in Watchtower module to return test directory structure
+        from pathlib import Path as RealPath
 
-        with patch('Watchtower.__file__', fake_watchtower_path):
+        def mock_path_side_effect(path_arg):
+            # If this is the __file__ path, return our test structure
+            if isinstance(path_arg, str) and 'Watchtower.py' in path_arg:
+                test_file_path = RealPath(self.test_dir) / "src" / "Watchtower.py"
+                return test_file_path
+            return RealPath(path_arg)
+
+        with patch('Watchtower.Path', side_effect=mock_path_side_effect):
             # Run discover WITHOUT generate flag
             asyncio.run(discover_channels(diff_mode=False, generate_config=False))
 

@@ -6,10 +6,18 @@ storage. Tracks application statistics like message counts, routing success/fail
 rates, and queue sizes.
 
 Features:
-- Automatic persistence to JSON file on each update
+- Periodic persistence to JSON file (every 60 seconds by default)
 - Counter-based metrics (increment, set, get)
 - Graceful recovery from corrupted metrics files
 - Thread-safe for single-process use
+- Force save on shutdown for clean exit
+
+Performance:
+    Uses periodic saves instead of immediate persistence to reduce disk I/O:
+    - Default: Save every 60 seconds (configurable)
+    - Max data loss: 60 seconds worth of metrics on crash
+    - Significant performance gain for high-volume message processing
+    - SSD-friendly for Raspberry Pi and similar devices
 
 Common Metrics:
     - messages_received_telegram: Total messages from Telegram
@@ -17,8 +25,10 @@ Common Metrics:
     - messages_routed_success: Successfully delivered messages
     - messages_routed_failed: Failed delivery attempts
     - messages_no_destination: Messages with no matching destinations
+    - telegram_missed_messages: Messages found via polling that were missed
 """
 import json
+import time
 from pathlib import Path
 from typing import Dict
 from collections import defaultdict
@@ -28,11 +38,19 @@ logger = setup_logger(__name__)
 
 
 class MetricsCollector:
-    """Lightweight metrics collector using JSON file storage.
+    """Lightweight metrics collector using JSON file storage with periodic saves.
 
-    Persists metrics to JSON file after each update. Suitable for single-process
-    applications. For multi-process setups, consider external metrics systems.
+    Persists metrics to JSON file every SAVE_INTERVAL seconds to balance data
+    integrity with performance. Suitable for single-process applications running
+    on devices like Raspberry Pi where minimizing disk writes is important.
+
+    Attributes:
+        SAVE_INTERVAL: Seconds between automatic saves (default: 60)
+        metrics_file: Path to metrics JSON file
+        metrics: Dictionary of metric names to values
     """
+
+    SAVE_INTERVAL = 60  # seconds - save metrics every minute
 
     def __init__(self, metrics_file: Path):
         """Initialize metrics collector.
@@ -42,6 +60,8 @@ class MetricsCollector:
         """
         self.metrics_file = metrics_file
         self.metrics: Dict[str, int] = defaultdict(int)
+        self._last_save_time = time.time()
+        self._dirty = False  # Track if metrics changed since last save
         self._load_metrics()
 
     def _load_metrics(self) -> None:
@@ -62,10 +82,14 @@ class MetricsCollector:
             logger.info("[MetricsCollector] No existing metrics file, starting fresh")
 
     def _save_metrics(self) -> None:
-        """Save current metrics to file.
+        """Save current metrics to file immediately.
 
         Creates parent directory if needed. Logs errors but doesn't raise to
         prevent metrics failures from disrupting message processing.
+
+        Note:
+            Called by _maybe_save_metrics() for periodic saves and force_save()
+            for shutdown. Not called directly by increment/set anymore.
         """
         try:
             # Ensure parent directory exists
@@ -73,28 +97,74 @@ class MetricsCollector:
 
             with open(self.metrics_file, 'w') as f:
                 json.dump(dict(self.metrics), f, indent=2)
+
+            logger.debug(f"[MetricsCollector] Saved metrics to {self.metrics_file}")
         except Exception as e:
             logger.error(f"[MetricsCollector] Failed to save metrics: {e}")
+
+    def _maybe_save_metrics(self) -> None:
+        """Save metrics if interval has passed since last save.
+
+        Only saves if:
+        1. Metrics have changed (_dirty flag is True)
+        2. At least SAVE_INTERVAL seconds have passed since last save
+
+        This reduces disk I/O while ensuring metrics are persisted regularly.
+        """
+        if self._dirty and (time.time() - self._last_save_time) >= self.SAVE_INTERVAL:
+            self._save_metrics()
+            self._last_save_time = time.time()
+            self._dirty = False
+
+    def force_save(self) -> None:
+        """Force immediate save of metrics regardless of interval.
+
+        Should be called on application shutdown to ensure all metrics are
+        persisted. Safe to call multiple times.
+
+        Example:
+            >>> collector.force_save()  # Called during shutdown
+        """
+        if self._dirty:
+            self._save_metrics()
+            self._last_save_time = time.time()
+            self._dirty = False
+            logger.info("[MetricsCollector] Forced save on shutdown")
 
     def increment(self, metric_name: str, value: int = 1) -> None:
         """Increment a metric counter.
 
+        Marks metrics as dirty and triggers periodic save if interval elapsed.
+        Does NOT immediately save to disk - use force_save() for that.
+
         Args:
             metric_name: Name of the metric (e.g., "messages_received_telegram")
             value: Amount to increment by (default: 1)
+
+        Example:
+            >>> collector.increment("messages_received_telegram")
+            >>> collector.increment("messages_routed", 5)
         """
         self.metrics[metric_name] += value
-        self._save_metrics()
+        self._dirty = True
+        self._maybe_save_metrics()
 
     def set(self, metric_name: str, value: int) -> None:
         """Set a metric to a specific value (replaces existing value).
 
+        Marks metrics as dirty and triggers periodic save if interval elapsed.
+        Does NOT immediately save to disk - use force_save() for that.
+
         Args:
             metric_name: Name of the metric
             value: Value to set
+
+        Example:
+            >>> collector.set("time_ran", 3600)  # Set runtime to 1 hour
         """
         self.metrics[metric_name] = value
-        self._save_metrics()
+        self._dirty = True
+        self._maybe_save_metrics()
 
     def get(self, metric_name: str) -> int:
         """Get current value of a metric.
@@ -116,18 +186,25 @@ class MetricsCollector:
         return dict(self.metrics)
 
     def reset(self) -> None:
-        """Reset all metrics to zero and persist the change."""
+        """Reset all metrics to zero and force immediate save.
+
+        This is a significant operation that warrants immediate persistence.
+        """
         self.metrics.clear()
-        self._save_metrics()
+        self._dirty = True
+        self.force_save()
         logger.info("[MetricsCollector] All metrics reset to zero")
 
     def reset_metric(self, metric_name: str) -> None:
-        """Reset a specific metric to zero.
+        """Reset a specific metric to zero and force immediate save.
 
         Args:
             metric_name: Name of the metric to reset
+
+        This is a significant operation that warrants immediate persistence.
         """
         if metric_name in self.metrics:
             del self.metrics[metric_name]
-            self._save_metrics()
+            self._dirty = True
+            self.force_save()
             logger.info(f"[MetricsCollector] Reset metric: {metric_name}")

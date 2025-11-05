@@ -221,6 +221,9 @@ class Watchtower:
             self.metrics.set("time_ran", runtime_seconds)
             logger.info(f"[Watchtower] Application ran for {runtime_seconds} seconds")
 
+        # Force save metrics before shutdown (in case periodic save hasn't triggered)
+        self.metrics.force_save()
+
         # Log metrics before shutdown
         metrics_summary = self.metrics.get_all()
         if metrics_summary:

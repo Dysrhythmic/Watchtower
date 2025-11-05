@@ -198,8 +198,10 @@ class TestOCRMultipleDestinations(unittest.TestCase):
         )
         msg.original_message = Mock()
 
-        # Mock os.path.exists so media file is considered to exist
-        with patch('os.path.exists', return_value=True):
+        # Mock os.path.exists to return True for exists checks but prevent file deletion
+        # Also mock os.remove to prevent deletion of the test fixture
+        with patch('os.path.exists', return_value=True), \
+             patch('os.remove') as mock_remove:
             # Process message
             asyncio.run(app._handle_message(msg, False))
 

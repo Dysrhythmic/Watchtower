@@ -1132,11 +1132,16 @@ class TestTelegramLogCleanup(unittest.TestCase):
         self.telegramlog_dir = self.temp_dir / "telegramlog"
         self.telegramlog_dir.mkdir(parents=True, exist_ok=True)
 
+        # Create attachments directory (required by Watchtower.__init__)
+        self.attachments_dir = self.temp_dir / "attachments"
+        self.attachments_dir.mkdir(parents=True, exist_ok=True)
+
         # Create mock config
         mock_config = Mock()
         mock_config.project_root = self.temp_dir
         mock_config.telegramlog_dir = self.telegramlog_dir
         mock_config.tmp_dir = self.temp_dir
+        mock_config.attachments_dir = self.attachments_dir
         mock_config.webhooks = []
         mock_config.rss_feeds = []
 

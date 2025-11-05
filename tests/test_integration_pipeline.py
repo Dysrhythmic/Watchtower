@@ -261,7 +261,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
 
         # Mock Telegram handler with restriction check
         mock_telegram = MockTelegram.return_value
-        mock_telegram._is_media_restricted = Mock(return_value=True)  # Media allowed
+        mock_telegram._is_media_restricted = Mock(return_value=False)  # Media allowed (not restricted)
         mock_telegram.download_media = AsyncMock(return_value="/tmp/attachments/test.jpg")
 
         watchtower = Watchtower(sources=['telegram'])
@@ -320,7 +320,8 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
 
         # Mock Telegram handler with restriction check that fails
         mock_telegram = MockTelegram.return_value
-        mock_telegram._is_media_restricted = Mock(return_value=False)  # Media BLOCKED
+        mock_telegram._is_media_restricted = Mock(return_value=True)  # Media BLOCKED (restricted=True)
+        mock_telegram.download_media = AsyncMock(return_value="/tmp/attachments/test.jpg")
 
         watchtower = Watchtower(sources=['telegram'])
 

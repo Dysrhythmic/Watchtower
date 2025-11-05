@@ -1,57 +1,115 @@
-import logging
+"""
+ConfigManager - Configuration loading and validation
+
+This module loads and validates configuration from multiple sources:
+- Environment variables (.env file): Telegram API credentials, webhook URLs
+- JSON config file (config.json): Destination mappings, channel configs, keyword files
+- Keyword files: External JSON files with keyword lists for filtering
+
+Configuration Structure:
+    config/
+    ├── .env                    # API credentials, webhook URLs (git-ignored)
+    ├── config.json             # Main configuration
+    ├── kw-general.json         # Keyword lists (example)
+    └── kw-work.json
+
+Features:
+- Validates required environment variables on startup
+- Flexible destination configuration (Discord webhooks, Telegram channels)
+- Keyword file references with caching
+- RSS feed deduplication (same URL used by multiple destinations)
+- Per-destination channel-specific settings (OCR, restricted mode, parsers)
+
+Configuration Flow:
+    1. Load environment variables from .env
+    2. Parse config.json destinations array
+    3. For each destination:
+        a. Resolve webhook URL or Telegram channel from env vars
+        b. Load channel source configurations
+        c. Load RSS feed configurations
+        d. Resolve keyword file references
+    4. Build internal data structures (webhooks list, rss_feeds list)
+"""
 import os
 import json
 from typing import List, Dict, Optional, Set
 from dotenv import load_dotenv
 from pathlib import Path
+from logger_setup import setup_logger
 
 # Resolve config dir (always project-root/config)
 _CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
 
-# Load .env
+# Load .env file into environment
 _ENV_PATH = _CONFIG_DIR / ".env"
 load_dotenv(dotenv_path=_ENV_PATH)
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
+
 
 class ConfigManager:
-    """Manages configuration from environment variables and JSON config."""
+    """Manages configuration from environment variables and JSON config files.
+
+    Loads configuration on initialization and validates all required settings.
+    Raises ValueError if configuration is invalid or incomplete.
+    """
 
     def __init__(self):
+        """Initialize ConfigManager by loading all configuration sources.
+
+        Loads environment variables, parses config.json, validates settings,
+        and creates temporary working directories.
+
+        Raises:
+            ValueError: If required environment variables are missing or config is invalid
+        """
+        # Load Telegram API credentials from environment
         self.api_id = os.getenv('TELEGRAM_API_ID')
         self.api_hash = os.getenv('TELEGRAM_API_HASH')
 
         if not self.api_id or not self.api_hash:
             raise ValueError("Missing required: TELEGRAM_API_ID, TELEGRAM_API_HASH")
 
-        # Paths
+        # Project directory structure
         self.project_root = Path(__file__).resolve().parents[1]
 
-        # tmp directories at project root
+        # Temporary working directories (created if they don't exist)
         self.tmp_dir = self.project_root / "tmp"
-        self.attachments_dir = self.tmp_dir / "attachments"
-        self.rsslog_dir = self.tmp_dir / "rsslog"
+        self.attachments_dir = self.tmp_dir / "attachments"  # Downloaded media files
+        self.rsslog_dir = self.tmp_dir / "rsslog"  # RSS feed timestamp logs
         self.attachments_dir.mkdir(parents=True, exist_ok=True)
         self.rsslog_dir.mkdir(parents=True, exist_ok=True)
 
         # Keyword file cache: filename -> List[keywords]
+        # Avoids re-parsing JSON files when multiple destinations use same keyword file
         self._keyword_cache: Dict[str, List[str]] = {}
 
-        # Load config.json
+        # Load and parse config.json
         config_path = _CONFIG_DIR / "config.json"
         self.webhooks, self.rss_feeds = self._load_config(config_path)
 
-        # channel_id -> friendly name mapping for display/logging
+        # Channel ID -> friendly name mapping (populated at runtime)
         self.channel_names: Dict[str, str] = {}
 
         logger.info(f"[ConfigManager] Loaded {len(self.webhooks)} destinations and {len(self.rss_feeds)} RSS feeds")
 
-    def _load_config(self, config_file: Path):
-        """Load and validate configuration for destinations."""
+    def _load_config(self, config_file: Path) -> tuple[List[Dict], List[Dict]]:
+        """Load and validate configuration from config.json.
+
+        Parses JSON configuration file and processes each destination entry.
+        Deduplicates RSS feeds (same URL appearing in multiple destinations).
+
+        Args:
+            config_file: Path to config.json
+
+        Returns:
+            tuple[List[Dict], List[Dict]]: (webhooks, rss_feeds)
+                - webhooks: List of destination configurations
+                - rss_feeds: List of unique RSS feed configurations
+
+        Raises:
+            ValueError: If config file not found or no valid destinations configured
+        """
         if not config_file.exists():
             raise ValueError(f"Config file {config_file} not found")
 

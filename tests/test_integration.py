@@ -156,6 +156,9 @@ class TestMetricsIntegration(unittest.TestCase):
         self.assertEqual(app.metrics.get("messages_received_telegram"), 1)
         self.assertEqual(app.metrics.get("messages_sent_discord"), 2)
 
+        # Force save to ensure persistence (periodic saves don't happen immediately)
+        app.metrics.force_save()
+
         # Verify persistence
         metrics_file = temp_dir / "metrics.json"
         self.assertTrue(metrics_file.exists())

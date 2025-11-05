@@ -120,6 +120,9 @@ class TestMetricsCollector(unittest.TestCase):
         """Test saving to and loading from JSON."""
         self.metrics.increment("test_metric", 10)
 
+        # Force save to ensure persistence (periodic saves don't happen immediately)
+        self.metrics.force_save()
+
         # Create new instance with same file
         metrics2 = MetricsCollector(Path(self.temp_file.name))
         self.assertEqual(metrics2.get("test_metric"), 10)

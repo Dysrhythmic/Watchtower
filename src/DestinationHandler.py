@@ -1,21 +1,39 @@
-import logging
+"""
+DestinationHandler - Abstract base class for message delivery platforms
+
+This module defines the common interface and shared functionality for all destination
+handlers (Discord, Telegram, etc.). Provides rate limiting, text chunking, and
+standardized message sending operations.
+
+Features:
+- Automatic rate limit tracking and enforcement
+- Text chunking for platform message length limits
+- Abstract interface for platform-specific implementations
+
+Implementations:
+    - DiscordHandler: Discord webhook delivery
+    - TelegramHandler: Telegram bot API delivery
+"""
 import time
 import math
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
+from logger_setup import setup_logger
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
+
 
 class DestinationHandler(ABC):
-    """Abstract base class for destination handlers (Discord, Telegram, etc.)."""
+    """Abstract base class for destination handlers (Discord, Telegram, etc.).
+
+    Provides shared functionality for rate limiting and text chunking. Subclasses
+    must implement platform-specific send and format operations.
+    """
 
     def __init__(self):
+        """Initialize handler with empty rate limit tracking."""
         # Track rate limits per destination: key -> expiry timestamp
-        self._rate_limits: Dict = {}
+        self._rate_limits: Dict[str, float] = {}
 
     @abstractmethod
     def _get_rate_limit_key(self, destination_identifier) -> str:
@@ -66,14 +84,21 @@ class DestinationHandler(ABC):
         )
 
     def _chunk_text(self, text: str, max_length: int) -> List[str]:
-        """Split text into chunks respecting max length.
+        """Split text into chunks respecting max length and newline boundaries.
+
+        Attempts to split at newlines when possible to preserve message structure.
+        If no newline is found within max_length, performs hard split.
 
         Args:
-            text: Text to split
+            text: Text to split into chunks
             max_length: Maximum characters per chunk
 
         Returns:
-            List of text chunks
+            List[str]: Text chunks, each ≤ max_length characters
+
+        Example:
+            >>> handler._chunk_text("Line1\\nLine2\\nLine3", max_length=10)
+            ["Line1", "Line2", "Line3"]
         """
         if len(text) <= max_length:
             return [text]
@@ -84,13 +109,14 @@ class DestinationHandler(ABC):
                 chunks.append(text)
                 break
 
-            # Try to split at newline
+            # Try to split at newline to preserve message structure
             split_point = text.rfind('\n', 0, max_length)
             if split_point == -1:
+                # No newline found - perform hard split at max_length
                 split_point = max_length
 
             chunks.append(text[:split_point])
-            text = text[split_point:].lstrip('\n')
+            text = text[split_point:].lstrip('\n')  # Remove leading newlines
 
         return chunks
 

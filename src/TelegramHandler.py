@@ -1,4 +1,37 @@
-import logging
+"""
+TelegramHandler - Telegram bot operations for both source and destination
+
+This module handles all Telegram operations using Telethon library, serving dual roles:
+1. Source Handler: Monitors configured Telegram channels for new messages
+2. Destination Handler: Sends formatted messages to Telegram channels/chats
+
+Key Features:
+- Async message monitoring with automatic channel resolution
+- Message downloading with media attachment support
+- Restricted mode for CTI workflows (blocks photos/videos, allows text files only)
+- Defanged URL generation for threat intelligence sharing
+- Rate limit handling with exponential backoff
+- Reply context extraction for message threads
+- HTML formatting for rich text display
+
+Telegram API Details:
+    - Caption limit: 1024 characters (for media captions)
+    - Message limit: 4096 characters (for text messages)
+    - Automatic chunking when content exceeds limits
+    - Rate limiting via FloodWaitError with retry_after seconds
+
+Restricted Mode:
+    Security feature for CTI workflows that only allows specific document types:
+    - Allowed extensions: .txt, .csv, .log, .sql, .xml, .dat, .db, .mdb, .json
+    - Allowed MIME types: text/plain, text/csv, application/json, etc.
+    - Blocks: Photos, videos, and other potentially malicious media
+    - Both extension AND MIME type must match for security
+
+URL Defanging:
+    Converts Telegram URLs to non-clickable format for safe sharing:
+    - https://t.me → hxxps://t[.]me
+    - Used in threat intelligence workflows to prevent accidental clicks
+"""
 import os
 from typing import Optional, Dict, List
 from telethon import TelegramClient, events, utils
@@ -7,15 +40,26 @@ from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, Channel, 
 from ConfigManager import ConfigManager
 from MessageData import MessageData
 from DestinationHandler import DestinationHandler
+from logger_setup import setup_logger
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 class TelegramHandler(DestinationHandler):
-    """Handles all Telegram operations."""
+    """Telegram handler for message monitoring and delivery.
+
+    Dual-purpose handler that:
+    1. Monitors configured Telegram channels for new messages (source mode)
+    2. Delivers formatted messages to Telegram destinations (destination mode)
+
+    Attributes:
+        TELEGRAM_CAPTION_LIMIT: Max caption length (1024 chars)
+        TELEGRAM_MESSAGE_LIMIT: Max message length (4096 chars)
+        ALLOWED_MIME_TYPES: Permitted MIME types in restricted mode
+        ALLOWED_EXTENSIONS: Permitted file extensions in restricted mode
+        client: Telethon TelegramClient instance
+        channels: Resolved channel entities (channel_id -> entity)
+        msg_callback: Callback function for new messages
+    """
 
     # Telegram limits
     TELEGRAM_CAPTION_LIMIT = 1024  # Maximum caption length for media
@@ -33,6 +77,14 @@ class TelegramHandler(DestinationHandler):
     }
 
     def __init__(self, config: ConfigManager):
+        """Initialize TelegramHandler with configuration.
+
+        Creates Telethon client with session file and API credentials from config.
+        Session file stores authentication state to avoid re-login on restarts.
+
+        Args:
+            config: ConfigManager with api_id, api_hash, and channel configurations
+        """
         super().__init__()
         self.config = config
         session_path = str(self.config.project_root / "config" / "watchtower_session.session")
@@ -45,7 +97,12 @@ class TelegramHandler(DestinationHandler):
         self._dest_cache: Dict[str, int] = {}
 
     async def start(self) -> None:
-        """Start client and resolve channels."""
+        """Start Telegram client and resolve all configured channels.
+
+        Connects to Telegram, authenticates using session file, and resolves all
+        channel IDs from config into Telegram entities. Stores resolved entities
+        in self.channels for message monitoring. Logs success/failure for each channel.
+        """
         await self.client.start()
         logger.info("[TelegramHandler] Telegram client started")
 
@@ -66,7 +123,20 @@ class TelegramHandler(DestinationHandler):
     async def _resolve_entity(self, identifier: str):
         """Shared entity resolution logic for channels and destinations.
 
-        Handles @username, -100xxx numeric IDs, and bare usernames.
+        Handles multiple Telegram identifier formats:
+        - @username: Direct username lookup
+        - -100xxx: Supergroup numeric ID
+        - xxx: Bare numeric ID
+        - username: Bare username (adds @ prefix automatically)
+
+        Args:
+            identifier: Channel identifier in any supported format
+
+        Returns:
+            Telegram entity (Channel, User, or Chat object)
+
+        Raises:
+            Exception: If entity cannot be resolved
         """
         if identifier.startswith('@'):
             return await self.client.get_entity(identifier)
@@ -78,7 +148,14 @@ class TelegramHandler(DestinationHandler):
             return await self.client.get_entity(f"@{identifier}")
 
     async def _resolve_channel(self, channel_id: str):
-        """Resolve a channel ID to a Telegram entity."""
+        """Resolve a channel ID to a Telegram entity.
+
+        Args:
+            channel_id: Channel identifier from config
+
+        Returns:
+            Telegram entity if successful, None if resolution fails
+        """
         try:
             return await self._resolve_entity(channel_id)
         except Exception as e:
@@ -86,7 +163,12 @@ class TelegramHandler(DestinationHandler):
             return None
 
     async def fetch_latest_messages(self):
-        """Fetch latest message from each channel for connection proof."""
+        """Fetch latest message from each channel for connection proof.
+
+        Retrieves the most recent message from each monitored channel and passes
+        it to the message callback with is_latest=True flag. Used during startup
+        to verify channel connectivity and permissions.
+        """
         for channel_id, telegram_entity in self.channels.items():
             channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
             try:
@@ -99,7 +181,14 @@ class TelegramHandler(DestinationHandler):
                 logger.error(f"[TelegramHandler] Error fetching from {channel_name}: {e}")
 
     def setup_handlers(self, callback) -> None:
-        """Setup message event handlers."""
+        """Setup message event handlers for monitoring new messages.
+
+        Registers event handler for NewMessage events on all channels. Each new
+        message is converted to MessageData and passed to the callback function.
+
+        Args:
+            callback: Async function to call for each new message (message_data, is_latest)
+        """
         self.msg_callback = callback
 
         configured_unique = len(self.config.get_all_channel_ids())
@@ -123,7 +212,18 @@ class TelegramHandler(DestinationHandler):
                 logger.error(f"[TelegramHandler] Error handling message from {channel_name}: {e}", exc_info=True)
 
     async def _create_message_data(self, message, channel_id: str) -> MessageData:
-        """Create MessageData from Telegram message."""
+        """Create MessageData from Telegram message.
+
+        Extracts all relevant information from Telegram message and converts
+        to standardized MessageData format for routing and processing.
+
+        Args:
+            message: Telethon Message object
+            channel_id: Source channel numeric ID
+
+        Returns:
+            MessageData: Standardized message container
+        """
         self._msg_counter += 1
 
         username = self._extract_username_from_sender(message.sender)
@@ -149,7 +249,17 @@ class TelegramHandler(DestinationHandler):
 
     @staticmethod
     def _extract_username_from_sender(sender) -> str:
-        """Extract display name from message sender."""
+        """Extract display name from message sender.
+
+        Handles different sender types (User, Channel) and falls back gracefully
+        when username or name information is missing.
+
+        Args:
+            sender: Telegram sender object (User, Channel, or None)
+
+        Returns:
+            str: Display name (username, full name, or "Unknown")
+        """
         if not sender:
             return "Unknown"
 
@@ -168,7 +278,14 @@ class TelegramHandler(DestinationHandler):
 
     @staticmethod
     def _get_media_type(media) -> Optional[str]:
-        """Determine media type from Telegram message media."""
+        """Determine media type from Telegram message media.
+
+        Args:
+            media: Telegram media object (MessageMediaPhoto, MessageMediaDocument, etc.)
+
+        Returns:
+            Optional[str]: "Photo", "Document", "Other", or None if no media
+        """
         if not media:
             return None
 
@@ -180,7 +297,18 @@ class TelegramHandler(DestinationHandler):
             return "Other"
 
     async def _get_reply_context(self, message) -> Optional[Dict]:
-        """Extract context about what message this is replying to."""
+        """Extract context about what message this is replying to.
+
+        Fetches the original message being replied to and extracts relevant
+        metadata for display in forwarded messages.
+
+        Args:
+            message: Telegram message object with reply_to field
+
+        Returns:
+            Optional[Dict]: Reply context with keys: message_id, author, text, time,
+                          media_type, has_media. None if reply fetch fails.
+        """
         try:
             replied_msg = await self.client.get_messages(
                 message.chat_id,
@@ -286,10 +414,18 @@ class TelegramHandler(DestinationHandler):
 
     @staticmethod
     def build_message_url(channel_id: str, channel_username_or_name: str, message_id: Optional[int]) -> Optional[str]:
-        """
-        Build a canonical t.me link for a message, whether the chat is public or private.
-        - Public:  https://t.me/<username>/<message_id>
-        - Private: https://t.me/c/<internal_id>/<message_id>   (internal_id = chat_id with '-100' stripped)
+        """Build a canonical t.me link for a message, whether public or private.
+
+        Args:
+            channel_id: Numeric channel ID (e.g., "-1001234567890")
+            channel_username_or_name: Channel username (with/without @) or display name
+            message_id: Message ID number
+
+        Returns:
+            Optional[str]: Telegram URL in format:
+                - Public: https://t.me/<username>/<message_id>
+                - Private: https://t.me/c/<internal_id>/<message_id>
+                  (internal_id = chat_id with '-100' prefix stripped)
         """
         if not message_id:
             return None
@@ -329,6 +465,13 @@ class TelegramHandler(DestinationHandler):
         """Resolve a destination '@username' or numeric id to chat_id (int).
 
         Uses caching to avoid repeated API calls for the same destination.
+        Handles both username and numeric ID formats.
+
+        Args:
+            channel_specifier: Destination identifier (@username or numeric ID)
+
+        Returns:
+            Optional[int]: Numeric chat_id if successful, None if resolution fails
         """
         if channel_specifier in self._dest_cache:
             return self._dest_cache[channel_specifier]
@@ -347,7 +490,16 @@ class TelegramHandler(DestinationHandler):
             return None
 
     def _get_rate_limit_key(self, destination_identifier) -> str:
-        """Get rate limit key for Telegram (chat ID)."""
+        """Get rate limit key for Telegram (chat ID).
+
+        Implements DestinationHandler interface for rate limit tracking.
+
+        Args:
+            destination_identifier: Telegram chat ID (int)
+
+        Returns:
+            str: String representation of chat ID for rate limit tracking
+        """
         return str(destination_identifier)
 
     def send_message(self, content: str, destination_chat_id: int, media_path: Optional[str] = None) -> bool:
@@ -476,7 +628,14 @@ class TelegramHandler(DestinationHandler):
         return '\n'.join(lines)
 
     def _format_reply_context_html(self, reply_context: Dict) -> str:
-        """Format reply context for Telegram display using HTML."""
+        """Format reply context for Telegram display using HTML.
+
+        Args:
+            reply_context: Reply metadata dict with author, time, text, media_type
+
+        Returns:
+            str: Formatted reply context with HTML markup
+        """
         from html import escape
 
         parts = []
@@ -499,5 +658,9 @@ class TelegramHandler(DestinationHandler):
         return '\n'.join(parts)
 
     async def run(self) -> None:
-        """Keep client running."""
+        """Keep Telegram client running indefinitely.
+
+        Blocks until client disconnects. Used to maintain persistent connection
+        for message monitoring. Should be run as async task.
+        """
         await self.client.run_until_disconnected()

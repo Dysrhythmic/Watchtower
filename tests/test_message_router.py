@@ -1,3 +1,55 @@
+"""
+Test MessageRouter - Keyword matching and message routing logic
+
+This module tests the MessageRouter component which determines which destinations
+should receive each message based on keyword matching and channel configuration.
+
+What This Tests:
+    - Keyword matching (case-insensitive, partial matches)
+    - Empty keyword lists (forward all messages)
+    - Channel ID matching (with/without -100 prefix)
+    - OCR text inclusion in keyword searches
+    - Parser functionality (trim_front_lines, trim_back_lines)
+    - Per-destination configuration (restricted_mode, parser, OCR)
+    - RSS feed routing
+
+Test Pattern - Keyword Matching:
+    1. Create mock ConfigManager with webhooks list
+    2. Configure channel with keywords in webhooks[0]['channels'][0]['keywords']
+    3. Create MessageData with text that should/shouldn't match
+    4. Call router.get_destinations(msg)
+    5. Assert correct number of matching destinations
+
+Test Pattern - Parser Testing:
+    1. Create MessageData with multi-line text
+    2. Define parser dict: {'trim_front_lines': N, 'trim_back_lines': M}
+    3. Call router.parse_msg(msg, parser)
+    4. Assert correct lines were removed
+
+Mock Setup Template:
+    self.mock_config = Mock()
+    self.mock_config.webhooks = [{
+        'name': 'Destination Name',
+        'type': 'discord',  # or 'telegram'
+        'webhook_url': 'https://discord.com/webhook',  # for Discord
+        'channels': [{
+            'id': '@channel_name',  # or numeric ID
+            'keywords': ['keyword1', 'keyword2'],  # or [] for all messages
+            'restricted_mode': False,
+            'parser': None,  # or {'trim_front_lines': 0, 'trim_back_lines': 0}
+            'ocr': False
+        }]
+    }]
+
+How to Add New Tests:
+    1. Add test method starting with test_
+    2. Use descriptive docstring: """Test <what behavior>."""
+    3. Create MessageData with relevant content
+    4. Call router method being tested
+    5. Use self.assertEqual/assertTrue/assertIn to verify behavior
+    6. For keyword tests: check len(destinations) and matched keywords
+    7. For parser tests: verify trimmed text matches expected output
+"""
 import unittest
 import sys
 import os
@@ -15,7 +67,7 @@ from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 
 
 class TestMessageRouter(unittest.TestCase):
-    """Test MessageRouter."""
+    """Test MessageRouter keyword matching and routing logic."""
 
     def setUp(self):
         """Create MessageRouter with mocked config."""

@@ -1,10 +1,40 @@
+"""
+MessageData - Generic message container for cross-platform message handling
+
+This module defines the MessageData dataclass which serves as a unified representation
+of messages from different sources (Telegram, RSS). It provides a common interface
+for message routing, processing, and forwarding operations.
+
+Key Features:
+- Source-agnostic design (works with Telegram, RSS, or future sources)
+- OCR integration support for image text extraction
+- Metadata extensibility via flexible metadata dict
+- Media attachment tracking
+"""
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Literal, Any
 from datetime import datetime
 
 @dataclass
 class MessageData:
-    """Generic container for message information from any source"""
+    """Generic container for message information from any source.
+
+    Attributes:
+        source_type: Platform origin ("telegram" or "rss")
+        channel_id: Unique channel identifier (username, numeric ID, or RSS URL)
+        channel_name: Human-readable channel name
+        username: Message sender or source label
+        timestamp: Message creation time
+        text: Primary message text content
+        has_media: Whether message contains media attachment
+        media_type: Type of media (photo, video, document, etc.)
+        media_path: Local filesystem path to downloaded media
+        reply_context: Optional reply-to information (Telegram only)
+        original_message: Original platform-specific message object
+        ocr_enabled: Whether OCR processing should be applied
+        ocr_raw: Extracted text from OCR processing
+        metadata: Flexible storage for additional data (rss_link, defanged URLs, etc.)
+    """
 
     # Source identity
     source_type: Literal["telegram", "rss"] = "telegram"

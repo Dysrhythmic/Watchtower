@@ -1,26 +1,46 @@
-from __future__ import annotations
-import os
-import argparse
-import asyncio
-import logging
-import json
-from typing import List, Dict, Optional, TYPE_CHECKING
-from pathlib import Path
-
-if TYPE_CHECKING:
-    from MessageData import MessageData
-
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
 """
-Error Handling Pattern:
+Watchtower - Main orchestrator for message monitoring and routing
 
+This module contains the core Watchtower application that coordinates all components
+to monitor message sources (Telegram, RSS) and route matching messages to configured
+destinations (Discord, Telegram) based on keywords and filters.
+
+Architecture:
+    Watchtower serves as the central coordinator that:
+    1. Initializes all handlers (Telegram, Discord, RSS, OCR)
+    2. Starts message monitoring on configured sources
+    3. Routes messages through MessageRouter based on keywords
+    4. Applies per-destination transformations (parsing, formatting)
+    5. Handles media downloads and restrictions
+    6. Manages retry queue for failed deliveries
+    7. Collects metrics and handles graceful shutdown
+
+Message Flow:
+    1. Source (Telegram/RSS) receives message → converts to MessageData
+    2. Watchtower._handle_message() receives MessageData
+    3. Pre-process: OCR extraction, URL defanging
+    4. MessageRouter finds matching destinations based on keywords
+    5. For each destination:
+        a. Apply parser (trim lines if configured)
+        b. Format message (Discord markdown or Telegram HTML)
+        c. Check media restrictions
+        d. Send via DiscordHandler or TelegramHandler
+        e. On failure: enqueue for retry via MessageQueue
+    6. Clean up: Remove downloaded media files
+
+Key Components:
+    - ConfigManager: Loads config.json and environment variables
+    - TelegramHandler: Source + destination for Telegram
+    - RSSHandler: Source for RSS feeds
+    - DiscordHandler: Destination for Discord webhooks
+    - MessageRouter: Keyword matching and routing logic
+    - OCRHandler: Text extraction from images
+    - MessageQueue: Retry queue with exponential backoff
+    - MetricsCollector: Usage statistics tracking
+
+Error Handling Pattern:
     Use exc_info=True in logger.error() calls for unexpected exceptions that indicate bugs
-    or system failures. This includes full tracebacks for debugging.
+    or system failures (includes full tracebacks for debugging).
 
     Do NOT use exc_info=True for:
     - Expected errors (network timeouts, missing files, config validation)
@@ -30,10 +50,47 @@ Error Handling Pattern:
     Examples:
         logger.error("Failed to connect", exc_info=True)  # YES - unexpected system error
         logger.error("Invalid config file")                # NO - expected validation error
+
+Subcommands:
+    monitor: Run live message monitoring and routing
+        --sources: Comma-separated sources (telegram, rss, or all)
+
+    discover: Auto-generate config from accessible Telegram channels
+        --diff: Show only new channels not in existing config
+        --generate: Write config_discovered.json file
 """
+from __future__ import annotations
+import os
+import argparse
+import asyncio
+import json
+from typing import List, Dict, Optional, TYPE_CHECKING
+from pathlib import Path
+from logger_setup import setup_logger
+
+if TYPE_CHECKING:
+    from MessageData import MessageData
+
+logger = setup_logger(__name__)
 
 class Watchtower:
-    """Main application coordinating all components."""
+    """Main application orchestrator for CTI message routing.
+
+    Coordinates all components to monitor message sources (Telegram, RSS feeds)
+    and intelligently route matching messages to configured destinations (Discord,
+    Telegram) based on keyword filtering and per-destination configuration.
+
+    Attributes:
+        config: ConfigManager instance with application configuration
+        telegram: TelegramHandler for Telegram operations (source + destination)
+        discord: DiscordHandler for Discord webhook delivery
+        router: MessageRouter for keyword matching and routing
+        ocr: OCRHandler for text extraction from images
+        message_queue: MessageQueue for retry handling
+        metrics: MetricsCollector for usage statistics
+        sources: List of enabled sources ("telegram", "rss")
+        rss: RSSHandler instance (created if RSS is enabled)
+    """
 
     def __init__(self,
                  sources: List[str],
@@ -85,7 +142,12 @@ class Watchtower:
         logger.info("[Watchtower] Initialized")
 
     def _cleanup_attachments_dir(self):
-        """Remove any leftover media files from previous runs."""
+        """Remove any leftover media files from previous runs.
+
+        Cleans the tmp/attachments directory of any files remaining from
+        previous application runs (e.g., if app crashed before cleanup).
+        Runs during initialization to ensure clean state.
+        """
         import glob
         attachments_path = self.config.attachments_dir
         if attachments_path.exists():
@@ -177,8 +239,22 @@ class Watchtower:
     async def _handle_message(self, message_data: 'MessageData', is_latest: bool) -> bool:
         """Process incoming message from any source (Telegram, RSS).
 
+        Central message processing pipeline that:
+        1. Handles connection proof logging (is_latest=True messages)
+        2. Pre-processes message (OCR, URL defanging)
+        3. Routes to matching destinations via MessageRouter
+        4. Checks media restrictions for each destination
+        5. Dispatches message to each destination
+        6. Tracks metrics and handles errors
+        7. Cleans up media files in finally block
+
+        Args:
+            message_data: Incoming message from Telegram or RSS source
+            is_latest: If True, this is a connection proof message (not routed)
+
         Returns:
-            bool: True if message was successfully routed to at least one destination, False otherwise
+            bool: True if message was successfully routed to at least one destination,
+                  False if no destinations matched or all deliveries failed
         """
         try:
             # Connection proof logging only
@@ -439,7 +515,18 @@ class Watchtower:
         return parsed_message.media_path
 
 def _get_entity_type_and_name(telegram_entity):
-    """Extract entity type and name from Telegram entity."""
+    """Extract entity type and name from Telegram entity.
+
+    Used by discover subcommand to categorize Telegram entities.
+
+    Args:
+        telegram_entity: Telethon entity (Channel, Chat, or User)
+
+    Returns:
+        tuple[str, str]: (entity_type, entity_name)
+            entity_type: "Channel", "Supergroup", "Group", "Bot", or "User"
+            entity_name: Display name (title, username, or full name)
+    """
     from telethon.tl.types import Channel, Chat, User
 
     entity_type = "Unknown"
@@ -474,13 +561,33 @@ def _get_entity_type_and_name(telegram_entity):
     return entity_type, entity_name
 
 def _get_channel_identifier(telegram_entity, dialog_id):
-    """Get channel identifier (username or numeric ID)."""
+    """Get channel identifier (username or numeric ID).
+
+    Used by discover subcommand to generate config entries.
+
+    Args:
+        telegram_entity: Telethon entity
+        dialog_id: Numeric dialog ID from Telegram
+
+    Returns:
+        str: "@username" if available, otherwise numeric ID
+    """
     if hasattr(telegram_entity, 'username') and telegram_entity.username:
         return f"@{telegram_entity.username}"
     return str(dialog_id)
 
 def _load_existing_config(config_dir: Path):
-    """Load existing config and return set of channel IDs."""
+    """Load existing config and return set of channel IDs.
+
+    Used by discover --diff to compare discovered channels with existing config.
+
+    Args:
+        config_dir: Path to config directory
+
+    Returns:
+        tuple: (existing_channel_ids set, existing_channel_details dict)
+               Returns (None, None) on error
+    """
     config_file_name = os.getenv('CONFIG_FILE', 'config.json')
     config_path = config_dir / config_file_name
 
@@ -512,14 +619,36 @@ def _load_existing_config(config_dir: Path):
         return None, None
 
 def _calculate_diff(channels, existing_channel_ids):
-    """Calculate new and removed channels."""
+    """Calculate new and removed channels.
+
+    Compares discovered channels with existing config to identify changes.
+
+    Args:
+        channels: List of discovered channel dicts
+        existing_channel_ids: Set of channel IDs from existing config
+
+    Returns:
+        tuple: (new_channels list, removed_channel_ids set)
+    """
     discovered_ids = set(ch['info']['id'] for ch in channels)
     new_channels = [ch for ch in channels if ch['info']['id'] not in existing_channel_ids]
     removed_channel_ids = existing_channel_ids - discovered_ids
     return new_channels, removed_channel_ids
 
 def _print_diff_output(new_channels, removed_channel_ids, existing_channel_ids, all_channels):
-    """Print diff mode output."""
+    """Print diff mode output showing configuration changes.
+
+    Displays formatted diff showing new and removed channels with summary statistics.
+
+    Args:
+        new_channels: List of new channel dicts
+        removed_channel_ids: Set of removed channel IDs
+        existing_channel_ids: Set of existing channel IDs from config
+        all_channels: List of all discovered channels
+
+    Returns:
+        bool: True if changes detected, False if no changes
+    """
     has_changes = len(new_channels) > 0 or len(removed_channel_ids) > 0
 
     if not has_changes:
@@ -699,6 +828,12 @@ async def discover_channels(diff_mode=False, generate_config=False):
         logger.info("  python3 src/Watchtower.py discover --generate")
 
 def main():
+    """Main entry point for Watchtower CLI.
+
+    Parses command-line arguments and dispatches to appropriate subcommand:
+    - monitor: Run live message monitoring and routing
+    - discover: Auto-generate config from accessible Telegram channels
+    """
     parser = argparse.ArgumentParser(description="Watchtower - CTI Message Routing")
     subparsers = parser.add_subparsers(dest="cmd")
 

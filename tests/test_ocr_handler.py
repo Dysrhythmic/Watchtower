@@ -1,3 +1,55 @@
+"""
+Test OCRHandler - Text extraction from images using EasyOCR
+
+This module tests the OCRHandler component which extracts text from images
+(screenshots, photos) for keyword matching and routing.
+
+What This Tests:
+    - Availability check when EasyOCR installed/not installed
+    - Text extraction from images
+    - Handling empty OCR results
+    - Error handling during OCR processing
+    - Reader initialization (should only initialize once)
+    - Integration with actual image files
+
+Test Pattern - Basic OCR:
+    1. Mock easyocr.Reader class with @patch decorator
+    2. Configure mock reader's readtext() return value
+    3. Patch _EASYOCR_AVAILABLE to True
+    4. Create OCRHandler instance
+    5. Call extract_text() with image path
+    6. Assert text matches expected output
+
+Test Pattern - Availability:
+    1. Patch _EASYOCR_AVAILABLE to False
+    2. Create OCRHandler instance
+    3. Call is_available()
+    4. Assert returns False
+
+Mock Setup Template:
+    @patch('easyocr.Reader')
+    def test_extraction(self, mock_reader_class):
+        # Configure mock
+        mock_reader = Mock()
+        mock_reader.readtext.return_value = ["Line 1", "Line 2"]
+        mock_reader_class.return_value = mock_reader
+
+        # Patch availability
+        with patch('OCRHandler._EASYOCR_AVAILABLE', True):
+            handler = OCRHandler()
+            handler._ensure_reader()
+            text = handler.extract_text("/path/to/image.png")
+            # Assert text content
+
+How to Add New Tests:
+    1. Add test method starting with test_
+    2. Use descriptive docstring: """Test <what OCR behavior>."""
+    3. Mock easyocr.Reader if testing extraction
+    4. Patch _EASYOCR_AVAILABLE to control availability
+    5. Use self.assertIn/assertIsNone for text verification
+    6. For error tests: use side_effect=Exception("error")
+    7. For integration tests: use actual test images from tests/ directory
+"""
 import unittest
 import sys
 import os
@@ -10,7 +62,7 @@ from OCRHandler import OCRHandler
 
 
 class TestOCRHandler(unittest.TestCase):
-    """Test OCRHandler."""
+    """Test OCRHandler text extraction from images."""
 
     def test_is_available_false_when_no_easyocr(self):
         """Test availability check when EasyOCR not installed."""
@@ -198,8 +250,10 @@ class TestOCRMultipleDestinations(unittest.TestCase):
         )
         msg.original_message = Mock()
 
-        # Mock os.path.exists so media file is considered to exist
-        with patch('os.path.exists', return_value=True):
+        # Mock os.path.exists to return True for exists checks but prevent file deletion
+        # Also mock os.remove to prevent deletion of the test fixture
+        with patch('os.path.exists', return_value=True), \
+             patch('os.remove') as mock_remove:
             # Process message
             asyncio.run(app._handle_message(msg, False))
 

@@ -1,3 +1,49 @@
+"""
+Test DestinationHandler - Base class for Discord and Telegram handlers
+
+This module tests the DestinationHandler abstract base class which provides
+shared functionality for all destination handlers (rate limiting, text chunking).
+
+What This Tests:
+    - Rate limit tracking (per-destination, ceiling rounding, expiry)
+    - Text chunking algorithm (respects newlines, max length)
+    - Chunking order preservation for extremely long messages (10k+ chars)
+    - Base class interface requirements
+
+Test Pattern - Rate Limiting:
+    1. Create concrete DestinationHandler subclass for testing
+    2. Call _store_rate_limit(destination, seconds)
+    3. Check _rate_limits dict contains correct expiry timestamp
+    4. Use time.time() assertions with small variance tolerance
+
+Test Pattern - Text Chunking:
+    1. Create handler instance
+    2. Call _chunk_text(text, max_length)
+    3. Assert chunk count, length constraints, and content preservation
+    4. For order tests: use real-world long messages, check key phrases appear in order
+
+Concrete Handler Template (for testing abstract base):
+    class ConcreteHandler(DestinationHandler):
+        def _get_rate_limit_key(self, destination_identifier):
+            return str(destination_identifier)
+
+        def send_message(self, content, destination_identifier, media_path=None):
+            return True
+
+        def format_message(self, message_data, destination):
+            return "formatted"
+
+    handler = ConcreteHandler()
+
+How to Add New Tests:
+    1. Add test method starting with test_
+    2. Use descriptive docstring: """Test <what behavior>."""
+    3. Create ConcreteHandler instance in setUp() or test method
+    4. For rate limit tests: use import time and check timestamps
+    5. For chunking tests: verify no chunk exceeds max_length
+    6. For order tests: create long messages with distinct markers
+    7. Use self.assertEqual/assertLessEqual for assertions
+"""
 import unittest
 import sys
 import os
@@ -16,7 +62,7 @@ from MessageQueue import MessageQueue
 
 
 class TestDestinationHandler(unittest.TestCase):
-    """Test DestinationHandler base class."""
+    """Test DestinationHandler base class rate limiting and chunking."""
 
     def setUp(self):
         """Create a concrete implementation for testing."""

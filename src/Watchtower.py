@@ -77,7 +77,6 @@ class Watchtower:
         self.sources = sources
         self.rss = None  # created only if RSS is enabled
         self._shutdown_requested = False
-        self._shutdown_complete = False  # Prevent duplicate shutdown
         self._start_time = None  # Track application runtime
 
         # Clean up any leftover media files from previous runs
@@ -138,22 +137,16 @@ class Watchtower:
             try:
                 await asyncio.gather(*tasks)
             except asyncio.CancelledError:
-                logger.info("[Watchtower] Tasks cancelled, shutting down gracefully...")
-                await self.shutdown()
+                logger.info("[Watchtower] Tasks cancelled, returning to main...")
 
     async def shutdown(self):
         """Gracefully shutdown the application.
 
-        Stops all sources (Telegram, RSS), disconnects clients, saves metrics,
-        and ensures idempotent shutdown (safe to call multiple times).
+        Stops all sources (Telegram, RSS), disconnects clients, saves metrics.
 
         Returns:
             None
         """
-        # Idempotency guard: prevent duplicate shutdown
-        if self._shutdown_complete:
-            return
-
         import time
         logger.info("[Watchtower] Initiating graceful shutdown...")
         self._shutdown_requested = True
@@ -180,7 +173,6 @@ class Watchtower:
             logger.info("[Watchtower] Telegram client disconnected")
 
         logger.info("[Watchtower] Shutdown complete")
-        self._shutdown_complete = True
 
     async def _handle_message(self, message_data: 'MessageData', is_latest: bool) -> bool:
         """Process incoming message from any source (Telegram, RSS).

@@ -70,12 +70,12 @@ graph TB
     KW -.->|Load| CFG
     MC -.->|Save| METRICS
 
-    style WT fill:#ffe6e6
-    style MR fill:#e6f2ff
-    style CFG fill:#e6ffe6
-    style TGH fill:#fff2e6
-    style DH fill:#fff2e6
-    style RSSH fill:#fff2e6
+    style WT fill:#000,stroke:#fff,color:#fff
+    style MR fill:#000,stroke:#fff,color:#fff
+    style CFG fill:#000,stroke:#fff,color:#fff
+    style TGH fill:#000,stroke:#fff,color:#fff
+    style DH fill:#000,stroke:#fff,color:#fff
+    style RSSH fill:#000,stroke:#fff,color:#fff
 ```
 
 ## Key Components

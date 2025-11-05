@@ -107,14 +107,16 @@ All diagrams are in Mermaid format and will render in:
 
 ### Color Coding
 
-Diagrams use consistent light color coding for readability:
-- **Light Red/Pink** (`#ffe6e6`) - Core orchestrator, critical components
-- **Light Blue** (`#e6f2ff`) - Configuration, data structures
-- **Light Green** (`#e6ffe6`) - Routing, processing logic
-- **Light Orange** (`#fff2e6`) - Handlers, external interfaces
-- **Light Yellow** (`#ffffee`) - Optional/enhancement features
+All diagrams use **black backgrounds with white text** for optimal readability.
 
-Note: Colors are intentionally very light to ensure text remains readable.
+Different components are highlighted using the same black/white scheme:
+- Core orchestrator and critical components
+- Configuration and data structures
+- Routing and processing logic
+- Handlers and external interfaces
+- Optional/enhancement features
+
+Note: All boxes use `fill:#000,stroke:#fff,color:#fff` for consistent dark theme styling.
 
 ## Using This Documentation
 

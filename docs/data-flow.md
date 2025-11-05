@@ -45,7 +45,7 @@ flowchart TD
 
     %% URL Defanging
     Defang{Source is<br/>Telegram?}
-    Defang -->|Yes| DefangURL[Build Defanged URL<br/>hxxps://t[.]me/...]
+    Defang -->|Yes| DefangURL["Build Defanged URL<br/>hxxps://t.me with dots/slashes defanged"]
     Defang -->|No| Route
     DefangURL --> AddURL[Add to metadata:<br/>src_url_defanged]
     AddURL --> Route
@@ -123,12 +123,12 @@ flowchart TD
     RSS_Dup --> End
 
     %% Styling
-    style MD fill:#e6f2ff
-    style Route fill:#e6ffe6
-    style DiscordFormat fill:#fff2e6
-    style TelegramFormat fill:#fff2e6
-    style OCR_Extract fill:#ffffee
-    style Cleanup fill:#ffe6e6
+    style MD fill:#000,stroke:#fff,color:#fff
+    style Route fill:#000,stroke:#fff,color:#fff
+    style DiscordFormat fill:#000,stroke:#fff,color:#fff
+    style TelegramFormat fill:#000,stroke:#fff,color:#fff
+    style OCR_Extract fill:#000,stroke:#fff,color:#fff
+    style Cleanup fill:#000,stroke:#fff,color:#fff
 ```
 
 ## Message Queue Retry Flow
@@ -169,10 +169,10 @@ flowchart TD
     Increment --> Background
     Success --> Background
 
-    style Enqueue fill:#fff2e6
-    style CalcBackoff fill:#e6ffe6
-    style Success fill:#e6ffe6
-    style MaxRetries fill:#ffe6e6
+    style Enqueue fill:#000,stroke:#fff,color:#fff
+    style CalcBackoff fill:#000,stroke:#fff,color:#fff
+    style Success fill:#000,stroke:#fff,color:#fff
+    style MaxRetries fill:#000,stroke:#fff,color:#fff
 ```
 
 ## Key Decision Points

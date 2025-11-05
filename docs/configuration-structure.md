@@ -33,11 +33,11 @@ graph TB
     CM -->|caches| KW_CACHE
     CM -->|populates| CHANNEL_NAMES
 
-    style ENV fill:#ffe6e6
-    style CONFIG fill:#e6f2ff
-    style KW_GEN fill:#e6ffe6
-    style WEBHOOKS fill:#fff2e6
-    style RSS_FEEDS fill:#fff2e6
+    style ENV fill:#000,stroke:#fff,color:#fff
+    style CONFIG fill:#000,stroke:#fff,color:#fff
+    style KW_GEN fill:#000,stroke:#fff,color:#fff
+    style WEBHOOKS fill:#000,stroke:#fff,color:#fff
+    style RSS_FEEDS fill:#000,stroke:#fff,color:#fff
 ```
 
 ## config.json Structure
@@ -78,11 +78,11 @@ graph TD
     RSS1 --> R1_KW["keywords: Object"]
     RSS1 --> R1_PARSER["parser: Object (optional)"]
 
-    style ROOT fill:#e6f2ff
-    style DEST1 fill:#fff2e6
-    style CHAN1 fill:#e6ffe6
-    style C1_KW fill:#ffffee
-    style RSS1 fill:#ffe6e6
+    style ROOT fill:#000,stroke:#fff,color:#fff
+    style DEST1 fill:#000,stroke:#fff,color:#fff
+    style CHAN1 fill:#000,stroke:#fff,color:#fff
+    style C1_KW fill:#000,stroke:#fff,color:#fff
+    style RSS1 fill:#000,stroke:#fff,color:#fff
 ```
 
 ## Example Configuration

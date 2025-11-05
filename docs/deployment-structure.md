@@ -42,10 +42,10 @@ graph TB
     TESTS --> TEST_IMG[test-img.jpg<br/>OCR test image]
 
     %% Config Files
-    CONFIG --> ENV[.env<br/>API keys (git-ignored)]
+    CONFIG --> ENV[".env<br/>API keys - git-ignored"]
     CONFIG --> JSON[config.json<br/>Main config]
     CONFIG --> KW_FILES[kw-*.json<br/>Keyword files]
-    CONFIG --> SESSION[watchtower_session.session<br/>Telegram session (git-ignored)]
+    CONFIG --> SESSION["watchtower_session.session<br/>Telegram session - git-ignored"]
 
     %% Temp Files
     TMP --> ATTACH[attachments/<br/>Downloaded media]
@@ -64,11 +64,11 @@ graph TB
     ROOT_FILES --> README[README.md]
     ROOT_FILES --> REQS[requirements.txt]
 
-    style SRC fill:#e6f2ff
-    style TESTS fill:#e6ffe6
-    style CONFIG fill:#fff2e6
-    style TMP fill:#ffe6e6
-    style DOCS fill:#ffffee
+    style SRC fill:#000,stroke:#fff,color:#fff
+    style TESTS fill:#000,stroke:#fff,color:#fff
+    style CONFIG fill:#000,stroke:#fff,color:#fff
+    style TMP fill:#000,stroke:#fff,color:#fff
+    style DOCS fill:#000,stroke:#fff,color:#fff
 ```
 
 ## File Descriptions
@@ -186,10 +186,10 @@ graph TB
     MAIN -.->|Read/Write| TMP_DIR
     MAIN -.->|Read/Write| SESSION
 
-    style MAIN fill:#ffe6e6
-    style TG_API fill:#e6f2ff
-    style DC_WH1 fill:#e6f2ff
-    style TG_DEST fill:#e6f2ff
+    style MAIN fill:#000,stroke:#fff,color:#fff
+    style TG_API fill:#000,stroke:#fff,color:#fff
+    style DC_WH1 fill:#000,stroke:#fff,color:#fff
+    style TG_DEST fill:#000,stroke:#fff,color:#fff
 ```
 
 ## Network Communications

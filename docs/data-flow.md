@@ -123,12 +123,12 @@ flowchart TD
     RSS_Dup --> End
 
     %% Styling
-    style MD fill:#99ccff
-    style Route fill:#99ff99
-    style DiscordFormat fill:#ffcc99
-    style TelegramFormat fill:#ffcc99
-    style OCR_Extract fill:#ffff99
-    style Cleanup fill:#ff9999
+    style MD fill:#e6f2ff
+    style Route fill:#e6ffe6
+    style DiscordFormat fill:#fff2e6
+    style TelegramFormat fill:#fff2e6
+    style OCR_Extract fill:#ffffee
+    style Cleanup fill:#ffe6e6
 ```
 
 ## Message Queue Retry Flow
@@ -169,10 +169,10 @@ flowchart TD
     Increment --> Background
     Success --> Background
 
-    style Enqueue fill:#ffcc99
-    style CalcBackoff fill:#99ff99
-    style Success fill:#99ff99
-    style MaxRetries fill:#ff9999
+    style Enqueue fill:#fff2e6
+    style CalcBackoff fill:#e6ffe6
+    style Success fill:#e6ffe6
+    style MaxRetries fill:#ffe6e6
 ```
 
 ## Key Decision Points

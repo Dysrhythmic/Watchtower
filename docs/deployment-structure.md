@@ -64,11 +64,11 @@ graph TB
     ROOT_FILES --> README[README.md]
     ROOT_FILES --> REQS[requirements.txt]
 
-    style SRC fill:#99ccff
-    style TESTS fill:#99ff99
-    style CONFIG fill:#ffcc99
-    style TMP fill:#ff9999
-    style DOCS fill:#ffff99
+    style SRC fill:#e6f2ff
+    style TESTS fill:#e6ffe6
+    style CONFIG fill:#fff2e6
+    style TMP fill:#ffe6e6
+    style DOCS fill:#ffffee
 ```
 
 ## File Descriptions
@@ -186,10 +186,10 @@ graph TB
     MAIN -.->|Read/Write| TMP_DIR
     MAIN -.->|Read/Write| SESSION
 
-    style MAIN fill:#ff9999
-    style TG_API fill:#99ccff
-    style DC_WH1 fill:#99ccff
-    style TG_DEST fill:#99ccff
+    style MAIN fill:#ffe6e6
+    style TG_API fill:#e6f2ff
+    style DC_WH1 fill:#e6f2ff
+    style TG_DEST fill:#e6f2ff
 ```
 
 ## Network Communications

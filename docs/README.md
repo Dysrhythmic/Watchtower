@@ -107,12 +107,14 @@ All diagrams are in Mermaid format and will render in:
 
 ### Color Coding
 
-Diagrams use consistent color coding:
-- **Red/Pink** (`#ff9999`) - Core orchestrator, critical components
-- **Blue** (`#99ccff`) - Configuration, data structures
-- **Green** (`#99ff99`) - Routing, processing logic
-- **Orange** (`#ffcc99`) - Handlers, external interfaces
-- **Yellow** (`#ffff99`) - Optional/enhancement features
+Diagrams use consistent light color coding for readability:
+- **Light Red/Pink** (`#ffe6e6`) - Core orchestrator, critical components
+- **Light Blue** (`#e6f2ff`) - Configuration, data structures
+- **Light Green** (`#e6ffe6`) - Routing, processing logic
+- **Light Orange** (`#fff2e6`) - Handlers, external interfaces
+- **Light Yellow** (`#ffffee`) - Optional/enhancement features
+
+Note: Colors are intentionally very light to ensure text remains readable.
 
 ## Using This Documentation
 

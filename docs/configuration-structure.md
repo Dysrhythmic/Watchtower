@@ -42,6 +42,59 @@ graph TB
 
 ## config.json Structure
 
+### ASCII Structure View
+
+```
+config.json
+│
+└── destinations: [ ]
+    │
+    ├── Destination Object
+    │   ├── name: "Destination Name"
+    │   ├── type: "discord" | "telegram"
+    │   ├── env_key: "ENV_VAR_NAME"
+    │   │
+    │   ├── channels: [ ]
+    │   │   │
+    │   │   ├── Channel Object
+    │   │   │   ├── id: "@username" or "-1001234567890"
+    │   │   │   ├── keywords:
+    │   │   │   │   ├── files: ["kw-general.json", ...]
+    │   │   │   │   └── inline: ["keyword1", "keyword2", ...]
+    │   │   │   ├── restricted_mode: true/false
+    │   │   │   ├── parser:
+    │   │   │   │   ├── trim_front_lines: 0
+    │   │   │   │   └── trim_back_lines: 0
+    │   │   │   └── ocr: true/false
+    │   │   │
+    │   │   └── (more channels...)
+    │   │
+    │   └── rss: [ ]  (optional)
+    │       │
+    │       ├── RSS Feed Object
+    │       │   ├── url: "https://..."
+    │       │   ├── name: "Feed Name"
+    │       │   ├── keywords: (same as channel)
+    │       │   └── parser: (optional)
+    │       │
+    │       └── (more feeds...)
+    │
+    └── (more destinations...)
+
+
+Example Values:
+  • type: "discord" or "telegram"
+  • id: "@channelname", "-1001234567890", or "1234567890"
+  • env_key: Points to .env file variable containing webhook URL or channel ID
+  • keywords.files: List of JSON files in config/ directory
+  • keywords.inline: Keywords defined directly in config
+  • restricted_mode: Blocks photos/videos, only allows text files
+  • parser: Removes first/last N lines from messages
+  • ocr: Enables text extraction from images
+```
+
+### Detailed Mermaid Tree
+
 ```mermaid
 graph TD
     ROOT[config.json]

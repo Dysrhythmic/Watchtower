@@ -4,6 +4,110 @@ This document illustrates the class structure and relationships in the Watchtowe
 
 ## Main Class Relationships
 
+### ASCII Class Hierarchy
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      WATCHTOWER (Main)                       │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │ - config: ConfigManager                                │  │
+│  │ - telegram: TelegramHandler                            │  │
+│  │ - discord: DiscordHandler                              │  │
+│  │ - rss: RSSHandler                                      │  │
+│  │ - router: MessageRouter                                │  │
+│  │ - ocr: OCRHandler                                      │  │
+│  │ - message_queue: MessageQueue                          │  │
+│  │ - metrics: MetricsCollector                            │  │
+│  │                                                          │  │
+│  │ + start() async                                         │  │
+│  │ + shutdown() async                                      │  │
+│  │ - _handle_message(MessageData, bool) async -> bool     │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               │ uses
+                ┌──────────────┴──────────────┐
+                │                             │
+                ▼                             ▼
+        ┌──────────────┐              ┌──────────────┐
+        │ ConfigManager│              │MessageRouter │
+        │──────────────│              │──────────────│
+        │+ webhooks    │              │+ routes msgs │
+        │+ rss_feeds   │              │+ matches kw  │
+        │+ load_config │              │+ parse_msg   │
+        └──────────────┘              └──────────────┘
+
+
+    ┌─────────────────────────────────────────────┐
+    │       DestinationHandler (Abstract)         │
+    │─────────────────────────────────────────────│
+    │ - _rate_limits: Dict                        │
+    │                                             │
+    │ + send_message()*                           │
+    │ + format_message()*                         │
+    │ # _chunk_text(text, max_length) -> List    │
+    │ # _store_rate_limit(dest, seconds)          │
+    └──────────────┬──────────────────────────────┘
+                   │
+                   │ inherits
+        ┌──────────┴──────────┐
+        │                     │
+        ▼                     ▼
+┌──────────────────┐  ┌──────────────────┐
+│ TelegramHandler  │  │  DiscordHandler  │
+│──────────────────│  │──────────────────│
+│ - client         │  │ + DISCORD_LIMIT  │
+│ - channels       │  │                  │
+│ + start()        │  │ + send_message() │
+│ + send_copy()    │  │ + format(HTML)   │
+│ + format(HTML)   │  │                  │
+└──────────────────┘  └──────────────────┘
+     (Dual Role:           (Destination
+  Source + Destination)      Only)
+
+
+         ┌──────────────┐
+         │ RSSHandler   │
+         │──────────────│
+         │ - feeds      │
+         │ + run_feed() │
+         │ + poll()     │
+         └──────────────┘
+         (Source Only)
+
+
+    ┌──────────────┐        ┌──────────────┐
+    │ MessageData  │        │ MessageQueue │
+    │──────────────│        │──────────────│
+    │+ source_type │        │ - _queue     │
+    │+ channel_id  │        │ + enqueue()  │
+    │+ text        │        │ + process()  │
+    │+ has_media   │        └──────────────┘
+    │+ ocr_raw     │
+    └──────────────┘
+    (Data Container)
+
+
+    ┌───────────────┐      ┌──────────────┐
+    │  OCRHandler   │      │MetricsColletr│
+    │───────────────│      │──────────────│
+    │+ extract_text │      │+ increment() │
+    │+ is_available │      │+ set()       │
+    └───────────────┘      │+ get_all()   │
+                           └──────────────┘
+
+
+Legend:
+  * = abstract method (must implement in subclass)
+  # = protected method
+  + = public method
+  - = private attribute
+  ──► = uses/depends on
+  ───  = inherits from
+```
+
+### Detailed Mermaid Diagram
+
 ```mermaid
 classDiagram
     %% Core Classes

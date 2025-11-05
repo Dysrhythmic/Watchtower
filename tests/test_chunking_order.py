@@ -184,19 +184,16 @@ class TestRetryQueueOrderingchunk(unittest.TestCase):
         self.assertEqual(queue.get_queue_size(), 3,
             "Should have 3 queued messages")
 
-        # Dequeue and verify order
-        items = []
-        while queue.get_queue_size() > 0:
-            item = queue._queue.get()
-            items.append(item)
+        # Get items from queue (it's a list of RetryItem dataclass objects)
+        items = queue._queue.copy()
 
         # Verify chunks are in original order
-        self.assertIn("Part 1:", items[0]['content'],
-            "First dequeued item should be Part 1")
-        self.assertIn("Part 2:", items[1]['content'],
-            "Second dequeued item should be Part 2")
-        self.assertIn("Part 3:", items[2]['content'],
-            "Third dequeued item should be Part 3")
+        self.assertIn("Part 1:", items[0].formatted_content,
+            "First queued item should be Part 1")
+        self.assertIn("Part 2:", items[1].formatted_content,
+            "Second queued item should be Part 2")
+        self.assertIn("Part 3:", items[2].formatted_content,
+            "Third queued item should be Part 3")
 
 
 if __name__ == '__main__':

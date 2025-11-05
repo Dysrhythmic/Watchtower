@@ -33,7 +33,7 @@ class TestDiscoverSubcommand(unittest.TestCase):
         import shutil
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
-    @patch('Watchtower.TelegramClient')
+    @patch('telethon.TelegramClient')
     @patch('Watchtower.Path')
     def test_discover_generate_creates_config_file(self, mock_path_class, mock_telegram_client):
         """
@@ -168,7 +168,7 @@ class TestDiscoverSubcommand(unittest.TestCase):
             self.assertEqual(channel['parser']['trim_back_lines'], 0,
                 "Default parser trim_back_lines should be 0")
 
-    @patch('Watchtower.TelegramClient')
+    @patch('telethon.TelegramClient')
     @patch('Watchtower.Path')
     def test_discover_without_generate_no_file_created(self, mock_path_class, mock_telegram_client):
         """

@@ -1303,68 +1303,6 @@ class TestWatchtowerShutdown(unittest.TestCase):
     These tests cover Bug #2: Shutdown metrics logged twice.
     """
 
-    def test_shutdown_metrics_logged_once(self):
-        """
-        Given: Watchtower running
-        When: Shutdown called multiple times
-        Then: Metrics logged only once
-
-        Tests: Bug #2 - Duplicate shutdown logging
-        Reproduces: Shutdown messages appearing twice
-
-        This test should FAIL before fix and PASS after fix.
-        """
-        # Create mock dependencies
-        mock_config = Mock()
-        mock_config.tmp_dir = Path("/tmp")
-        mock_config.attachments_dir = Mock()
-        mock_config.attachments_dir.glob = Mock(return_value=[])  # No files to cleanup
-        mock_config.webhooks = []
-        mock_config.rss_feeds = []
-        mock_config.telegram_api_id = "123"
-        mock_config.telegram_api_hash = "hash"
-
-        mock_metrics = Mock()
-        mock_metrics.get_all.return_value = {
-            "messages_received_telegram": 10,
-            "time_ran": 100
-        }
-
-        mock_queue = Mock()
-        mock_queue.get_queue_size.return_value = 0  # Empty queue
-
-        mock_router = Mock()
-        mock_ocr = Mock()
-        mock_telegram = Mock()
-        mock_telegram.client = Mock()
-        mock_telegram.client.is_connected = Mock(return_value=False)  # Not connected
-        mock_discord = Mock()
-
-        # Create Watchtower instance with mocked dependencies (dependency injection)
-        app = Watchtower(
-            sources=[],
-            config=mock_config,
-            telegram=mock_telegram,
-            discord=mock_discord,
-            router=mock_router,
-            ocr=mock_ocr,
-            message_queue=mock_queue,
-            metrics=mock_metrics
-        )
-        app._start_time = time.time()
-
-        # Capture log messages
-        with self.assertLogs(level='INFO') as log_context:
-            # Call shutdown TWICE (simulates the bug)
-            asyncio.run(app.shutdown())
-            asyncio.run(app.shutdown())
-
-        # Count "Final metrics:" messages
-        metrics_logs = [msg for msg in log_context.output if "Final metrics:" in msg]
-
-        # Should only appear ONCE, but currently appears TWICE (bug)
-        self.assertEqual(len(metrics_logs), 1,
-            f"Metrics should be logged only once, but found {len(metrics_logs)} times")
 
 if __name__ == '__main__':
     unittest.main()

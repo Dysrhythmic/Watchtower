@@ -64,6 +64,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -130,6 +131,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -189,6 +191,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -252,6 +255,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -311,6 +315,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -370,6 +375,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -432,6 +438,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -494,6 +501,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -559,6 +567,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -624,6 +633,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_router = MockRouter.return_value
@@ -688,6 +698,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_discord = MockDiscord.return_value
@@ -752,6 +763,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_discord = MockDiscord.return_value
@@ -821,6 +833,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_discord = MockDiscord.return_value
@@ -877,6 +890,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_discord = MockDiscord.return_value
@@ -939,6 +953,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_discord = MockDiscord.return_value
@@ -1001,6 +1016,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_telegram = MockTelegram.return_value
@@ -1067,6 +1083,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_telegram = MockTelegram.return_value
@@ -1135,6 +1152,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_telegram = MockTelegram.return_value
@@ -1196,6 +1214,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_telegram = MockTelegram.return_value
@@ -1257,6 +1276,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_config.project_root = Path("/tmp")
         mock_config.attachments_dir = Path("/tmp/attachments")
         mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
         mock_telegram = MockTelegram.return_value

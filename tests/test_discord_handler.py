@@ -150,6 +150,7 @@ class TestDiscordHandler(unittest.TestCase):
         """Test handling 500 server error."""
         mock_response = Mock()
         mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
         mock_post.return_value = mock_response
 
         success = self.handler.send_message("Test", "https://discord.com/webhook", None)

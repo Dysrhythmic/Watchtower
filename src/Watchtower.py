@@ -875,7 +875,7 @@ def main():
 
     # discover subcommand
     discover_parser = subparsers.add_parser("discover", help="Auto-generate config from accessible Telegram channels")
-    discover_parser.add_argument("--diff", action="store_true", help="Show only new channels not in existing config")
+    discover_parser.add_argument("--diff", action="store_true", help="Compare with existing config (shows new and removed channels)")
     discover_parser.add_argument("--generate", action="store_true", help="Generate config_discovered.json file")
 
     args = parser.parse_args()

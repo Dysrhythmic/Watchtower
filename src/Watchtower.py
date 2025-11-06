@@ -63,7 +63,9 @@ from __future__ import annotations
 import os
 import argparse
 import asyncio
+import glob
 import json
+import time
 from typing import List, Dict, Optional, TYPE_CHECKING
 from pathlib import Path
 from logger_setup import setup_logger
@@ -148,7 +150,6 @@ class Watchtower:
         previous application runs (e.g., if app crashed before cleanup).
         Runs during initialization to ensure clean state.
         """
-        import glob
         attachments_path = self.config.attachments_dir
         if attachments_path.exists():
             files = list(attachments_path.glob('*'))
@@ -171,7 +172,6 @@ class Watchtower:
         Returns:
             None
         """
-        import time
         self._start_time = time.time()
         tasks = []
 
@@ -211,7 +211,6 @@ class Watchtower:
         Returns:
             None
         """
-        import time
         logger.info("[Watchtower] Initiating graceful shutdown...")
         self._shutdown_requested = True
 

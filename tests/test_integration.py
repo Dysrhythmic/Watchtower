@@ -18,6 +18,7 @@ def create_mock_config(extra_attrs=None):
     mock_config.tmp_dir = Path("/tmp")
     mock_config.attachments_dir = Path("/tmp/attachments")
     mock_config.rsslog_dir = Path("/tmp/rsslog")
+    mock_config.telegramlog_dir = Path("/tmp/telegramlog")
     mock_config.project_root = Path("/tmp")
     mock_config.api_id = "123"
     mock_config.api_hash = "abc"

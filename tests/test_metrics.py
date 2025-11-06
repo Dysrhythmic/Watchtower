@@ -243,6 +243,7 @@ class TestMetricsIntegration(unittest.TestCase):
         mock_config.tmp_dir = Path(tempfile.mkdtemp())
         mock_config.attachments_dir = mock_config.tmp_dir / "attachments"
         mock_config.rsslog_dir = mock_config.tmp_dir / "rsslog"
+        mock_config.telegramlog_dir = mock_config.tmp_dir / "telegramlog"
         mock_config.project_root = mock_config.tmp_dir
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
@@ -300,6 +301,7 @@ class TestMetricsIntegration(unittest.TestCase):
         mock_config.tmp_dir = Path(tempfile.mkdtemp())
         mock_config.attachments_dir = mock_config.tmp_dir / "attachments"
         mock_config.rsslog_dir = mock_config.tmp_dir / "rsslog"
+        mock_config.telegramlog_dir = mock_config.tmp_dir / "telegramlog"
         mock_config.project_root = mock_config.tmp_dir
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
@@ -357,6 +359,7 @@ class TestMetricsIntegration(unittest.TestCase):
         mock_config.tmp_dir = Path(tempfile.mkdtemp())
         mock_config.attachments_dir = mock_config.tmp_dir / "attachments"
         mock_config.rsslog_dir = mock_config.tmp_dir / "rsslog"
+        mock_config.telegramlog_dir = mock_config.tmp_dir / "telegramlog"
         mock_config.project_root = mock_config.tmp_dir
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"

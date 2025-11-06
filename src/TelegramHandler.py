@@ -372,6 +372,7 @@ class TelegramHandler(DestinationHandler):
                             messages_to_process.append(message)
 
                         # Process all missed messages in chronological order (oldest first)
+                        missed_count = 0
                         if messages_to_process:
                             # Reverse the list to process oldest to newest
                             messages_to_process.reverse()
@@ -396,6 +397,9 @@ class TelegramHandler(DestinationHandler):
                                 f"[TelegramHandler] Processed {missed_count} missed messages "
                                 f"from {channel_name} (newest_id={newest_msg_id})"
                             )
+
+                        # Log polling activity (similar to RSSHandler)
+                        logger.info(f"[TelegramHandler] {channel_name} polled; missed={missed_count}")
 
                     except Exception as e:
                         logger.error(f"[TelegramHandler] Error polling {channel_name}: {e}")

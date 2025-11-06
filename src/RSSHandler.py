@@ -256,7 +256,7 @@ class RSSHandler:
             try:
                 parsed_feed = feedparser.parse(rss_url)
                 if parsed_feed.bozo:
-                    logger.error(f"[RSSHandler] Parse error for {rss_name}: {getattr(parsed_feed, 'bozo_exception', '')}")
+                    logger.warning(f"[RSSHandler] Parse error for {rss_name}: {getattr(parsed_feed, 'bozo_exception', '')}")
 
                 count_new = 0
                 count_routed = 0

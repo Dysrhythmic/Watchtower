@@ -54,7 +54,7 @@ Mock Setup Template:
 
 How to Add New Tests:
     1. Add test method starting with test_
-    2. Use descriptive docstring: """Test <what Telegram feature>."""
+    2. Use descriptive docstring describing what Telegram feature is tested
     3. For formatting tests: create MessageData and assert HTML markup
     4. For URL tests: use static methods directly (no handler instance needed)
     5. For restricted mode: mock MessageMediaDocument with attributes
@@ -879,6 +879,344 @@ class TestTelegramReplyContext(unittest.TestCase):
         self.assertIsNone(result)
         # Should log error about getting reply context
         self.assertTrue(any("Error getting reply context" in msg for msg in log_context.output))
+
+
+class TestTelegramLogFunctionality(unittest.TestCase):
+    """Test telegram log file creation, reading, updating, and cleanup."""
+
+    def setUp(self):
+        """Create TelegramHandler with mocked config and temp log directory."""
+        import tempfile
+        import shutil
+
+        # Create temporary directory for telegram logs
+        self.temp_dir = Path(tempfile.mkdtemp())
+        self.telegramlog_dir = self.temp_dir / "telegramlog"
+        self.telegramlog_dir.mkdir(parents=True, exist_ok=True)
+
+        mock_config = Mock()
+        mock_config.project_root = self.temp_dir
+        mock_config.api_id = "123"
+        mock_config.api_hash = "abc"
+        mock_config.telegramlog_dir = self.telegramlog_dir
+        mock_config.channel_names = {
+            '-100123456789': 'Test Channel',
+            '@testchannel': 'Test Username Channel',
+            '987654321': 'Plain ID Channel'
+        }
+
+        with patch('TelegramHandler.TelegramClient'):
+            self.handler = TelegramHandler(mock_config)
+
+    def tearDown(self):
+        """Clean up temporary directory."""
+        import shutil
+        if self.temp_dir.exists():
+            shutil.rmtree(self.temp_dir)
+
+    def test_telegram_log_path_numeric_id(self):
+        """Test _telegram_log_path strips -100 prefix from numeric IDs."""
+        # Given: Numeric channel ID with -100 prefix
+        channel_id = '-100123456789'
+
+        # When: Getting log path
+        log_path = self.handler._telegram_log_path(channel_id)
+
+        # Then: Should strip -100 prefix
+        self.assertEqual(log_path.name, '123456789.txt')
+        self.assertEqual(log_path.parent, self.telegramlog_dir)
+
+    def test_telegram_log_path_username_id(self):
+        """Test _telegram_log_path strips @ prefix from username IDs."""
+        # Given: Username channel ID with @ prefix
+        channel_id = '@testchannel'
+
+        # When: Getting log path
+        log_path = self.handler._telegram_log_path(channel_id)
+
+        # Then: Should strip @ prefix
+        self.assertEqual(log_path.name, 'testchannel.txt')
+        self.assertEqual(log_path.parent, self.telegramlog_dir)
+
+    def test_telegram_log_path_plain_id(self):
+        """Test _telegram_log_path handles plain numeric IDs."""
+        # Given: Plain numeric ID without prefix
+        channel_id = '987654321'
+
+        # When: Getting log path
+        log_path = self.handler._telegram_log_path(channel_id)
+
+        # Then: Should use as-is
+        self.assertEqual(log_path.name, '987654321.txt')
+        self.assertEqual(log_path.parent, self.telegramlog_dir)
+
+    def test_create_telegram_log(self):
+        """Test _create_telegram_log creates proper two-line format."""
+        # Given: Channel ID and message ID
+        channel_id = '-100123456789'
+        msg_id = 42
+
+        # When: Creating telegram log
+        self.handler._create_telegram_log(channel_id, msg_id)
+
+        # Then: Should create file with channel name and message ID
+        log_path = self.handler._telegram_log_path(channel_id)
+        self.assertTrue(log_path.exists())
+
+        content = log_path.read_text(encoding='utf-8')
+        lines = content.strip().split('\n')
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[0], 'Test Channel')
+        self.assertEqual(lines[1], '42')
+
+    def test_create_telegram_log_unresolved_channel(self):
+        """Test _create_telegram_log handles unresolved channel names."""
+        # Given: Channel ID not in channel_names
+        channel_id = '-100999999999'
+        msg_id = 100
+
+        # When: Creating telegram log
+        self.handler._create_telegram_log(channel_id, msg_id)
+
+        # Then: Should use "Unresolved:<id>" format
+        log_path = self.handler._telegram_log_path(channel_id)
+        content = log_path.read_text(encoding='utf-8')
+        lines = content.strip().split('\n')
+        self.assertEqual(lines[0], 'Unresolved:-100999999999')
+        self.assertEqual(lines[1], '100')
+
+    def test_read_telegram_log_existing(self):
+        """Test _read_telegram_log reads message ID from existing log."""
+        # Given: Existing telegram log
+        channel_id = '-100123456789'
+        msg_id = 42
+        self.handler._create_telegram_log(channel_id, msg_id)
+
+        # When: Reading telegram log
+        result = self.handler._read_telegram_log(channel_id)
+
+        # Then: Should return message ID
+        self.assertEqual(result, 42)
+
+    def test_read_telegram_log_nonexistent(self):
+        """Test _read_telegram_log returns None for nonexistent log."""
+        # Given: No telegram log exists
+        channel_id = '-100999999999'
+
+        # When: Reading telegram log
+        result = self.handler._read_telegram_log(channel_id)
+
+        # Then: Should return None
+        self.assertIsNone(result)
+
+    def test_read_telegram_log_corrupted(self):
+        """Test _read_telegram_log handles corrupted log files."""
+        # Given: Corrupted telegram log (invalid integer)
+        channel_id = '-100123456789'
+        log_path = self.handler._telegram_log_path(channel_id)
+        log_path.write_text("Test Channel\ninvalid_number\n", encoding='utf-8')
+
+        # When: Reading telegram log
+        with self.assertLogs(level='ERROR') as log_context:
+            result = self.handler._read_telegram_log(channel_id)
+
+        # Then: Should return None and log error
+        self.assertIsNone(result)
+        self.assertTrue(any("Error reading log" in msg for msg in log_context.output))
+
+    def test_read_telegram_log_single_line(self):
+        """Test _read_telegram_log handles single-line files."""
+        # Given: Telegram log with only one line
+        channel_id = '-100123456789'
+        log_path = self.handler._telegram_log_path(channel_id)
+        log_path.write_text("Test Channel\n", encoding='utf-8')
+
+        # When: Reading telegram log
+        result = self.handler._read_telegram_log(channel_id)
+
+        # Then: Should return None (not enough lines)
+        self.assertIsNone(result)
+
+    def test_update_telegram_log(self):
+        """Test _update_telegram_log updates existing log."""
+        # Given: Existing telegram log
+        channel_id = '-100123456789'
+        self.handler._create_telegram_log(channel_id, 42)
+
+        # When: Updating telegram log with new message ID
+        self.handler._update_telegram_log(channel_id, 100)
+
+        # Then: Should update message ID while preserving channel name
+        content = self.handler._telegram_log_path(channel_id).read_text(encoding='utf-8')
+        lines = content.strip().split('\n')
+        self.assertEqual(lines[0], 'Test Channel')
+        self.assertEqual(lines[1], '100')
+
+    def test_update_telegram_log_creates_if_missing(self):
+        """Test _update_telegram_log creates log if it doesn't exist."""
+        # Given: No existing telegram log
+        channel_id = '-100123456789'
+
+        # When: Updating telegram log
+        self.handler._update_telegram_log(channel_id, 50)
+
+        # Then: Should create log
+        log_path = self.handler._telegram_log_path(channel_id)
+        self.assertTrue(log_path.exists())
+
+        content = log_path.read_text(encoding='utf-8')
+        lines = content.strip().split('\n')
+        self.assertEqual(lines[1], '50')
+
+    def test_telegram_log_workflow(self):
+        """Test complete workflow: create, read, update."""
+        # Given: Channel ID
+        channel_id = '@testchannel'
+
+        # When: Creating initial log
+        self.handler._create_telegram_log(channel_id, 1)
+
+        # Then: Should read correctly
+        self.assertEqual(self.handler._read_telegram_log(channel_id), 1)
+
+        # When: Updating log
+        self.handler._update_telegram_log(channel_id, 2)
+
+        # Then: Should read new value
+        self.assertEqual(self.handler._read_telegram_log(channel_id), 2)
+
+        # When: Updating again
+        self.handler._update_telegram_log(channel_id, 100)
+
+        # Then: Should read latest value
+        self.assertEqual(self.handler._read_telegram_log(channel_id), 100)
+
+    def test_multiple_channel_logs(self):
+        """Test managing logs for multiple channels simultaneously."""
+        # Given: Multiple channel IDs
+        channels = {
+            '-100123456789': 42,
+            '@channel1': 100,
+            '987654321': 200
+        }
+
+        # When: Creating logs for all channels
+        for channel_id, msg_id in channels.items():
+            self.handler._create_telegram_log(channel_id, msg_id)
+
+        # Then: All logs should be readable independently
+        for channel_id, expected_msg_id in channels.items():
+            self.assertEqual(
+                self.handler._read_telegram_log(channel_id),
+                expected_msg_id
+            )
+
+        # When: Updating one channel
+        self.handler._update_telegram_log('-100123456789', 500)
+
+        # Then: Only that channel should be updated
+        self.assertEqual(self.handler._read_telegram_log('-100123456789'), 500)
+        self.assertEqual(self.handler._read_telegram_log('@channel1'), 100)
+        self.assertEqual(self.handler._read_telegram_log('987654321'), 200)
+
+
+class TestTelegramLogCleanup(unittest.TestCase):
+    """Test telegram log cleanup functionality in Watchtower."""
+
+    def setUp(self):
+        """Create Watchtower instance with mocked dependencies."""
+        import tempfile
+
+        # Create temporary directory for telegram logs
+        self.temp_dir = Path(tempfile.mkdtemp())
+        self.telegramlog_dir = self.temp_dir / "telegramlog"
+        self.telegramlog_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create attachments directory (required by Watchtower.__init__)
+        self.attachments_dir = self.temp_dir / "attachments"
+        self.attachments_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create mock config
+        mock_config = Mock()
+        mock_config.project_root = self.temp_dir
+        mock_config.telegramlog_dir = self.telegramlog_dir
+        mock_config.tmp_dir = self.temp_dir
+        mock_config.attachments_dir = self.attachments_dir
+        mock_config.webhooks = []
+        mock_config.rss_feeds = []
+
+        # Create Watchtower instance using dependency injection
+        from Watchtower import Watchtower
+        self.watchtower = Watchtower(
+            sources=[],
+            config=mock_config,
+            telegram=Mock(),
+            discord=Mock(),
+            router=Mock(),
+            ocr=Mock(),
+            message_queue=Mock(),
+            metrics=Mock()
+        )
+
+    def tearDown(self):
+        """Clean up temporary directory."""
+        import shutil
+        if self.temp_dir.exists():
+            shutil.rmtree(self.temp_dir)
+
+    def test_clear_telegram_logs(self):
+        """Test _clear_telegram_logs removes all log files."""
+        # Given: Multiple telegram log files
+        (self.telegramlog_dir / "123456789.txt").write_text("Channel 1\n100\n")
+        (self.telegramlog_dir / "channel1.txt").write_text("Channel 2\n200\n")
+        (self.telegramlog_dir / "999999999.txt").write_text("Channel 3\n300\n")
+
+        # When: Clearing telegram logs
+        self.watchtower._clear_telegram_logs()
+
+        # Then: All .txt files should be removed
+        remaining_files = list(self.telegramlog_dir.glob("*.txt"))
+        self.assertEqual(len(remaining_files), 0)
+
+    def test_clear_telegram_logs_empty_directory(self):
+        """Test _clear_telegram_logs handles empty directory."""
+        # Given: Empty telegramlog directory
+        # When: Clearing telegram logs
+        self.watchtower._clear_telegram_logs()
+
+        # Then: Should complete without errors
+        self.assertTrue(self.telegramlog_dir.exists())
+
+    def test_clear_telegram_logs_nonexistent_directory(self):
+        """Test _clear_telegram_logs handles nonexistent directory."""
+        # Given: Non-existent telegramlog directory
+        import shutil
+        shutil.rmtree(self.telegramlog_dir)
+
+        # When: Clearing telegram logs
+        # Then: Should complete without errors (silently skips if directory doesn't exist)
+        try:
+            self.watchtower._clear_telegram_logs()
+        except Exception as e:
+            self.fail(f"_clear_telegram_logs raised an exception: {e}")
+
+        # Verify directory still doesn't exist
+        self.assertFalse(self.telegramlog_dir.exists())
+
+    def test_clear_telegram_logs_preserves_other_files(self):
+        """Test _clear_telegram_logs only removes .txt files."""
+        # Given: Mix of .txt and other files
+        (self.telegramlog_dir / "channel1.txt").write_text("Channel 1\n100\n")
+        (self.telegramlog_dir / "README.md").write_text("# Telegram Logs")
+        (self.telegramlog_dir / "data.json").write_text("{}")
+
+        # When: Clearing telegram logs
+        self.watchtower._clear_telegram_logs()
+
+        # Then: Only .txt files should be removed
+        self.assertFalse((self.telegramlog_dir / "channel1.txt").exists())
+        self.assertTrue((self.telegramlog_dir / "README.md").exists())
+        self.assertTrue((self.telegramlog_dir / "data.json").exists())
 
 
 if __name__ == '__main__':

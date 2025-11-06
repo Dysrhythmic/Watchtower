@@ -185,6 +185,8 @@ class Watchtower:
             # connection proofs
             await self.telegram.fetch_latest_messages()
             tasks.append(asyncio.create_task(self.telegram.run()))
+            # Start polling for missed messages
+            tasks.append(asyncio.create_task(self.telegram.poll_missed_messages(self.metrics)))
 
         # RSS source
         if 'rss' in self.sources and self.config.rss_feeds:
@@ -219,6 +221,9 @@ class Watchtower:
             self.metrics.set("time_ran", runtime_seconds)
             logger.info(f"[Watchtower] Application ran for {runtime_seconds} seconds")
 
+        # Force save metrics before shutdown (in case periodic save hasn't triggered)
+        self.metrics.force_save()
+
         # Log metrics before shutdown
         metrics_summary = self.metrics.get_all()
         if metrics_summary:
@@ -229,12 +234,42 @@ class Watchtower:
         if queue_size > 0:
             logger.warning(f"[Watchtower] Shutting down with {queue_size} messages in retry queue (will be lost)")
 
+        # Clear telegram logs (don't process messages sent during downtime)
+        if self.telegram:
+            self._clear_telegram_logs()
+
         # Disconnect Telegram client
         if self.telegram and self.telegram.client.is_connected():
             await self.telegram.client.disconnect()
             logger.info("[Watchtower] Telegram client disconnected")
 
         logger.info("[Watchtower] Shutdown complete")
+
+    def _clear_telegram_logs(self):
+        """Clear all telegram log files on shutdown.
+
+        Removes all .txt files in the telegramlog directory. Telegram logs are
+        not persistent across restarts since we don't want to process messages
+        sent during downtime.
+
+        Called during shutdown to prevent stale log files from affecting next startup.
+
+        Returns:
+            None
+
+        Note:
+            Errors during cleanup are logged but non-fatal (shutdown continues)
+        """
+        try:
+            telegramlog_dir = self.config.telegramlog_dir
+            if telegramlog_dir.exists():
+                count = 0
+                for log_file in telegramlog_dir.glob("*.txt"):
+                    log_file.unlink()
+                    count += 1
+                logger.info(f"[Watchtower] Cleared {count} telegram log file(s)")
+        except Exception as e:
+            logger.error(f"[Watchtower] Error clearing telegram logs: {e}")
 
     async def _handle_message(self, message_data: 'MessageData', is_latest: bool) -> bool:
         """Process incoming message from any source (Telegram, RSS).
@@ -761,9 +796,6 @@ async def discover_channels(diff_mode=False, generate_config=False):
     for dialog in dialogs:
         telegram_entity = dialog.entity
 
-        if isinstance(telegram_entity, User) and telegram_entity.is_self:
-            continue
-
         if isinstance(telegram_entity, (Channel, Chat, User)):
             entity_type, entity_name = _get_entity_type_and_name(telegram_entity)
             channel_id = _get_channel_identifier(telegram_entity, dialog.id)
@@ -843,7 +875,7 @@ def main():
 
     # discover subcommand
     discover_parser = subparsers.add_parser("discover", help="Auto-generate config from accessible Telegram channels")
-    discover_parser.add_argument("--diff", action="store_true", help="Show only new channels not in existing config")
+    discover_parser.add_argument("--diff", action="store_true", help="Compare with existing config (shows new and removed channels)")
     discover_parser.add_argument("--generate", action="store_true", help="Generate config_discovered.json file")
 
     args = parser.parse_args()

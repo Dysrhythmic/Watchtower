@@ -191,10 +191,206 @@ Private channels (those with invite links like `https://t.me/+ewIIWdHcmfM5ZjAx`)
 
 **Note:** Your Telegram account must remain a member of the private channel for monitoring to work. If you leave the channel, you'll need to rejoin using the invite link.
 
+## Understanding Log Output
+
+Watchtower uses colored logging to make errors and warnings more visible:
+- 🔴 **ERROR** messages appear in red
+- 🟡 **WARNING** messages appear in yellow
+- ⚪ **INFO** messages appear in white
+
+### Common Log Messages
+
+**Connection Proof (Startup)**
+```
+[Watchtower] CONNECTION ESTABLISHED
+  Channel: Security Feed
+  Latest message by: @username
+  Timestamp: 2025-11-05 14:30:00
+```
+Appears on startup for each Telegram channel to verify connectivity. Shows the most recent message metadata.
+
+**Telegram Message Processing**
+```
+[TelegramHandler] Received message tg_id=12345 from Channel Name
+```
+- `tg_id`: Telegram message ID (sequential integer unique within that channel)
+- Logged for every message received from Telegram event handler
+
+**RSS Feed Polling**
+```
+[RSSHandler] Security Feed polled; new=7; routed=3
+```
+- `new=7`: Number of new RSS entries found since last poll
+- `routed=3`: Number of entries that matched keywords and were forwarded
+- Logged every 5 minutes (300 seconds) per RSS feed
+
+**Missed Message Detection**
+```
+[TelegramHandler] Missed message detected: Channel Name msg_id=12346
+[TelegramHandler] Processed 5 missed messages from Channel Name
+```
+- Appears when polling finds messages that were missed during downtime
+- Polls every 5 minutes (300 seconds) for each Telegram channel
+- All missed messages are processed, not just the most recent
+
+**Telegram Logs**
+```
+[TelegramHandler] Created log for Channel Name: msg_id=12345
+[Watchtower] Cleared 3 telegram log file(s)
+```
+- Created on startup during connection proofs
+- Cleared on shutdown (not persistent across restarts)
+- Stored in `tmp/telegramlog/` with sanitized channel IDs as filenames
+
+### Metrics Summary (Shutdown)
+```
+[Watchtower] Final metrics: {
+  "telegram_missed_messages": 12,
+  "messages_routed": 145,
+  "time_ran": 3600
+}
+```
+- `telegram_missed_messages`: Total messages found via polling that were previously missed
+- `messages_routed`: Total messages successfully forwarded to at least one destination
+- `time_ran`: Application runtime in seconds
+
+## Testing
+
+### Running Tests
+
+Run all tests:
+```bash
+python3 -m unittest discover tests/
+```
+
+Run specific test file:
+```bash
+python3 -m unittest tests/test_telegram_handler.py
+```
+
+Run specific test class:
+```bash
+python3 -m unittest tests.test_telegram_handler.TestTelegramLogFunctionality
+```
+
+### Test Coverage
+
+The test suite covers:
+- **Configuration**: Loading, validation, keyword resolution (654 lines)
+- **Telegram Handler**: Message formatting, restricted mode, URL defanging, telegram logs (1215 lines)
+- **Discord Handler**: Webhook sending, chunking, rate limits (313 lines)
+- **Message Router**: Keyword matching, destination routing (934 lines)
+- **RSS Handler**: Feed parsing, deduplication, timestamp tracking (569 lines)
+- **OCR Handler**: Text extraction from images (269 lines)
+- **Message Queue**: Retry logic, exponential backoff (370 lines)
+- **Metrics**: Counter tracking, persistence (397 lines)
+- **Integration**: End-to-end message flow (2536 lines)
+
+### Test Requirements
+
+Tests use mock objects and don't require:
+- Real Telegram API credentials
+- Real Discord webhooks
+- Network access
+- External services
+
+All tests run offline using unittest.mock for external dependencies.
+
+## Telegram Log Files
+
+Watchtower creates per-channel log files to track message processing and detect missed messages.
+
+### File Structure
+
+```
+tmp/
+└── telegramlog/
+    ├── 123456789.txt      # Channel with ID -100123456789
+    ├── channelname.txt    # Channel with username @channelname
+    └── 987654321.txt      # Another channel
+```
+
+**Filename sanitization:**
+- Numeric IDs: `-100` prefix stripped (e.g., `-100123456789` → `123456789.txt`)
+- Username IDs: `@` prefix stripped (e.g., `@channel` → `channel.txt`)
+
+### File Format
+
+Each log file contains two lines:
+```
+Channel Display Name
+12345
+```
+- **Line 1**: Human-readable channel name (for manual inspection)
+- **Line 2**: Last processed message ID (integer)
+
+### Lifecycle
+
+1. **Created**: On startup during connection proofs with latest message ID
+2. **Updated**: After processing each message (both event handler and polling)
+3. **Used**: Every 5 minutes during polling to detect missed messages
+4. **Cleared**: On shutdown (logs are not persistent across restarts)
+
+### Why Not Persistent?
+
+Telegram logs are intentionally cleared on shutdown because:
+- We don't want to process messages sent during extended downtime
+- Prevents message floods after long outages
+- Simpler than implementing age-based filtering like RSS feeds
+
+If you restart Watchtower, it will create new logs from the current latest message and won't process any messages sent while it was offline.
+
+## Discover Command
+
+The `discover` command helps you find all Telegram channels accessible to your account:
+
+```bash
+python3 src/Watchtower.py discover
+```
+
+### Example Output
+
+```
+Discovered 5 accessible Telegram channels:
+  @securitynews (Security News Official)
+  @threatalerts (Threat Intelligence Alerts)
+  -1001234567890 (Private CTI Feed)
+  @vxunderground (vx-underground)
+  -1009876543210 (Research Group)
+
+Generated config file: config/config_discovered.json
+```
+
+### Using the Output
+
+1. **Review** `config_discovered.json` to see all discovered channels
+2. **Copy** channel IDs/usernames to your `config/config.json`
+3. **Add** keywords, parsers, and destinations for each channel
+4. **Test** with `python3 src/Watchtower.py monitor --sources telegram`
+
+### Diff Mode
+
+Compare discovered channels against existing config:
+```bash
+python3 src/Watchtower.py discover --diff
+```
+
+**Output:**
+```
+Channels in config but not accessible:
+  - @oldchannel (may have been deleted or you lost access)
+
+Channels accessible but not in config:
+  + @newchannel (available to add)
+  + -1001234567890 (Private Feed - available to add)
+```
+
+Use this to audit your configuration and find new channels to monitor.
+
 ## Troubleshooting
 - If you change your Telegram account or channels, delete `watchtower_session.session` and restart.
 - Make sure your Telegram account can access all the channels you want to monitor.
-- Check the CLI logs for debug info.
+- Check the CLI logs for debug info (errors appear in red, warnings in yellow).
 - Verify that your Discord webhook URLs are correct and the webhooks are active.
 - Ensure channel IDs in your JSON config match the actual Telegram channel identifiers.
 - For private Telegram channels, use the numeric chat ID (e.g., `-1001234567890`), not the invite link.

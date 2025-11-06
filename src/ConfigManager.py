@@ -77,8 +77,10 @@ class ConfigManager:
         self.tmp_dir = self.project_root / "tmp"
         self.attachments_dir = self.tmp_dir / "attachments"  # Downloaded media files
         self.rsslog_dir = self.tmp_dir / "rsslog"  # RSS feed timestamp logs
+        self.telegramlog_dir = self.tmp_dir / "telegramlog"  # Telegram message ID logs
         self.attachments_dir.mkdir(parents=True, exist_ok=True)
         self.rsslog_dir.mkdir(parents=True, exist_ok=True)
+        self.telegramlog_dir.mkdir(parents=True, exist_ok=True)
 
         # Keyword file cache: filename -> List[keywords]
         # Avoids re-parsing JSON files when multiple destinations use same keyword file

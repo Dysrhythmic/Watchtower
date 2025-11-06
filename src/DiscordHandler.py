@@ -34,6 +34,7 @@ class DiscordHandler(DestinationHandler):
     """
 
     MAX_LENGTH = 2000  # Discord's message character limit
+    AVATAR_URL = "https://raw.githubusercontent.com/Dysrhythmic/Watchtower/master/watchtower.png"
 
     def __init__(self):
         """Initialize Discord handler."""
@@ -70,7 +71,11 @@ class DiscordHandler(DestinationHandler):
             if media_path and os.path.exists(media_path):
                 with open(media_path, 'rb') as f:
                     files = {'file': f}
-                    data = {'username': 'Watchtower', 'content': chunks[0]}
+                    data = {
+                        'username': 'Watchtower',
+                        'avatar_url': self.AVATAR_URL,
+                        'content': chunks[0]
+                    }
                     response = requests.post(webhook_url, files=files, data=data, timeout=15)
 
                     if response.status_code == 429:
@@ -87,7 +92,11 @@ class DiscordHandler(DestinationHandler):
 
             # Send remaining chunks as text-only messages
             for chunk_index, chunk in enumerate(chunks[chunks_sent:], start=chunks_sent + 1):
-                payload = {"username": "Watchtower", "content": chunk}
+                payload = {
+                    "username": "Watchtower",
+                    "avatar_url": self.AVATAR_URL,
+                    "content": chunk
+                }
                 response = requests.post(webhook_url, json=payload, timeout=5)
 
                 if response.status_code == 429:

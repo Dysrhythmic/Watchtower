@@ -46,7 +46,7 @@ Mock Setup Template:
 
 How to Add New Tests:
     1. Add test method starting with test_
-    2. Use descriptive docstring: """Test <what Discord feature>."""
+    2. Use descriptive docstring describing what Discord feature is tested""
     3. Create MessageData with relevant content
     4. For formatting tests: assert string contains expected markdown
     5. For sending tests: use @patch('requests.post')

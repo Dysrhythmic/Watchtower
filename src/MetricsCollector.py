@@ -71,26 +71,7 @@ class MetricsCollector:
         self.metrics: Dict[str, int] = defaultdict(int)
         self._last_save_time = time.time()
         self._dirty = False  # Track if metrics changed since last save
-        # NOTE: Intentionally NOT loading previous metrics - each session starts fresh
-        # self._load_metrics()  # Disabled - metrics are per-session only
         logger.info("[MetricsCollector] Starting with fresh metrics (per-session)")
-
-    def _load_metrics(self) -> None:
-        """Load existing metrics from file.
-
-        If file doesn't exist or is corrupted, starts with empty metrics.
-        """
-        if self.metrics_file.exists():
-            try:
-                with open(self.metrics_file, 'r') as f:
-                    data = json.load(f)
-                    self.metrics = defaultdict(int, data)
-                logger.info(f"[MetricsCollector] Loaded metrics from {self.metrics_file}")
-            except Exception as e:
-                logger.warning(f"[MetricsCollector] Failed to load metrics: {e}, starting fresh")
-                self.metrics = defaultdict(int)
-        else:
-            logger.info("[MetricsCollector] No existing metrics file, starting fresh")
 
     def _save_metrics(self) -> None:
         """Save current metrics to file immediately.

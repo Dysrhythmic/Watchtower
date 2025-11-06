@@ -342,7 +342,10 @@ class TelegramHandler(DestinationHandler):
 
                     try:
                         missed_count = 0
+                        max_msg_id = last_processed_id  # Track highest message ID seen
+
                         # Fetch messages newer than last processed ID
+                        # NOTE: iter_messages returns in reverse chronological order (newest first)
                         async for message in self.client.iter_messages(
                             telegram_entity,
                             min_id=last_processed_id
@@ -350,6 +353,8 @@ class TelegramHandler(DestinationHandler):
                             if message.id > last_processed_id:
                                 # Found a missed message
                                 missed_count += 1
+                                max_msg_id = max(max_msg_id, message.id)  # Track highest ID
+
                                 logger.warning(
                                     f"[TelegramHandler] Missed message detected: "
                                     f"{channel_name} msg_id={message.id}"
@@ -359,14 +364,15 @@ class TelegramHandler(DestinationHandler):
                                     message_data = await self._create_message_data(message, channel_id)
                                     await self.msg_callback(message_data, is_latest=False)
 
-                                self._update_telegram_log(channel_id, message.id)
-
+                        # Update log ONCE with the highest message ID seen
                         if missed_count > 0:
+                            self._update_telegram_log(channel_id, max_msg_id)
+
                             if metrics_collector:
                                 metrics_collector.increment("telegram_missed_messages", missed_count)
                             logger.warning(
                                 f"[TelegramHandler] Processed {missed_count} missed messages "
-                                f"from {channel_name}"
+                                f"from {channel_name} (max_id={max_msg_id})"
                             )
 
                     except Exception as e:
@@ -396,14 +402,17 @@ class TelegramHandler(DestinationHandler):
             try:
                 channel_id = str(event.chat_id)
                 channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
-                message_data = await self._create_message_data(event.message, channel_id)
-                telegram_msg_id = getattr(message_data.original_message, "id", None)
-                logger.info(f"[TelegramHandler] Received message tg_id={telegram_msg_id} from {channel_name}")
+                telegram_msg_id = event.message.id
 
-                # Update telegram log BEFORE processing to prevent duplicates if processing fails
+                # Update telegram log IMMEDIATELY to prevent race condition with polling
+                # This must happen before creating message_data (which can be slow)
                 if telegram_msg_id:
                     self._update_telegram_log(channel_id, telegram_msg_id)
 
+                logger.info(f"[TelegramHandler] Received message tg_id={telegram_msg_id} from {channel_name}")
+
+                # Now create message_data and route (polling won't duplicate this message)
+                message_data = await self._create_message_data(event.message, channel_id)
                 await callback(message_data, is_latest=False)
 
             except Exception as e:

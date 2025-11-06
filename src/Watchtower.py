@@ -225,21 +225,20 @@ class Watchtower:
         self.metrics.force_save()
 
         # Log metrics before shutdown with explanatory note
-        # NOTE: Most metrics are CUMULATIVE across all sessions (persist in metrics.json)
-        #       Only time_ran is PER-SESSION (current run only)
+        # NOTE: All metrics are PER-SESSION (reset on each startup)
         metrics_summary = self.metrics.get_all()
         if metrics_summary:
             logger.info(
-                f"[Watchtower] Final metrics (cumulative across all sessions except time_ran):\n"
-                f"  messages_received_telegram: Total Telegram messages received\n"
-                f"  messages_received_rss: Total RSS messages received\n"
-                f"  messages_no_destination: Messages with no matching destinations (both sources)\n"
+                f"[Watchtower] Final metrics for this session:\n"
+                f"  messages_received_telegram: Telegram messages received (this session)\n"
+                f"  messages_received_rss: RSS messages received (this session)\n"
+                f"  messages_no_destination: Messages with no destinations (both sources)\n"
                 f"  messages_routed_success: Messages successfully routed (both sources)\n"
                 f"  messages_sent_discord: Messages sent to Discord (from any source)\n"
                 f"  messages_sent_telegram: Messages sent to Telegram (from any source)\n"
                 f"  ocr_sent: Messages with OCR text successfully sent (any destination)\n"
                 f"  telegram_missed_messages: Missed messages caught by polling\n"
-                f"  time_ran: Current session duration in seconds (per-session only)\n"
+                f"  time_ran: Session duration in seconds\n"
                 f"\n{json.dumps(metrics_summary, indent=2)}"
             )
 

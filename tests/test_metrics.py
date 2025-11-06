@@ -67,6 +67,7 @@ How to Add New Tests:
 import unittest
 import sys
 import os
+import json
 import tempfile
 from unittest.mock import Mock, patch
 from pathlib import Path
@@ -117,15 +118,20 @@ class TestMetricsCollector(unittest.TestCase):
         self.assertIn("metric2", all_metrics)
 
     def test_save_and_load_json(self):
-        """Test saving to and loading from JSON."""
+        """Test saving to JSON (metrics are per-session, NOT loaded on startup)."""
         self.metrics.increment("test_metric", 10)
 
         # Force save to ensure persistence (periodic saves don't happen immediately)
         self.metrics.force_save()
 
-        # Create new instance with same file
+        # Verify file was saved correctly by reading it directly
+        with open(self.temp_file.name, 'r') as f:
+            saved_data = json.load(f)
+        self.assertEqual(saved_data["test_metric"], 10)
+
+        # Create new instance with same file - should start fresh (per-session)
         metrics2 = MetricsCollector(Path(self.temp_file.name))
-        self.assertEqual(metrics2.get("test_metric"), 10)
+        self.assertEqual(metrics2.get("test_metric"), 0)  # Fresh start, not loaded
 
     def test_reset_all_metrics(self):
         """Test resetting all metrics."""
@@ -146,11 +152,11 @@ class TestMetricsCollector(unittest.TestCase):
         self.assertEqual(self.metrics.get("new_metric"), 1)
 
     def test_persistence_after_reset(self):
-        """Test metrics persist to file after reset."""
+        """Test new MetricsCollector starts fresh (per-session behavior)."""
         self.metrics.increment("test", 5)
         self.metrics.reset()
 
-        # Load from file
+        # Create new instance - should start fresh (per-session)
         metrics2 = MetricsCollector(Path(self.temp_file.name))
         self.assertEqual(len(metrics2.get_all()), 0)
 

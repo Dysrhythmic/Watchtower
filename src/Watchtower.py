@@ -63,7 +63,9 @@ from __future__ import annotations
 import os
 import argparse
 import asyncio
+import glob
 import json
+import time
 from typing import List, Dict, Optional, TYPE_CHECKING
 from pathlib import Path
 from logger_setup import setup_logger
@@ -148,7 +150,6 @@ class Watchtower:
         previous application runs (e.g., if app crashed before cleanup).
         Runs during initialization to ensure clean state.
         """
-        import glob
         attachments_path = self.config.attachments_dir
         if attachments_path.exists():
             files = list(attachments_path.glob('*'))
@@ -171,7 +172,6 @@ class Watchtower:
         Returns:
             None
         """
-        import time
         self._start_time = time.time()
         tasks = []
 
@@ -211,7 +211,6 @@ class Watchtower:
         Returns:
             None
         """
-        import time
         logger.info("[Watchtower] Initiating graceful shutdown...")
         self._shutdown_requested = True
 
@@ -224,10 +223,23 @@ class Watchtower:
         # Force save metrics before shutdown (in case periodic save hasn't triggered)
         self.metrics.force_save()
 
-        # Log metrics before shutdown
+        # Log metrics before shutdown with explanatory note
+        # NOTE: All metrics are PER-SESSION (reset on each startup)
         metrics_summary = self.metrics.get_all()
         if metrics_summary:
-            logger.info(f"[Watchtower] Final metrics: {json.dumps(metrics_summary, indent=2)}")
+            logger.info(
+                f"[Watchtower] Final metrics for this session:\n"
+                f"  messages_received_telegram: Telegram messages received (this session)\n"
+                f"  messages_received_rss: RSS messages received (this session)\n"
+                f"  messages_no_destination: Messages with no destinations (both sources)\n"
+                f"  messages_routed_success: Messages successfully routed (both sources)\n"
+                f"  messages_sent_discord: Messages sent to Discord (from any source)\n"
+                f"  messages_sent_telegram: Messages sent to Telegram (from any source)\n"
+                f"  ocr_sent: Messages with OCR text successfully sent (any destination)\n"
+                f"  telegram_missed_messages: Missed messages caught by polling\n"
+                f"  time_ran: Session duration in seconds\n"
+                f"\n{json.dumps(metrics_summary, indent=2)}"
+            )
 
         # Check retry queue status
         queue_size = self.message_queue.get_queue_size()

@@ -33,6 +33,7 @@ URL Defanging:
     - Used in threat intelligence workflows to prevent accidental clicks
 """
 import os
+from html import escape
 from pathlib import Path
 from typing import Optional, Dict, List
 from telethon import TelegramClient, events, utils
@@ -166,6 +167,23 @@ class TelegramHandler(DestinationHandler):
             logger.error(f"[TelegramHandler] Failed to resolve {channel_id}: {e}")
             return None
 
+    def _get_channel_name(self, channel_id: str) -> str:
+        """Get friendly channel name, or 'Unresolved:ID' if unknown.
+
+        Args:
+            channel_id: Channel ID (username, numeric ID, or identifier)
+
+        Returns:
+            str: Human-readable channel name or "Unresolved:{channel_id}"
+
+        Examples:
+            >>> handler._get_channel_name("@test_channel")
+            "Test Channel"  # If in channel_names
+            >>> handler._get_channel_name("-100123456789")
+            "Unresolved:-100123456789"  # If not resolved yet
+        """
+        return self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
+
     def _telegram_log_path(self, channel_id: str):
         """Get path to telegram log file for a channel.
 
@@ -212,7 +230,7 @@ class TelegramHandler(DestinationHandler):
             12345
         """
         log_path = self._telegram_log_path(channel_id)
-        channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
+        channel_name = self._get_channel_name(channel_id)
 
         content = f"{channel_name}\n{msg_id}\n"
         log_path.write_text(content, encoding='utf-8')
@@ -269,7 +287,7 @@ class TelegramHandler(DestinationHandler):
             Logs at debug level to avoid spam since this is called for every message.
         """
         log_path = self._telegram_log_path(channel_id)
-        channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
+        channel_name = self._get_channel_name(channel_id)
 
         content = f"{channel_name}\n{msg_id}\n"
         log_path.write_text(content, encoding='utf-8')
@@ -287,7 +305,7 @@ class TelegramHandler(DestinationHandler):
         enabling missed message detection during polling.
         """
         for channel_id, telegram_entity in self.channels.items():
-            channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
+            channel_name = self._get_channel_name(channel_id)
             try:
                 async for message in self.client.iter_messages(telegram_entity, limit=1):
                     if message:
@@ -334,7 +352,7 @@ class TelegramHandler(DestinationHandler):
                 await asyncio.sleep(self.DEFAULT_POLL_INTERVAL)
 
                 for channel_id, telegram_entity in self.channels.items():
-                    channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
+                    channel_name = self._get_channel_name(channel_id)
                     last_processed_id = self._read_telegram_log(channel_id)
 
                     if not last_processed_id:
@@ -372,6 +390,7 @@ class TelegramHandler(DestinationHandler):
                             messages_to_process.append(message)
 
                         # Process all missed messages in chronological order (oldest first)
+                        missed_count = 0
                         if messages_to_process:
                             # Reverse the list to process oldest to newest
                             messages_to_process.reverse()
@@ -396,6 +415,9 @@ class TelegramHandler(DestinationHandler):
                                 f"[TelegramHandler] Processed {missed_count} missed messages "
                                 f"from {channel_name} (newest_id={newest_msg_id})"
                             )
+
+                        # Log polling activity (similar to RSSHandler)
+                        logger.info(f"[TelegramHandler] {channel_name} polled; missed={missed_count}")
 
                     except Exception as e:
                         logger.error(f"[TelegramHandler] Error polling {channel_name}: {e}")
@@ -423,7 +445,7 @@ class TelegramHandler(DestinationHandler):
         async def handle_message(event):
             try:
                 channel_id = str(event.chat_id)
-                channel_name = self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}")
+                channel_name = self._get_channel_name(channel_id)
                 telegram_msg_id = event.message.id
 
                 # Update telegram log IMMEDIATELY to prevent race condition with polling
@@ -438,7 +460,7 @@ class TelegramHandler(DestinationHandler):
                 await callback(message_data, is_latest=False)
 
             except Exception as e:
-                channel_name = self.config.channel_names.get(str(event.chat_id), f"Unresolved:{event.chat_id}")
+                channel_name = self._get_channel_name(str(event.chat_id))
                 logger.error(f"[TelegramHandler] Error handling message from {channel_name}: {e}", exc_info=True)
 
     async def _create_message_data(self, message, channel_id: str) -> MessageData:
@@ -467,7 +489,7 @@ class TelegramHandler(DestinationHandler):
         return MessageData(
             source_type="telegram",
             channel_id=channel_id,
-            channel_name=self.config.channel_names.get(channel_id, f"Unresolved:{channel_id}"),
+            channel_name=self._get_channel_name(channel_id),
             username=username,
             timestamp=message.date,
             text=message.text or "",
@@ -823,8 +845,6 @@ class TelegramHandler(DestinationHandler):
         - Code: <code>text</code>
         - Blockquote: <blockquote>text</blockquote> (Telegram 5.13+)
         """
-        from html import escape
-
         lines = [
             f"<b>New message from:</b> {escape(message_data.channel_name)}",
             f"<b>By:</b> {escape(message_data.username)}",
@@ -866,8 +886,6 @@ class TelegramHandler(DestinationHandler):
         Returns:
             str: Formatted reply context with HTML markup
         """
-        from html import escape
-
         parts = []
         author = escape(reply_context['author'])
         time = escape(reply_context['time'])

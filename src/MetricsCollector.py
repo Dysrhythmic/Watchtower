@@ -6,9 +6,9 @@ storage. Tracks application statistics like message counts, routing success/fail
 rates, and queue sizes.
 
 Features:
+- Per-session metrics (reset on each startup)
 - Periodic persistence to JSON file (every 60 seconds by default)
 - Counter-based metrics (increment, set, get)
-- Graceful recovery from corrupted metrics files
 - Thread-safe for single-process use
 - Force save on shutdown for clean exit
 
@@ -19,13 +19,19 @@ Performance:
     - Significant performance gain for high-volume message processing
     - SSD-friendly for Raspberry Pi and similar devices
 
+Metrics Persistence:
+    - Metrics are PER-SESSION ONLY (reset on each startup)
+    - Saved to metrics.json at shutdown for logging/archival purposes
+    - NOT loaded on startup - each session starts fresh at zero
+
 Common Metrics:
-    - messages_received_telegram: Total messages from Telegram
-    - messages_received_rss: Total messages from RSS feeds
-    - messages_routed_success: Successfully delivered messages
-    - messages_routed_failed: Failed delivery attempts
-    - messages_no_destination: Messages with no matching destinations
-    - telegram_missed_messages: Messages found via polling that were missed
+    - messages_received_telegram: Messages from Telegram (this session)
+    - messages_received_rss: Messages from RSS feeds (this session)
+    - messages_routed_success: Successfully delivered messages (this session)
+    - messages_routed_failed: Failed delivery attempts (this session)
+    - messages_no_destination: Messages with no matching destinations (this session)
+    - telegram_missed_messages: Messages found via polling (this session)
+    - time_ran: Session duration in seconds (this session)
 """
 import json
 import time
@@ -55,6 +61,9 @@ class MetricsCollector:
     def __init__(self, metrics_file: Path):
         """Initialize metrics collector.
 
+        Metrics are per-session (reset on each startup). The metrics file is used
+        for saving at shutdown but is NOT loaded on startup.
+
         Args:
             metrics_file: Path to metrics JSON file (e.g., tmp/metrics.json)
         """
@@ -62,24 +71,7 @@ class MetricsCollector:
         self.metrics: Dict[str, int] = defaultdict(int)
         self._last_save_time = time.time()
         self._dirty = False  # Track if metrics changed since last save
-        self._load_metrics()
-
-    def _load_metrics(self) -> None:
-        """Load existing metrics from file.
-
-        If file doesn't exist or is corrupted, starts with empty metrics.
-        """
-        if self.metrics_file.exists():
-            try:
-                with open(self.metrics_file, 'r') as f:
-                    data = json.load(f)
-                    self.metrics = defaultdict(int, data)
-                logger.info(f"[MetricsCollector] Loaded metrics from {self.metrics_file}")
-            except Exception as e:
-                logger.warning(f"[MetricsCollector] Failed to load metrics: {e}, starting fresh")
-                self.metrics = defaultdict(int)
-        else:
-            logger.info("[MetricsCollector] No existing metrics file, starting fresh")
+        logger.info("[MetricsCollector] Starting with fresh metrics (per-session)")
 
     def _save_metrics(self) -> None:
         """Save current metrics to file immediately.

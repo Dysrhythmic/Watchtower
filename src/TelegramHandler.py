@@ -341,22 +341,44 @@ class TelegramHandler(DestinationHandler):
                         continue
 
                     try:
-                        missed_count = 0
-                        max_msg_id = last_processed_id  # Track highest message ID seen
-
-                        # Fetch messages newer than last processed ID
+                        # Fetch recent messages to check for any newer than last_processed_id
                         # NOTE: iter_messages returns in reverse chronological order (newest first)
+                        newest_msg_id = None
+                        messages_to_process = []
+
                         async for message in self.client.iter_messages(
                             telegram_entity,
-                            min_id=last_processed_id
+                            limit=100  # Check last 100 messages for missed ones
                         ):
-                            if message.id > last_processed_id:
-                                # Found a missed message
-                                missed_count += 1
-                                max_msg_id = max(max_msg_id, message.id)  # Track highest ID
-
+                            # First message is always the newest (highest ID)
+                            if newest_msg_id is None:
+                                newest_msg_id = message.id
+                                # Check if we're up-to-date
+                                if last_processed_id >= newest_msg_id:
+                                    # Everything is up-to-date, no missed messages
+                                    break
+                                # We have missed messages, log detection
                                 logger.warning(
-                                    f"[TelegramHandler] Missed message detected: "
+                                    f"[TelegramHandler] Detected missed messages in {channel_name}: "
+                                    f"log_id={last_processed_id}, newest_id={newest_msg_id}"
+                                )
+
+                            # Check if we've reached messages we've already processed
+                            if message.id <= last_processed_id:
+                                # Stop here - we've found the boundary
+                                break
+
+                            # This is a missed message - collect it for processing
+                            messages_to_process.append(message)
+
+                        # Process all missed messages in chronological order (oldest first)
+                        if messages_to_process:
+                            # Reverse the list to process oldest to newest
+                            messages_to_process.reverse()
+
+                            for message in messages_to_process:
+                                logger.warning(
+                                    f"[TelegramHandler] Processing missed message: "
                                     f"{channel_name} msg_id={message.id}"
                                 )
 
@@ -364,15 +386,15 @@ class TelegramHandler(DestinationHandler):
                                     message_data = await self._create_message_data(message, channel_id)
                                     await self.msg_callback(message_data, is_latest=False)
 
-                        # Update log ONCE with the highest message ID seen
-                        if missed_count > 0:
-                            self._update_telegram_log(channel_id, max_msg_id)
+                            # Update log ONCE with the newest message ID
+                            self._update_telegram_log(channel_id, newest_msg_id)
 
+                            missed_count = len(messages_to_process)
                             if metrics_collector:
                                 metrics_collector.increment("telegram_missed_messages", missed_count)
                             logger.warning(
                                 f"[TelegramHandler] Processed {missed_count} missed messages "
-                                f"from {channel_name} (max_id={max_msg_id})"
+                                f"from {channel_name} (newest_id={newest_msg_id})"
                             )
 
                     except Exception as e:

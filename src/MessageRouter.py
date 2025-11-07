@@ -28,7 +28,7 @@ from logger_setup import setup_logger
 from ConfigManager import ConfigManager
 from MessageData import MessageData
 
-logger = setup_logger(__name__)
+_logger = setup_logger(__name__)
 
 
 class MessageRouter:
@@ -60,8 +60,8 @@ class MessageRouter:
         Returns:
             bool: True if any destination monitoring this channel has restricted_mode=True
         """
-        for webhook in self.config.destinations:
-            for channel in webhook['channels']:
+        for destination in self.config.destinations:
+            for channel in destination['channels']:
                 if self._channel_matches(channel_id, channel_name, channel['id']):
                     if channel.get('restricted_mode', False):
                         return True
@@ -80,8 +80,8 @@ class MessageRouter:
         Returns:
             bool: True if any destination monitoring this channel has ocr=True
         """
-        for webhook in self.config.destinations:
-            for channel in webhook['channels']:
+        for destination in self.config.destinations:
+            for channel in destination['channels']:
                 if self._channel_matches(channel_id, channel_name, channel['id']):
                     if channel.get('ocr', False):
                         return True
@@ -137,8 +137,8 @@ class MessageRouter:
         # STEP 1: Check if this channel is configured anywhere
         # Early exit if channel is not monitored by any destination
         channel_is_configured = False
-        for webhook in self.config.destinations:
-            for channel in webhook.get('channels', []):
+        for destination in self.config.destinations:
+            for channel in destination.get('channels', []):
                 if self._channel_matches(message_data.channel_id, message_data.channel_name, channel['id']):
                     channel_is_configured = True
                     break
@@ -146,14 +146,14 @@ class MessageRouter:
                 break
 
         if not channel_is_configured:
-            logger.info(f"[MessageRouter] No configured matches for channel {message_data.channel_name} ({message_data.channel_id})")
+            _logger.info(f"[MessageRouter] No configured matches for channel {message_data.channel_name} ({message_data.channel_id})")
             return destinations
 
         # STEP 2: Collect all matching destinations
-        for webhook in self.config.destinations:
+        for destination in self.config.destinations:
             # Find the channel configuration for this destination (if it monitors this channel)
             channel_config = None
-            for channel in webhook['channels']:
+            for channel in destination['channels']:
                 if self._channel_matches(message_data.channel_id, message_data.channel_name, channel['id']):
                     channel_config = channel
                     break
@@ -172,12 +172,12 @@ class MessageRouter:
             keywords = channel_config.get('keywords')
             if not keywords:
                 # No keywords configured - forward all messages from this channel
-                destinations.append(self._make_dest_entry(webhook, channel_config, matched=[]))
+                destinations.append(self._make_dest_entry(destination, channel_config, matched=[]))
             elif searchable_text:
                 # Case-insensitive keyword matching
                 matched = [kw for kw in keywords if kw.lower() in searchable_text.lower()]
                 if matched:
-                    destinations.append(self._make_dest_entry(webhook, channel_config, matched=matched))
+                    destinations.append(self._make_dest_entry(destination, channel_config, matched=matched))
 
         return destinations
 
@@ -205,7 +205,7 @@ class MessageRouter:
 
             # Validate values
             if front < 0 or back < 0:
-                logger.warning(f"[MessageRouter] Invalid parser config: values must be >= 0, got front={front}, back={back}")
+                _logger.warning(f"[MessageRouter] Invalid parser config: values must be >= 0, got front={front}, back={back}")
                 return message_data
 
             # Skip parsing if both are 0
@@ -243,17 +243,17 @@ class MessageRouter:
 
         # Invalid or None - return unchanged
         if parser_config is not None:
-            logger.warning(f"[MessageRouter] Invalid parser config type: {type(parser_config)}, expected dict or None")
+            _logger.warning(f"[MessageRouter] Invalid parser config type: {type(parser_config)}, expected dict or None")
         return message_data
 
-    def _make_dest_entry(self, webhook: Dict, channel_config: Dict, matched: List[str]) -> Dict:
+    def _make_dest_entry(self, destination: Dict, channel_config: Dict, matched: List[str]) -> Dict:
         """Create normalized destination entry with routing metadata.
 
-        Combines webhook config and channel-specific config into a single dict
+        Combines destination config and channel-specific config into a single dict
         for use in message routing and dispatch.
 
         Args:
-            webhook: Destination webhook configuration
+            destination: Destination configuration
             channel_config: Channel-specific configuration (keywords, parser, etc.)
             matched: List of keywords that matched for this message
 
@@ -261,17 +261,17 @@ class MessageRouter:
             Dict: Normalized destination entry with all routing metadata
         """
         base = {
-            'name': webhook['name'],
-            'type': webhook.get('type', 'discord'),
+            'name': destination['name'],
+            'type': destination['type'],
             'keywords': matched,
             'restricted_mode': channel_config.get('restricted_mode', False),
             'parser': channel_config.get('parser'),
             'ocr': channel_config.get('ocr', False),
         }
         if base['type'] == 'discord':
-            base['discord_webhook_url'] = webhook['discord_webhook_url']
+            base['discord_webhook_url'] = destination['discord_webhook_url']
         else:
-            base['telegram_destination_channel'] = webhook['telegram_destination_channel']
+            base['telegram_destination_channel'] = destination['telegram_destination_channel']
         return base
 
     def _channel_matches(self, channel_id: str, channel_name: str, config_id: str) -> bool:

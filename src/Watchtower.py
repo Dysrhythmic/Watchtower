@@ -39,7 +39,7 @@ Key Components:
     - MetricsCollector: Usage statistics tracking
 
 Error Handling Pattern:
-    Use exc_info=True in logger.error() calls for unexpected exceptions that indicate bugs
+    Use exc_info=True in __logger.error() calls for unexpected exceptions that indicate bugs
     or system failures (includes full tracebacks for debugging).
 
     Do NOT use exc_info=True for:
@@ -48,8 +48,8 @@ Error Handling Pattern:
     - Business logic failures (message routing failures, API rate limits)
 
     Examples:
-        logger.error("Failed to connect", exc_info=True)  # YES - unexpected system error
-        logger.error("Invalid config file")                # NO - expected validation error
+        __logger.error("Failed to connect", exc_info=True)  # YES - unexpected system error
+        __logger.error("Invalid config file")                # NO - expected validation error
 
 Subcommands:
     monitor: Run live message monitoring and routing
@@ -73,7 +73,7 @@ from logger_setup import setup_logger
 if TYPE_CHECKING:
     from MessageData import MessageData
 
-logger = setup_logger(__name__)
+_logger = setup_logger(__name__)
 
 class Watchtower:
     """Main application orchestrator for CTI message routing.
@@ -141,7 +141,7 @@ class Watchtower:
         # Clean up any leftover media files from previous runs
         self._cleanup_attachments_dir()
 
-        logger.info("[Watchtower] Initialized")
+        _logger.info("[Watchtower] Initialized")
 
     def _cleanup_attachments_dir(self):
         """Remove any leftover media files from previous runs.
@@ -158,10 +158,10 @@ class Watchtower:
                     try:
                         if file_path.is_file():
                             os.remove(file_path)
-                            logger.debug(f"[Watchtower] Cleaned up leftover file: {file_path}")
+                            _logger.debug(f"[Watchtower] Cleaned up leftover file: {file_path}")
                     except Exception as e:
-                        logger.warning(f"[Watchtower] Failed to clean up {file_path}: {e}")
-                logger.info(f"[Watchtower] Cleaned up {len(files)} leftover media files from attachments directory")
+                        _logger.warning(f"[Watchtower] Failed to clean up {file_path}: {e}")
+                _logger.info(f"[Watchtower] Cleaned up {len(files)} leftover media files from attachments directory")
 
     async def start(self) -> None:
         """Start the Watchtower service.
@@ -195,13 +195,13 @@ class Watchtower:
             for feed in self.config.rss_feeds:
                 tasks.append(asyncio.create_task(self.rss.run_feed(feed)))
 
-        logger.info(f"[Watchtower] Now monitoring for new messages... (sources={','.join(self.sources)})")
+        _logger.info(f"[Watchtower] Now monitoring for new messages... (sources={','.join(self.sources)})")
 
         if tasks:
             try:
                 await asyncio.gather(*tasks)
             except asyncio.CancelledError:
-                logger.info("[Watchtower] Tasks cancelled, returning to main...")
+                _logger.info("[Watchtower] Tasks cancelled, returning to main...")
 
     async def shutdown(self):
         """Gracefully shutdown the application.
@@ -211,7 +211,7 @@ class Watchtower:
         Returns:
             None
         """
-        logger.info("[Watchtower] Initiating graceful shutdown...")
+        _logger.info("[Watchtower] Initiating graceful shutdown...")
         self._shutdown_requested = True
 
         # Calculate and save seconds_ran metric
@@ -226,7 +226,7 @@ class Watchtower:
         # NOTE: All metrics are PER-SESSION (reset on each startup)
         metrics_summary = self.metrics.get_all()
         if metrics_summary:
-            logger.info(
+            _logger.info(
                 f"[Watchtower] Final metrics for this session:\n"
                 f"\n{json.dumps(metrics_summary, indent=2)}"
             )
@@ -234,7 +234,7 @@ class Watchtower:
         # Check retry queue status
         queue_size = self.message_queue.get_queue_size()
         if queue_size > 0:
-            logger.warning(f"[Watchtower] Shutting down with {queue_size} messages in retry queue (will be lost)")
+            _logger.warning(f"[Watchtower] Shutting down with {queue_size} messages in retry queue (will be lost)")
 
         # Clear telegram logs (don't process messages sent during downtime)
         if self.telegram:
@@ -243,9 +243,9 @@ class Watchtower:
         # Disconnect Telegram client
         if self.telegram and self.telegram.client.is_connected():
             await self.telegram.client.disconnect()
-            logger.info("[Watchtower] Telegram client disconnected")
+            _logger.info("[Watchtower] Telegram client disconnected")
 
-        logger.info("[Watchtower] Shutdown complete")
+        _logger.info("[Watchtower] Shutdown complete")
 
     def _clear_telegram_logs(self):
         """Clear all telegram log files on shutdown.
@@ -269,9 +269,9 @@ class Watchtower:
                 for log_file in telegramlog_dir.glob("*.txt"):
                     log_file.unlink()
                     count += 1
-                logger.info(f"[Watchtower] Cleared {count} telegram log file(s)")
+                _logger.info(f"[Watchtower] Cleared {count} telegram log file(s)")
         except Exception as e:
-            logger.error(f"[Watchtower] Error clearing telegram logs: {e}")
+            _logger.error(f"[Watchtower] Error clearing telegram logs: {e}")
 
     async def _handle_message(self, message_data: 'MessageData', is_latest: bool) -> bool:
         """Process incoming message from any source (Telegram, RSS).
@@ -296,7 +296,7 @@ class Watchtower:
         try:
             # Connection proof logging only
             if is_latest:
-                logger.info(
+                _logger.info(
                     f"\n[Watchtower] CONNECTION ESTABLISHED\n"
                     f"  Channel: {message_data.channel_name}\n"
                     f"  Latest message by: {message_data.username}\n"
@@ -311,7 +311,7 @@ class Watchtower:
 
             destinations = self.router.get_destinations(message_data)
             if not destinations:
-                logger.info(f"[Watchtower] Message from {message_data.channel_name} by {message_data.username} has no destinations")
+                _logger.info(f"[Watchtower] Message from {message_data.channel_name} by {message_data.username} has no destinations")
                 self.metrics.increment("total_msgs_no_destination")
                 return False
 
@@ -331,7 +331,7 @@ class Watchtower:
             return success_count > 0
 
         except Exception as e:
-            logger.error(f"[Watchtower] Error processing message from {message_data.channel_name} by {message_data.username}: {e}", exc_info=True)
+            _logger.error(f"[Watchtower] Error processing message from {message_data.channel_name} by {message_data.username}: {e}", exc_info=True)
             return False
 
         finally:
@@ -339,9 +339,9 @@ class Watchtower:
             if message_data.media_path and os.path.exists(message_data.media_path):
                 try:
                     os.remove(message_data.media_path)
-                    logger.debug(f"[Watchtower] Cleaned up media file: {message_data.media_path}")
+                    _logger.debug(f"[Watchtower] Cleaned up media file: {message_data.media_path}")
                 except Exception as e:
-                    logger.error(f"[Watchtower] Error removing media at {message_data.media_path}: {e}")
+                    _logger.error(f"[Watchtower] Error removing media at {message_data.media_path}: {e}")
 
     async def _preprocess_message(self, message_data: MessageData):
         """Pre-process message with OCR and defanged URLs.
@@ -442,7 +442,7 @@ class Watchtower:
         else:
             status = "failed"
 
-        logger.info(f"[Watchtower] Message from {parsed_message.channel_name} by {parsed_message.username} {status} to {destination['name']}")
+        _logger.info(f"[Watchtower] Message from {parsed_message.channel_name} by {parsed_message.username} {status} to {destination['name']}")
 
         # Return True if status indicates success (not "failed")
         return status != "failed"
@@ -506,7 +506,7 @@ class Watchtower:
 
         destination_chat_id = await self.telegram.resolve_destination(channel_specifier)
         if destination_chat_id is None:
-            logger.warning(f"[TelegramHandler] Skipping unresolved destination: {channel_specifier}")
+            _logger.warning(f"[TelegramHandler] Skipping unresolved destination: {channel_specifier}")
             return "failed"
 
         try:
@@ -527,7 +527,7 @@ class Watchtower:
                 self.metrics.increment("messages_queued_retry")
                 return "queued for retry"
         except Exception as e:
-            logger.error(f"[TelegramHandler] Failed to send to {channel_specifier}: {e}")
+            _logger.error(f"[TelegramHandler] Failed to send to {channel_specifier}: {e}")
             return "failed"
 
     def _get_media_for_send(self, parsed_message: MessageData, destination: Dict, include_media: bool) -> Optional[str]:
@@ -629,10 +629,10 @@ def _load_existing_config(config_dir: Path, config_filename='config.json'):
     config_path = config_dir / config_filename
 
     if not config_path.exists():
-        logger.info(f"[Discover] No existing config found at {config_path}")
+        _logger.info(f"[Discover] No existing config found at {config_path}")
         return set(), {}
 
-    logger.info(f"[Discover] Loading existing config: {config_path}")
+    _logger.info(f"[Discover] Loading existing config: {config_path}")
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             existing_config = json.load(f)
@@ -649,10 +649,10 @@ def _load_existing_config(config_dir: Path, config_filename='config.json'):
                     existing_channel_ids.add(ch_id)
                     existing_channel_details[ch_id] = ch_id
 
-        logger.info(f"[Discover] Found {len(existing_channel_ids)} existing channels in config")
+        _logger.info(f"[Discover] Found {len(existing_channel_ids)} existing channels in config")
         return existing_channel_ids, existing_channel_details
     except Exception as e:
-        logger.error(f"[Discover] Error loading config: {e}")
+        _logger.error(f"[Discover] Error loading config: {e}")
         return None, None
 
 def _calculate_diff(channels, existing_channel_ids):
@@ -689,50 +689,50 @@ def _print_diff_output(new_channels, removed_channel_ids, existing_channel_ids, 
     has_changes = len(new_channels) > 0 or len(removed_channel_ids) > 0
 
     if not has_changes:
-        logger.info("")
-        logger.info("=" * 70)
-        logger.info("✓ NO CHANGES DETECTED")
-        logger.info("=" * 70)
-        logger.info(f"  All {len(existing_channel_ids)} configured channels are accessible.")
-        logger.info(f"  No new channels discovered.")
-        logger.info("=" * 70)
-        logger.info("")
+        _logger.info("")
+        _logger.info("=" * 70)
+        _logger.info("✓ NO CHANGES DETECTED")
+        _logger.info("=" * 70)
+        _logger.info(f"  All {len(existing_channel_ids)} configured channels are accessible.")
+        _logger.info(f"  No new channels discovered.")
+        _logger.info("=" * 70)
+        _logger.info("")
         return False
 
-    logger.info("")
-    logger.info("=" * 70)
-    logger.info("CONFIGURATION DIFF")
-    logger.info("=" * 70)
+    _logger.info("")
+    _logger.info("=" * 70)
+    _logger.info("CONFIGURATION DIFF")
+    _logger.info("=" * 70)
 
     if removed_channel_ids:
-        logger.info("")
-        logger.info("Removed/Inaccessible (in config but not accessible):")
+        _logger.info("")
+        _logger.info("Removed/Inaccessible (in config but not accessible):")
         for ch_id in sorted(removed_channel_ids):
-            logger.info(f"  - {ch_id}")
+            _logger.info(f"  - {ch_id}")
 
     if new_channels:
-        logger.info("")
-        logger.info("New Channels (accessible but not in config):")
+        _logger.info("")
+        _logger.info("New Channels (accessible but not in config):")
         for ch in new_channels:
-            logger.info(f"  + {ch['name']:40} [{ch['type']:10}] {ch['info']['id']}")
+            _logger.info(f"  + {ch['name']:40} [{ch['type']:10}] {ch['info']['id']}")
 
     type_counts = {}
     for ch in new_channels:
         entity_type = ch.get('type', 'Unknown')
         type_counts[entity_type] = type_counts.get(entity_type, 0) + 1
 
-    logger.info("")
-    logger.info("=" * 70)
-    logger.info("SUMMARY")
-    logger.info("=" * 70)
-    logger.info(f"  In config: {len(existing_channel_ids):3}  |  Discovered: {len(all_channels):3}  |  New (+): {len(new_channels):3}  |  Removed (-): {len(removed_channel_ids):3}")
+    _logger.info("")
+    _logger.info("=" * 70)
+    _logger.info("SUMMARY")
+    _logger.info("=" * 70)
+    _logger.info(f"  In config: {len(existing_channel_ids):3}  |  Discovered: {len(all_channels):3}  |  New (+): {len(new_channels):3}  |  Removed (-): {len(removed_channel_ids):3}")
 
     if new_channels:
         type_summary = ", ".join([f"{et}s: {count}" for et, count in sorted(type_counts.items())])
-        logger.info(f"  New by type: {type_summary}")
+        _logger.info(f"  New by type: {type_summary}")
 
-    logger.info("=" * 70)
-    logger.info("")
+    _logger.info("=" * 70)
+    _logger.info("")
     return True
 
 def _save_discovered_config(channels, config_dir: Path):
@@ -758,8 +758,8 @@ def _save_discovered_config(channels, config_dir: Path):
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
 
-    logger.info(f"[Discover] Configuration saved to {config_path}")
-    logger.info(f"[Discover] Note: To send to Telegram instead, change type to 'telegram' and set env_key to a Telegram channel ID")
+    _logger.info(f"[Discover] Configuration saved to {config_path}")
+    _logger.info(f"[Discover] Note: To send to Telegram instead, change type to 'telegram' and set env_key to a Telegram channel ID")
 
 async def discover_channels(diff_mode=False, generate_config=False):
     """Discover all accessible Telegram channels and optionally generate a config file.
@@ -783,8 +783,8 @@ async def discover_channels(diff_mode=False, generate_config=False):
         # Get config filename from env var (already loaded by ConfigManager)
         config_filename = os.getenv('CONFIG_FILE', 'config.json')
     except Exception as e:
-        logger.warning(f"[Discover] Could not load full config (this is OK for discovery): {e}")
-        logger.info("[Discover] Loading minimal config for discovery...")
+        _logger.warning(f"[Discover] Could not load full config (this is OK for discovery): {e}")
+        _logger.info("[Discover] Loading minimal config for discovery...")
         # Minimal bootstrap if full config unavailable
         from dotenv import load_dotenv
         project_root = Path(__file__).resolve().parents[1]
@@ -796,17 +796,17 @@ async def discover_channels(diff_mode=False, generate_config=False):
         config_filename = os.getenv('CONFIG_FILE', 'config.json')
 
     if not api_id or not api_hash:
-        logger.error("[Discover] Missing TELEGRAM_API_ID or TELEGRAM_API_HASH in .env file")
+        _logger.error("[Discover] Missing TELEGRAM_API_ID or TELEGRAM_API_HASH in .env file")
         return
 
-    logger.info("[Discover] Connecting to Telegram...")
+    _logger.info("[Discover] Connecting to Telegram...")
     session_path = str(config_dir / "watchtower_session.session")
     client = TelegramClient(session_path, api_id, api_hash)
 
     await client.start()
-    logger.info("[Discover] Connected to Telegram")
+    _logger.info("[Discover] Connected to Telegram")
 
-    logger.info("[Discover] Fetching all dialogs (channels, groups, bots, users)...")
+    _logger.info("[Discover] Fetching all dialogs (channels, groups, bots, users)...")
     dialogs = await client.get_dialogs()
 
     channels = []
@@ -831,12 +831,12 @@ async def discover_channels(diff_mode=False, generate_config=False):
                 "info": channel_info
             })
 
-            logger.info(f"  Found: {entity_name:40} [{entity_type:10}] ({channel_id})")
+            _logger.info(f"  Found: {entity_name:40} [{entity_type:10}] ({channel_id})")
 
     await client.disconnect()
 
     if not channels:
-        logger.warning("[Discover] No dialogs found!")
+        _logger.warning("[Discover] No dialogs found!")
         return
 
     if diff_mode:
@@ -854,27 +854,27 @@ async def discover_channels(diff_mode=False, generate_config=False):
             entity_type = ch.get('type', 'Unknown')
             type_counts[entity_type] = type_counts.get(entity_type, 0) + 1
 
-        logger.info(f"\n[Discover] Found {len(channels)} total dialogs:")
+        _logger.info(f"\n[Discover] Found {len(channels)} total dialogs:")
         for entity_type, count in sorted(type_counts.items()):
-            logger.info(f"  - {entity_type}: {count}")
+            _logger.info(f"  - {entity_type}: {count}")
 
     # Only generate config file if --generate flag was provided
     if generate_config:
         _save_discovered_config(channels, config_dir)
-        logger.info("")
-        logger.info("=" * 70)
-        logger.info("NEXT STEPS:")
-        logger.info("=" * 70)
-        logger.info("1. Review the generated config: config/config_discovered.json")
-        logger.info("2. Add your Discord webhook URL to .env as DISCORD_WEBHOOK_URL")
-        logger.info("3. Optionally add keywords to filter messages per channel")
-        logger.info("4. Rename config_discovered.json to config.json (or merge with existing)")
-        logger.info("5. Run: python3 src/Watchtower.py monitor --sources telegram")
-        logger.info("=" * 70)
+        _logger.info("")
+        _logger.info("=" * 70)
+        _logger.info("NEXT STEPS:")
+        _logger.info("=" * 70)
+        _logger.info("1. Review the generated config: config/config_discovered.json")
+        _logger.info("2. Add your Discord webhook URL to .env as DISCORD_WEBHOOK_URL")
+        _logger.info("3. Optionally add keywords to filter messages per channel")
+        _logger.info("4. Rename config_discovered.json to config.json (or merge with existing)")
+        _logger.info("5. Run: python3 src/Watchtower.py monitor --sources telegram")
+        _logger.info("=" * 70)
     else:
-        logger.info("")
-        logger.info("To generate a config file from these channels, run:")
-        logger.info("  python3 src/Watchtower.py discover --generate")
+        _logger.info("")
+        _logger.info("To generate a config file from these channels, run:")
+        _logger.info("  python3 src/Watchtower.py discover --generate")
 
 def main():
     """Main entry point for Watchtower CLI.
@@ -910,11 +910,11 @@ def main():
             app = Watchtower(sources)
             asyncio.run(app.start())
         except KeyboardInterrupt:
-            logger.info("[Watchtower] Interrupted by user (Ctrl+C)")
+            _logger.info("[Watchtower] Interrupted by user (Ctrl+C)")
             if app:
                 asyncio.run(app.shutdown())
         except Exception as e:
-            logger.error(f"[Watchtower] Fatal error: {e}")
+            _logger.error(f"[Watchtower] Fatal error: {e}")
             if app:
                 asyncio.run(app.shutdown())
             raise
@@ -923,9 +923,9 @@ def main():
         try:
             asyncio.run(discover_channels(diff_mode=args.diff, generate_config=args.generate))
         except KeyboardInterrupt:
-            logger.info("[Discover] Cancelled by user")
+            _logger.info("[Discover] Cancelled by user")
         except Exception as e:
-            logger.error(f"[Discover] Error: {e}", exc_info=True)
+            _logger.error(f"[Discover] Error: {e}", exc_info=True)
             raise
 
     else:

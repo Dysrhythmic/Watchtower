@@ -26,7 +26,7 @@ from logger_setup import setup_logger
 if TYPE_CHECKING:
     from Watchtower import Watchtower
 
-logger = setup_logger(__name__)
+_logger = setup_logger(__name__)
 
 
 @dataclass
@@ -83,7 +83,7 @@ class MessageQueue:
             next_retry_time=time.time() + self.INITIAL_BACKOFF
         )
         self._queue.append(retry_item)
-        logger.info(f"[MessageQueue] Enqueued message for retry: {reason} (destination: {destination['name']})")
+        _logger.info(f"[MessageQueue] Enqueued message for retry: {reason} (destination: {destination['name']})")
 
     async def process_queue(self, watchtower: 'Watchtower') -> None:
         """Background task that continuously processes retry queue.
@@ -95,7 +95,7 @@ class MessageQueue:
         Args:
             watchtower: Watchtower instance providing access to destination handlers
         """
-        logger.info("[MessageQueue] Retry queue processor started")
+        _logger.info("[MessageQueue] Retry queue processor started")
 
         while True:
             now = time.time()
@@ -108,14 +108,14 @@ class MessageQueue:
 
                     if success:
                         self._queue.remove(retry_item)
-                        logger.info(
+                        _logger.info(
                             f"[MessageQueue] Retry succeeded after {retry_item.attempt_count + 1} "
                             f"attempt(s) for {retry_item.destination['name']}"
                         )
                     elif retry_item.attempt_count >= self.MAX_RETRIES - 1:
                         # Max retries reached (0, 1, 2 = 3 attempts)
                         self._queue.remove(retry_item)
-                        logger.error(
+                        _logger.error(
                             f"[MessageQueue] Message dropped after {self.MAX_RETRIES} "
                             f"failed attempts to {retry_item.destination['name']}"
                         )
@@ -124,7 +124,7 @@ class MessageQueue:
                         retry_item.attempt_count += 1
                         backoff = self.INITIAL_BACKOFF * (2 ** retry_item.attempt_count)
                         retry_item.next_retry_time = now + backoff
-                        logger.info(
+                        _logger.info(
                             f"[MessageQueue] Retry attempt {retry_item.attempt_count + 1}/{self.MAX_RETRIES} "
                             f"failed for {retry_item.destination['name']}, next retry in {backoff}s"
                         )
@@ -164,7 +164,7 @@ class MessageQueue:
                 return False
 
         except Exception as e:
-            logger.error(f"[MessageQueue] Retry send exception for {dest['name']}: {e}")
+            _logger.error(f"[MessageQueue] Retry send exception for {dest['name']}: {e}")
             return False
 
         return False
@@ -186,4 +186,4 @@ class MessageQueue:
         size = len(self._queue)
         self._queue.clear()
         if size > 0:
-            logger.info(f"[MessageQueue] Cleared {size} items from retry queue")
+            _logger.info(f"[MessageQueue] Cleared {size} items from retry queue")

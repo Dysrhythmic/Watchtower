@@ -281,9 +281,9 @@ class ConfigManager:
             processed_channel['keywords'] = self._resolve_keywords(telegram_channel.get('keywords'))
             processed_channel['source_type'] = SOURCE_TYPE_TELEGRAM
 
-            # Validate empty keywords (forward all messages)
+            # Log empty keywords (forward all messages)
             if not processed_channel['keywords']:
-                _logger.warning(
+                _logger.info(
                     f"[ConfigManager] {name} -> {processed_channel['id']}: "
                     f"No keywords configured - ALL messages will be forwarded"
                 )
@@ -336,7 +336,9 @@ class ConfigManager:
                 elif 'trim_front_lines' in parser or 'trim_back_lines' in parser:
                     front = parser.get('trim_front_lines', 0)
                     back = parser.get('trim_back_lines', 0)
-                    _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: trim front={front}, back={back}")
+                    # Only log if there's actual trimming happening
+                    if front > 0 or back > 0:
+                        _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: trim front={front}, back={back}")
 
         return processed_telegram_channels
 
@@ -381,7 +383,7 @@ class ConfigManager:
             # Log RSS settings
             rss_name = rss_entry.get('name', rss_url)
             if not rss_channel['keywords']:
-                _logger.warning(
+                _logger.info(
                     f"[ConfigManager] {dest_name} -> RSS:{rss_name}: "
                     f"No keywords configured - ALL items will be forwarded"
                 )
@@ -394,7 +396,9 @@ class ConfigManager:
                 elif 'trim_front_lines' in parser or 'trim_back_lines' in parser:
                     front = parser.get('trim_front_lines', 0)
                     back = parser.get('trim_back_lines', 0)
-                    _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: trim front={front}, back={back}")
+                    # Only log if there's actual trimming happening
+                    if front > 0 or back > 0:
+                        _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: trim front={front}, back={back}")
 
     def _load_keyword_file(self, filename: str) -> List[str]:
         """Load keywords from a JSON file in the config directory.

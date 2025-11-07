@@ -34,6 +34,7 @@ class DiscordHandler(DestinationHandler):
     """
 
     MAX_LENGTH = 2000  # Discord's message character limit
+    FILE_SIZE_LIMIT = 25 * 1024 * 1024  # 25MB for Discord free tier (configurable by user)
     AVATAR_URL = "https://raw.githubusercontent.com/Dysrhythmic/Watchtower/master/watchtower.png"
 
     def __init__(self):

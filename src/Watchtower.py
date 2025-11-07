@@ -468,6 +468,14 @@ class Watchtower:
                 content += f"\n**[Media type {parsed_message.media_type} could not be forwarded to Discord]**"
 
         media_path = parsed_message.media_path if include_media else None
+
+        # Check file size limit before sending
+        if media_path:
+            content, should_send_media = self._check_file_size_and_modify_content(
+                content, media_path, self.discord.FILE_SIZE_LIMIT, destination
+            )
+            media_path = media_path if should_send_media else None
+
         success = self.discord.send_message(content, destination['discord_webhook_url'], media_path)
 
         if success:
@@ -502,6 +510,14 @@ class Watchtower:
             str: Status "sent", "queued for retry", or "failed"
         """
         media_path = self._get_media_for_send(parsed_message, destination, include_media)
+
+        # Check file size limit before sending
+        if media_path:
+            content, should_send_media = self._check_file_size_and_modify_content(
+                content, media_path, self.telegram.FILE_SIZE_LIMIT, destination
+            )
+            media_path = media_path if should_send_media else None
+
         channel_specifier = destination['telegram_destination_channel']
 
         destination_chat_id = await self.telegram.resolve_destination(channel_specifier)
@@ -529,6 +545,117 @@ class Watchtower:
         except Exception as e:
             _logger.error(f"[TelegramHandler] Failed to send to {channel_specifier}: {e}")
             return "failed"
+
+    def _extract_matched_lines_from_attachment(self, media_path: str, keywords: List[str]) -> List[str]:
+        """Extract lines from attachment file that match any of the keywords.
+
+        Reads the attachment file and returns all lines that contain at least one
+        of the specified keywords (case-insensitive matching).
+
+        Args:
+            media_path: Path to the attachment file
+            keywords: List of keywords to match against
+
+        Returns:
+            List[str]: Lines from the file that matched keywords (empty if none or error)
+        """
+        if not media_path or not keywords:
+            return []
+
+        try:
+            path = Path(media_path)
+            if not path.exists():
+                return []
+
+            # Check if file has a supported text extension
+            from MessageRouter import SUPPORTED_TEXT_EXTENSIONS
+            if path.suffix.lower() not in SUPPORTED_TEXT_EXTENSIONS:
+                return []
+
+            # Read file with encoding fallback
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+
+            # Find lines that match any keyword (case-insensitive)
+            matched_lines = []
+            for line in lines:
+                line_stripped = line.rstrip('\n\r')
+                if any(keyword.lower() in line_stripped.lower() for keyword in keywords):
+                    matched_lines.append(line_stripped)
+
+            return matched_lines
+
+        except Exception as e:
+            _logger.warning(f"[Watchtower] Failed to extract matched lines from {media_path}: {e}")
+            return []
+
+    def _check_file_size_and_modify_content(
+        self,
+        content: str,
+        media_path: Optional[str],
+        file_size_limit: int,
+        destination: Dict
+    ) -> tuple[str, bool]:
+        """Check if attachment exceeds file size limit and modify content if needed.
+
+        If the attachment file exceeds the destination's file size limit, extracts
+        the lines that matched keywords and appends them to the message content with
+        a "**From Attachment:**" header. The media should then be skipped.
+
+        Args:
+            content: Formatted message content
+            media_path: Path to attachment file (or None)
+            file_size_limit: Maximum file size in bytes for this destination
+            destination: Destination config with keywords
+
+        Returns:
+            tuple[str, bool]: (modified_content, should_include_media)
+                modified_content: Content with matched lines appended if file too large
+                should_include_media: False if file too large, True otherwise
+        """
+        if not media_path:
+            return content, False
+
+        try:
+            file_size = Path(media_path).stat().st_size
+
+            if file_size <= file_size_limit:
+                return content, True
+
+            # File is too large - extract matched lines
+            _logger.info(
+                f"[Watchtower] Attachment {Path(media_path).name} ({file_size / (1024*1024):.1f}MB) "
+                f"exceeds limit ({file_size_limit / (1024*1024):.1f}MB), extracting matched lines"
+            )
+
+            keywords = destination.get('keywords', [])
+            matched_lines = self._extract_matched_lines_from_attachment(media_path, keywords)
+
+            if matched_lines:
+                # Append matched lines to content with header
+                attachment_section = "\n\n**From Attachment:**\n" + "\n".join(matched_lines)
+                # Limit to first 20 lines to avoid overwhelming the message
+                if len(matched_lines) > 20:
+                    _logger.info(
+                        f"[Watchtower] Limiting attachment excerpt to first 20 lines "
+                        f"(matched {len(matched_lines)} total)"
+                    )
+                    attachment_section = (
+                        "\n\n**From Attachment:**\n" +
+                        "\n".join(matched_lines[:20]) +
+                        f"\n**[...{len(matched_lines) - 20} more matched line(s) omitted]**"
+                    )
+
+                content += attachment_section
+            else:
+                # No matched lines found (shouldn't happen if keywords matched)
+                content += "\n\n**[Attachment too large to forward, no matching text extracted]**"
+
+            return content, False
+
+        except Exception as e:
+            _logger.error(f"[Watchtower] Error checking file size for {media_path}: {e}")
+            return content, True  # On error, try to send normally
 
     def _get_media_for_send(self, parsed_message: MessageData, destination: Dict, include_media: bool) -> Optional[str]:
         """Determine which media file to send based on restricted mode and OCR settings.

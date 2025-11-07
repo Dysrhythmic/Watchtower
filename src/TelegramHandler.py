@@ -66,6 +66,7 @@ class TelegramHandler(DestinationHandler):
     # Telegram limits
     TELEGRAM_CAPTION_LIMIT = 1024  # Maximum caption length for media
     TELEGRAM_MESSAGE_LIMIT = 4096  # Maximum message length
+    FILE_SIZE_LIMIT = 2 * 1024 * 1024 * 1024  # 2GB for Telegram (user client via Telethon)
 
     # Polling configuration
     DEFAULT_POLL_INTERVAL = 300  # seconds (5 minutes) - check for missed messages

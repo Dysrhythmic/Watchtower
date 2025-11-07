@@ -650,6 +650,144 @@ class TestConfigManager(unittest.TestCase):
                         # This test documents the actual behavior
                         self.assertGreaterEqual(len(keywords), 3)
 
+    def test_invalid_destination_type(self):
+        """Test that invalid destination types are rejected."""
+        config_data = {
+            "destinations": [{
+                "name": "BadDest",
+                "type": "invalid_type",  # Invalid type
+                "env_key": "SOME_WEBHOOK",
+                "channels": [{"id": "@test", "keywords": {"inline": []}}]
+            }]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://example.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        # Should raise ValueError because no valid destinations
+                        with self.assertRaises(ValueError) as context:
+                            ConfigManager()
+                        self.assertIn("No valid destinations", str(context.exception))
+
+    def test_missing_destination_type(self):
+        """Test that destinations without type field are rejected."""
+        config_data = {
+            "destinations": [{
+                "name": "NoTypeDest",
+                # Missing "type" field
+                "env_key": "SOME_WEBHOOK",
+                "channels": [{"id": "@test", "keywords": {"inline": []}}]
+            }]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://example.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        with self.assertRaises(ValueError) as context:
+                            ConfigManager()
+                        self.assertIn("No valid destinations", str(context.exception))
+
+    def test_missing_env_variable_for_destination(self):
+        """Test that missing environment variables for destinations are handled."""
+        config_data = {
+            "destinations": [{
+                "name": "MissingEnv",
+                "type": "discord",
+                "env_key": "NONEXISTENT_WEBHOOK",
+                "channels": [{"id": "@test", "keywords": {"inline": []}}]
+            }]
+        }
+
+        def mock_getenv(key, default=None):
+            if key in ["TELEGRAM_API_ID", "TELEGRAM_API_HASH"]:
+                return "test123"
+            return default  # NONEXISTENT_WEBHOOK will return None
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', side_effect=mock_getenv):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        with self.assertRaises(ValueError) as context:
+                            ConfigManager()
+                        self.assertIn("No valid destinations", str(context.exception))
+
+    def test_destination_with_no_sources(self):
+        """Test that destinations with no channels or RSS sources are rejected."""
+        config_data = {
+            "destinations": [{
+                "name": "NoSources",
+                "type": "discord",
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": []  # No channels
+                # No RSS either
+            }]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://discord.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        with self.assertRaises(ValueError) as context:
+                            ConfigManager()
+                        self.assertIn("No valid destinations", str(context.exception))
+
+    def test_invalid_telegram_channels_config(self):
+        """Test that invalid telegram channel configs are rejected."""
+        config_data = {
+            "destinations": [{
+                "name": "InvalidChannels",
+                "type": "discord",
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": [
+                    {"keywords": {"inline": []}}  # Missing required 'id' field
+                ]
+            }]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://discord.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        with self.assertRaises(ValueError) as context:
+                            ConfigManager()
+                        self.assertIn("No valid destinations", str(context.exception))
+
+    def test_rss_feed_url_deduplication(self):
+        """Test that RSS feeds with duplicate URLs are deduplicated."""
+        config_data = {
+            "destinations": [
+                {
+                    "name": "Dest1",
+                    "type": "discord",
+                    "env_key": "DISCORD_WEBHOOK",
+                    "channels": [],
+                    "rss": [
+                        {"url": "https://example.com/feed.xml", "name": "Feed1"}
+                    ]
+                },
+                {
+                    "name": "Dest2",
+                    "type": "discord",
+                    "env_key": "DISCORD_WEBHOOK",
+                    "channels": [],
+                    "rss": [
+                        {"url": "https://example.com/feed.xml", "name": "Feed2"}  # Same URL, different name
+                    ]
+                }
+            ]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://discord.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        config = ConfigManager()
+                        # Should only have 1 RSS feed despite being in 2 destinations
+                        self.assertEqual(len(config.rss_feeds), 1)
+                        self.assertEqual(config.rss_feeds[0]['rss_url'], "https://example.com/feed.xml")
+
 
 if __name__ == '__main__':
     unittest.main()

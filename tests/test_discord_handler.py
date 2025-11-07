@@ -309,6 +309,104 @@ class TestDiscordReplyContext(unittest.TestCase):
         # Verify the actual message text is also present
         self.assertIn("This is a reply to the previous message", formatted)
 
+    @patch('requests.post')
+    def test_send_message_with_media_error(self, mock_post):
+        """Test handling of error response when sending media."""
+        mock_post.return_value.status_code = 500
+        mock_post.return_value.text = "Internal Server Error"
+
+        with patch('builtins.open', create=True) as mock_file:
+            with patch('os.path.exists', return_value=True):
+                mock_file.return_value.__enter__.return_value.read.return_value = b'fake image data'
+                success = self.handler.send_message("Test", "https://discord.com/webhook", "/tmp/test.jpg")
+                self.assertFalse(success)
+
+    @patch('requests.post')
+    def test_send_message_with_media_rate_limit(self, mock_post):
+        """Test handling of rate limit (429) when sending media."""
+        mock_response = Mock()
+        mock_response.status_code = 429
+        mock_response.json.return_value = {'retry_after': 5.0}
+        mock_post.return_value = mock_response
+
+        with patch('builtins.open', create=True) as mock_file:
+            with patch('os.path.exists', return_value=True):
+                mock_file.return_value.__enter__.return_value.read.return_value = b'fake image data'
+                success = self.handler.send_message("Test", "https://discord.com/webhook", "/tmp/test.jpg")
+                self.assertFalse(success)
+
+    @patch('requests.post')
+    def test_handle_rate_limit_json_parse_error(self, mock_post):
+        """Test handling of rate limit response with invalid JSON."""
+        # Simulate a 429 without valid JSON body
+        mock_response = Mock()
+        mock_response.status_code = 429
+        mock_response.json.side_effect = ValueError("Invalid JSON")
+        mock_post.return_value = mock_response
+
+        success = self.handler.send_message("Test", "https://discord.com/webhook", None)
+        self.assertFalse(success)
+
+    def test_format_message_with_reply_context_media_only(self):
+        """Test formatting reply context when original message had only media."""
+        from datetime import datetime, timezone
+
+        reply_context = {
+            'message_id': 456,
+            'author': '@mediauser',
+            'text': '',  # No text
+            'time': '2025-01-01 13:00:00 UTC',
+            'media_type': 'Photo',
+            'has_media': True
+        }
+
+        msg = MessageData(
+            source_type="telegram",
+            channel_name="Test Channel",
+            username="@testuser",
+            timestamp=datetime(2025, 1, 1, 13, 30, 0, tzinfo=timezone.utc),
+            text="Replying to a photo",
+            reply_context=reply_context
+        )
+
+        formatted = self.handler.format_message(msg, {})
+
+        self.assertIn("**  Replying to:**", formatted)
+        self.assertIn("@mediauser", formatted)
+        self.assertIn("**  Original content:** Photo", formatted)
+        self.assertIn("**  Original message:** [Media only, no caption]", formatted)
+
+    def test_format_message_with_reply_context_long_text(self):
+        """Test that reply context truncates long original messages."""
+        from datetime import datetime, timezone
+
+        # Create a reply context with long original text (> 200 chars)
+        long_text = "A" * 250
+
+        reply_context = {
+            'message_id': 789,
+            'author': '@longuser',
+            'text': long_text,
+            'time': '2025-01-01 14:00:00 UTC',
+            'media_type': None,
+            'has_media': False
+        }
+
+        msg = MessageData(
+            source_type="telegram",
+            channel_name="Test Channel",
+            username="@testuser",
+            timestamp=datetime(2025, 1, 1, 14, 30, 0, tzinfo=timezone.utc),
+            text="Replying to long text",
+            reply_context=reply_context
+        )
+
+        formatted = self.handler.format_message(msg, {})
+
+        # Should truncate at 200 chars and add " ..."
+        self.assertIn("A" * 200 + " ...", formatted)
+        self.assertNotIn("A" * 250, formatted)  # Full text should not be present
+
 
 if __name__ == '__main__':
     unittest.main()

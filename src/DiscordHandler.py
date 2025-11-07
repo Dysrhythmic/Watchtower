@@ -23,7 +23,7 @@ from logger_setup import setup_logger
 from MessageData import MessageData
 from DestinationHandler import DestinationHandler
 
-logger = setup_logger(__name__)
+_logger = setup_logger(__name__)
 
 
 class DiscordHandler(DestinationHandler):
@@ -34,6 +34,7 @@ class DiscordHandler(DestinationHandler):
     """
 
     MAX_LENGTH = 2000  # Discord's message character limit
+    FILE_SIZE_LIMIT = 25 * 1024 * 1024  # 25MB for Discord free tier (configurable by user)
     AVATAR_URL = "https://raw.githubusercontent.com/Dysrhythmic/Watchtower/master/watchtower.png"
 
     def __init__(self):
@@ -83,7 +84,7 @@ class DiscordHandler(DestinationHandler):
                         return False
                     elif response.status_code not in [200, 204]:
                         body = (response.text or "")[:200]
-                        logger.error(
+                        _logger.error(
                             f"[DiscordHandler] Unsuccessful status code from Discord webhook (media): "
                             f"status={response.status_code}, body={body}"
                         )
@@ -104,7 +105,7 @@ class DiscordHandler(DestinationHandler):
                     return False
                 elif response.status_code not in [200, 204]:
                     body = (response.text or "")[:200]
-                    logger.error(
+                    _logger.error(
                         f"[DiscordHandler] Unsuccessful status code from Discord webhook (chunk {chunk_index}/{len(chunks)}): "
                         f"status={response.status_code}, body={body}"
                     )
@@ -113,7 +114,7 @@ class DiscordHandler(DestinationHandler):
             return True
 
         except Exception as e:
-            logger.error(f"[DiscordHandler] Discord send failed: {e}")
+            _logger.error(f"[DiscordHandler] Discord send failed: {e}")
             return False
 
     def _handle_rate_limit(self, webhook_url: str, response: requests.Response) -> None:
@@ -132,7 +133,7 @@ class DiscordHandler(DestinationHandler):
             self._store_rate_limit(webhook_url, retry_after)
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             # Fallback if response parsing fails
-            logger.warning(f"[DiscordHandler] Rate limited (429) but couldn't parse retry_after: {e}")
+            _logger.warning(f"[DiscordHandler] Rate limited (429) but couldn't parse retry_after: {e}")
             self._store_rate_limit(webhook_url, 1.0)
 
     def format_message(self, message_data: MessageData, destination: Dict) -> str:

@@ -69,6 +69,7 @@ import sys
 import os
 import json
 import tempfile
+import time
 from unittest.mock import Mock, patch
 from pathlib import Path
 from datetime import datetime, timezone
@@ -232,6 +233,57 @@ class TestMetricsCollector(unittest.TestCase):
         self.metrics.set("seconds_ran", 200)
         self.assertEqual(self.metrics.get("seconds_ran"), 200)
         self.assertNotEqual(self.metrics.get("seconds_ran"), 300)
+
+    def test_reset_single_metric(self):
+        """Test resetting a single metric."""
+        self.metrics.increment("metric1", 10)
+        self.metrics.increment("metric2", 20)
+
+        # Reset only metric1
+        self.metrics.reset_metric("metric1")
+
+        # metric1 should be gone, metric2 should remain
+        self.assertEqual(self.metrics.get("metric1"), 0)
+        self.assertEqual(self.metrics.get("metric2"), 20)
+
+    def test_reset_metric_nonexistent(self):
+        """Test resetting a metric that doesn't exist (should be no-op)."""
+        self.metrics.increment("existing", 5)
+
+        # Try to reset nonexistent metric
+        self.metrics.reset_metric("nonexistent")
+
+        # Should not raise error, existing metric should remain
+        self.assertEqual(self.metrics.get("existing"), 5)
+
+    def test_save_metrics_write_error(self):
+        """Test that save errors are handled gracefully."""
+        # Create metrics with a path that will fail to write
+        bad_path = Path("/invalid/path/that/does/not/exist/metrics.json")
+        metrics = MetricsCollector(bad_path)
+        metrics.increment("test", 1)
+
+        # force_save should not raise an exception even if write fails
+        try:
+            metrics.force_save()
+        except Exception as e:
+            self.fail(f"force_save raised an exception: {e}")
+
+    def test_periodic_save_triggers_after_interval(self):
+        """Test that _maybe_save_metrics saves after interval elapses."""
+        metrics = MetricsCollector(Path(self.temp_file.name))
+
+        # Set metrics as dirty
+        metrics.increment("test", 1)
+
+        # Artificially set last_save_time to past
+        metrics._last_save_time = time.time() - (metrics.SAVE_INTERVAL + 1)
+
+        # Increment again, which should trigger save
+        metrics.increment("test2", 1)
+
+        # Metrics should now be saved and _dirty flag should be False
+        self.assertFalse(metrics._dirty)
 
 
 class TestMetricsIntegration(unittest.TestCase):

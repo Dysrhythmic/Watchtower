@@ -40,7 +40,7 @@ from typing import Dict
 from collections import defaultdict
 from logger_setup import setup_logger
 
-logger = setup_logger(__name__)
+_logger = setup_logger(__name__)
 
 
 class MetricsCollector:
@@ -71,7 +71,7 @@ class MetricsCollector:
         self.metrics: Dict[str, int] = defaultdict(int)
         self._last_save_time = time.time()
         self._dirty = False  # Track if metrics changed since last save
-        logger.info("[MetricsCollector] Starting with fresh metrics (per-session)")
+        _logger.info("[MetricsCollector] Starting with fresh metrics (per-session)")
 
     def _save_metrics(self) -> None:
         """Save current metrics to file immediately.
@@ -90,9 +90,9 @@ class MetricsCollector:
             with open(self.metrics_file, 'w') as f:
                 json.dump(dict(self.metrics), f, indent=2)
 
-            logger.debug(f"[MetricsCollector] Saved metrics to {self.metrics_file}")
+            _logger.debug(f"[MetricsCollector] Saved metrics to {self.metrics_file}")
         except Exception as e:
-            logger.error(f"[MetricsCollector] Failed to save metrics: {e}")
+            _logger.error(f"[MetricsCollector] Failed to save metrics: {e}")
 
     def _maybe_save_metrics(self) -> None:
         """Save metrics if interval has passed since last save.
@@ -121,7 +121,7 @@ class MetricsCollector:
             self._save_metrics()
             self._last_save_time = time.time()
             self._dirty = False
-            logger.info("[MetricsCollector] Forced save on shutdown")
+            _logger.info("[MetricsCollector] Forced save on shutdown")
 
     def increment(self, metric_name: str, value: int = 1) -> None:
         """Increment a metric counter.
@@ -185,7 +185,7 @@ class MetricsCollector:
         self.metrics.clear()
         self._dirty = True
         self.force_save()
-        logger.info("[MetricsCollector] All metrics reset to zero")
+        _logger.info("[MetricsCollector] All metrics reset to zero")
 
     def reset_metric(self, metric_name: str) -> None:
         """Reset a specific metric to zero and force immediate save.
@@ -199,4 +199,4 @@ class MetricsCollector:
             del self.metrics[metric_name]
             self._dirty = True
             self.force_save()
-            logger.info(f"[MetricsCollector] Reset metric: {metric_name}")
+            _logger.info(f"[MetricsCollector] Reset metric: {metric_name}")

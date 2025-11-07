@@ -24,11 +24,24 @@ Telegram Channel ID Formats:
     - Config accepts with or without -100 prefix
 """
 from typing import List, Dict, Optional
+from pathlib import Path
 from logger_setup import setup_logger
 from ConfigManager import ConfigManager
 from MessageData import MessageData
 
-logger = setup_logger(__name__)
+_logger = setup_logger(__name__)
+
+# File extensions that can be checked for keywords in attachments
+SUPPORTED_TEXT_EXTENSIONS = {
+    # Text files
+    '.txt', '.log', '.md',
+    # Data files
+    '.json', '.csv', '.xml', '.yml', '.yaml',
+    # Source code
+    '.py', '.js', '.java', '.c', '.cpp', '.h', '.hpp', '.go', '.rs', '.sh', '.bash', '.ps1',
+    # Config files
+    '.ini', '.conf', '.cfg', '.env', '.toml'
+}
 
 
 class MessageRouter:
@@ -60,8 +73,8 @@ class MessageRouter:
         Returns:
             bool: True if any destination monitoring this channel has restricted_mode=True
         """
-        for webhook in self.config.destinations:
-            for channel in webhook['channels']:
+        for destination in self.config.destinations:
+            for channel in destination['channels']:
                 if self._channel_matches(channel_id, channel_name, channel['id']):
                     if channel.get('restricted_mode', False):
                         return True
@@ -80,8 +93,8 @@ class MessageRouter:
         Returns:
             bool: True if any destination monitoring this channel has ocr=True
         """
-        for webhook in self.config.destinations:
-            for channel in webhook['channels']:
+        for destination in self.config.destinations:
+            for channel in destination['channels']:
                 if self._channel_matches(channel_id, channel_name, channel['id']):
                     if channel.get('ocr', False):
                         return True
@@ -137,8 +150,8 @@ class MessageRouter:
         # STEP 1: Check if this channel is configured anywhere
         # Early exit if channel is not monitored by any destination
         channel_is_configured = False
-        for webhook in self.config.destinations:
-            for channel in webhook.get('channels', []):
+        for destination in self.config.destinations:
+            for channel in destination.get('channels', []):
                 if self._channel_matches(message_data.channel_id, message_data.channel_name, channel['id']):
                     channel_is_configured = True
                     break
@@ -146,14 +159,14 @@ class MessageRouter:
                 break
 
         if not channel_is_configured:
-            logger.info(f"[MessageRouter] No configured matches for channel {message_data.channel_name} ({message_data.channel_id})")
+            _logger.info(f"[MessageRouter] No configured matches for channel {message_data.channel_name} ({message_data.channel_id})")
             return destinations
 
         # STEP 2: Collect all matching destinations
-        for webhook in self.config.destinations:
+        for destination in self.config.destinations:
             # Find the channel configuration for this destination (if it monitors this channel)
             channel_config = None
-            for channel in webhook['channels']:
+            for channel in destination['channels']:
                 if self._channel_matches(message_data.channel_id, message_data.channel_name, channel['id']):
                     channel_config = channel
                     break
@@ -168,92 +181,182 @@ class MessageRouter:
                 # Combine message text and OCR text for keyword matching
                 searchable_text = f"{searchable_text}\n{message_data.ocr_raw}" if searchable_text else message_data.ocr_raw
 
+            # Check text-based attachments if enabled
+            if channel_config.get('check_attachments') and message_data.media_path:
+                attachment_text = self._extract_attachment_text(message_data.media_path)
+                if attachment_text:
+                    searchable_text = (
+                        f"{searchable_text}\n{attachment_text}"
+                        if searchable_text
+                        else attachment_text
+                    )
+
             # Perform keyword matching
             keywords = channel_config.get('keywords')
             if not keywords:
                 # No keywords configured - forward all messages from this channel
-                destinations.append(self._make_dest_entry(webhook, channel_config, matched=[]))
+                destinations.append(self._make_dest_entry(destination, channel_config, matched=[]))
             elif searchable_text:
                 # Case-insensitive keyword matching
                 matched = [kw for kw in keywords if kw.lower() in searchable_text.lower()]
                 if matched:
-                    destinations.append(self._make_dest_entry(webhook, channel_config, matched=matched))
+                    destinations.append(self._make_dest_entry(destination, channel_config, matched=matched))
 
         return destinations
 
     def parse_msg(self, message_data: MessageData, parser_config: Optional[Dict]) -> MessageData:
         """Apply text parsing rules to message.
 
-        Parser trims lines from beginning/end of message text using dictionary format:
-        {"trim_front_lines": N, "trim_back_lines": M}
+        Parser supports (mutually exclusive):
+        - keep_first_lines: Keep only first N lines, discard rest
+        - trim_front_lines + trim_back_lines: Remove N lines from each end
 
         Args:
             message_data: Original message
-            parser_config: Parser configuration dict with trim_front_lines and trim_back_lines keys
+            parser_config: Parser configuration dict
 
         Returns:
             New MessageData with modified text
         """
         text = message_data.text or ""
-        if not text:
+        if not text or not isinstance(parser_config, dict):
             return message_data
 
-        # Dict config: trim from both ends
-        if isinstance(parser_config, dict):
-            front = int(parser_config.get('trim_front_lines', 0) or 0)
-            back = int(parser_config.get('trim_back_lines', 0) or 0)
+        # OPTION 1: keep_first_lines (takes precedence if present)
+        if 'keep_first_lines' in parser_config:
+            keep = int(parser_config.get('keep_first_lines', 0) or 0)
 
-            # Validate values
-            if front < 0 or back < 0:
-                logger.warning(f"[MessageRouter] Invalid parser config: values must be >= 0, got front={front}, back={back}")
-                return message_data
-
-            # Skip parsing if both are 0
-            if front == 0 and back == 0:
+            if keep <= 0:
+                _logger.warning(f"[MessageRouter] Invalid keep_first_lines={keep}, must be > 0")
                 return message_data
 
             lines = text.split('\n')
-            if front > 0:
-                lines = lines[front:]
-            if back > 0:
-                lines = lines[:-back]
-            new_text = '\n'.join(lines)
-            if not new_text:
-                parts = []
-                if front > 0: parts.append(f"first {front}")
-                if back > 0: parts.append(f"last {back}")
-                hint = " and ".join(parts) if parts else "all"
-                new_text = f"**[Message content removed by parser: {hint} line(s) stripped]**"
-            return MessageData(
-                source_type=message_data.source_type,
-                channel_id=message_data.channel_id,
-                channel_name=message_data.channel_name,
-                username=message_data.username,
-                timestamp=message_data.timestamp,
-                text=new_text,
-                has_media=message_data.has_media,
-                media_type=message_data.media_type,
-                media_path=message_data.media_path,
-                reply_context=message_data.reply_context,
-                original_message=message_data.original_message,
-                ocr_enabled=message_data.ocr_enabled,
-                ocr_raw=message_data.ocr_raw,
-                metadata=message_data.metadata
+            kept_lines = lines[:keep]
+
+            # Add notice if lines were omitted
+            if len(lines) > keep:
+                omitted_count = len(lines) - keep
+                new_text = '\n'.join(kept_lines) + f"\n\n**[{omitted_count} more line(s) omitted by parser]**"
+            else:
+                # Message has fewer lines than keep limit
+                new_text = '\n'.join(kept_lines)
+
+            return self._create_parsed_message(message_data, new_text)
+
+        # OPTION 2: trim_front_lines + trim_back_lines
+        front = int(parser_config.get('trim_front_lines', 0) or 0)
+        back = int(parser_config.get('trim_back_lines', 0) or 0)
+
+        # Validate values
+        if front < 0 or back < 0:
+            _logger.warning(f"[MessageRouter] Invalid parser values: front={front}, back={back} must be >= 0")
+            return message_data
+
+        # Skip parsing if both are 0
+        if front == 0 and back == 0:
+            return message_data
+
+        lines = text.split('\n')
+        if front > 0:
+            lines = lines[front:]
+        if back > 0:
+            lines = lines[:-back]
+
+        new_text = '\n'.join(lines)
+        if not new_text:
+            parts = []
+            if front > 0: parts.append(f"first {front}")
+            if back > 0: parts.append(f"last {back}")
+            hint = " and ".join(parts)
+            new_text = f"**[Message content removed by parser: {hint} line(s) stripped]**"
+
+        return self._create_parsed_message(message_data, new_text)
+
+    def _create_parsed_message(self, original: MessageData, new_text: str) -> MessageData:
+        """Create new MessageData with modified text, preserving all other fields.
+
+        Args:
+            original: Original MessageData
+            new_text: Modified text content
+
+        Returns:
+            New MessageData instance with updated text
+        """
+        return MessageData(
+            source_type=original.source_type,
+            channel_id=original.channel_id,
+            channel_name=original.channel_name,
+            username=original.username,
+            timestamp=original.timestamp,
+            text=new_text,
+            has_media=original.has_media,
+            media_type=original.media_type,
+            media_path=original.media_path,
+            reply_context=original.reply_context,
+            original_message=original.original_message,
+            ocr_enabled=original.ocr_enabled,
+            ocr_raw=original.ocr_raw,
+            metadata=original.metadata
+        )
+
+    def _extract_attachment_text(self, media_path: Optional[str]) -> Optional[str]:
+        """Extract searchable text from text-based attachment files.
+
+        Supports text files, data files, source code, and config files.
+        Reads entire file for complete keyword checking (supports 3GB+ files).
+
+        Args:
+            media_path: Path to downloaded media file
+
+        Returns:
+            Extracted text content (entire file), or None if:
+            - Not a text file type
+            - File doesn't exist
+            - Read error occurred
+        """
+        if not media_path:
+            return None
+
+        path = Path(media_path)
+        if not path.exists():
+            return None
+
+        # Check file extension
+        if path.suffix.lower() not in SUPPORTED_TEXT_EXTENSIONS:
+            return None
+
+        # Log file size for large files
+        file_size = path.stat().st_size
+        if file_size > 100 * 1024 * 1024:  # Log if > 100MB
+            _logger.info(
+                f"[MessageRouter] Reading {file_size / (1024*1024):.1f}MB attachment for keyword checking: {path.name}"
             )
 
-        # Invalid or None - return unchanged
-        if parser_config is not None:
-            logger.warning(f"[MessageRouter] Invalid parser config type: {type(parser_config)}, expected dict or None")
-        return message_data
+        # Read entire file content with encoding fallback
+        try:
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
 
-    def _make_dest_entry(self, webhook: Dict, channel_config: Dict, matched: List[str]) -> Dict:
+            _logger.debug(
+                f"[MessageRouter] Extracted {len(content)} chars from {path.name} "
+                f"for keyword checking"
+            )
+            return content
+
+        except Exception as e:
+            _logger.warning(
+                f"[MessageRouter] Failed to read attachment {path.name}: {e}"
+            )
+            return None
+
+    def _make_dest_entry(self, destination: Dict, channel_config: Dict, matched: List[str]) -> Dict:
         """Create normalized destination entry with routing metadata.
 
-        Combines webhook config and channel-specific config into a single dict
+        Combines destination config and channel-specific config into a single dict
         for use in message routing and dispatch.
 
         Args:
-            webhook: Destination webhook configuration
+            destination: Destination configuration
             channel_config: Channel-specific configuration (keywords, parser, etc.)
             matched: List of keywords that matched for this message
 
@@ -261,17 +364,17 @@ class MessageRouter:
             Dict: Normalized destination entry with all routing metadata
         """
         base = {
-            'name': webhook['name'],
-            'type': webhook.get('type', 'discord'),
+            'name': destination['name'],
+            'type': destination['type'],
             'keywords': matched,
             'restricted_mode': channel_config.get('restricted_mode', False),
             'parser': channel_config.get('parser'),
             'ocr': channel_config.get('ocr', False),
         }
         if base['type'] == 'discord':
-            base['discord_webhook_url'] = webhook['discord_webhook_url']
+            base['discord_webhook_url'] = destination['discord_webhook_url']
         else:
-            base['telegram_destination_channel'] = webhook['telegram_destination_channel']
+            base['telegram_destination_channel'] = destination['telegram_destination_channel']
         return base
 
     def _channel_matches(self, channel_id: str, channel_name: str, config_id: str) -> bool:

@@ -19,10 +19,13 @@ Destinations:
 - Includes attached media and reply context in messages
 - Telegram channels can be set in `restricted_mode` to only forward text type media to avoid potential malicious/explicit media from being downloaded and sent
 - For each destination, all channels have their own keyword filtering and other configuration for the most flexible routing control
-- Remove indicated number of lines from beginning and/or end of messages with the `parser` field in the configuration
+- Enhanced message parser with two modes: trim lines from ends or keep only first N lines
 - OCR integration for Telegram messages to run keyword filters against extracted text
+- Attachment keyword checking for text-based files (txt, json, csv, source code, config files, and more)
+- Configuration validation with duplicate destination detection and helpful warnings about default values
 - RSS feed monitoring support
-- Lightweight for compatibility running on devices with limit storage capacity such as a Raspberry Pi
+- Comprehensive test suite with 282 tests covering unit and integration scenarios
+- Lightweight for compatibility running on devices with limited storage capacity such as a Raspberry Pi
 
 ## Requirements
 - Python 3.8+
@@ -149,19 +152,137 @@ or simply omit the `keywords` field.
 
 
 ## Message Parser
-The `parser` field allows you to remove lines from the beginning and/or end of messages before forwarding:
+
+The `parser` field allows you to modify message text before forwarding. Two parsing modes are available (mutually exclusive):
+
+### Keep Only First N Lines
+
+Keeps only the first N lines of a message and discards the rest. Useful for RSS feeds where you only want the title and link without long summaries.
 
 ```json
-"parser": {
-  "trim_front_lines": 1,
-  "trim_back_lines": 2
+{
+  "parser": {
+    "keep_first_lines": 2
+  }
 }
 ```
+
+This keeps only the first 2 lines. If the message has more lines, a notice is appended: `[X more line(s) omitted by parser]`
+
+### Trim Lines from Ends
+
+Removes lines from the beginning and/or end of messages:
+
+```json
+{
+  "parser": {
+    "trim_front_lines": 1,
+    "trim_back_lines": 2
+  }
+}
+```
+
 This removes the first line and last 2 lines from each message.
 
-- Both values must be non-negative integers
-- Set either value to `0` to skip trimming from that end
-- The `parser` field is optional and can be omitted entirely for no parsing
+**Notes:**
+- `keep_first_lines` and trim options **cannot be used together**
+- All values must be non-negative integers
+- Set to `0` or omit the `parser` field entirely for no parsing
+- Parser validation occurs at startup with helpful error messages
+
+## Attachment Keyword Checking
+
+Text-based attachments can be checked for keywords in addition to message text and OCR. This is useful for analyzing text dumps, JSON files, source code, and configuration files shared in channels.
+
+### Supported File Types
+
+Watchtower automatically detects and processes these text-based file types:
+
+**Text & Documentation:**
+- `.txt` - Plain text files
+- `.log` - Log files
+- `.md` - Markdown files
+
+**Data Formats:**
+- `.json` - JSON data
+- `.csv` - CSV data
+- `.xml` - XML data
+- `.yml`, `.yaml` - YAML configuration
+
+**Source Code:**
+- `.py` - Python
+- `.js` - JavaScript
+- `.java` - Java
+- `.c`, `.cpp`, `.h`, `.hpp` - C/C++
+- `.go` - Go
+- `.rs` - Rust
+- `.sh`, `.bash` - Shell scripts
+- `.ps1` - PowerShell
+
+**Configuration Files:**
+- `.ini` - INI files
+- `.conf`, `.cfg` - Generic config
+- `.env` - Environment variables
+- `.toml` - TOML config
+
+### Configuration
+
+**Enabled:**
+```json
+{
+  "channels": [{
+    "id": "@channel",
+    "keywords": ["malware", "exploit"],
+    "check_attachments": true
+  }]
+}
+```
+
+**Disabled (default, backward compatible):**
+```json
+{
+  "channels": [{
+    "id": "@channel",
+    "keywords": ["malware"]
+  }]
+}
+```
+
+Omitting `check_attachments` or setting it to `false` disables the feature for that channel.
+
+### Behavior
+
+- **Complete file checking**: Entire file is read and checked for keywords (no partial reads)
+- **Large file support**: Supports 3GB+ text files from Telegram (entire file is checked)
+- **Smart filtering**: Binary files and unsupported types are automatically skipped
+- **Encoding resilient**: Invalid UTF-8 characters are gracefully handled
+- **Combined search**: Attachment text is added to message text + OCR for comprehensive keyword matching
+
+### Example Use Cases
+
+**Monitor threat intelligence channels sharing IOC dumps:**
+```json
+{
+  "check_attachments": true,
+  "keywords": ["malicious", "C2", "backdoor"]
+}
+```
+
+**Check JSON API responses shared in dev channels:**
+```json
+{
+  "check_attachments": true,
+  "keywords": ["error", "failed", "exception"]
+}
+```
+
+**Scan source code snippets for security issues:**
+```json
+{
+  "check_attachments": true,
+  "keywords": ["password", "api_key", "secret"]
+}
+```
 
 ## Security
 - Keep your `.env` and `watchtower_session.session` files private.
@@ -275,16 +396,31 @@ python3 -m unittest tests.test_telegram_handler.TestTelegramLogFunctionality
 
 ### Test Coverage
 
-The test suite covers:
-- **Configuration**: Loading, validation, keyword resolution (654 lines)
-- **Telegram Handler**: Message formatting, restricted mode, URL defanging, telegram logs (1215 lines)
-- **Discord Handler**: Webhook sending, chunking, rate limits (313 lines)
-- **Message Router**: Keyword matching, destination routing (934 lines)
-- **RSS Handler**: Feed parsing, deduplication, timestamp tracking (569 lines)
-- **OCR Handler**: Text extraction from images (269 lines)
-- **Message Queue**: Retry logic, exponential backoff (370 lines)
-- **Metrics**: Counter tracking, persistence (397 lines)
-- **Integration**: End-to-end message flow (2536 lines)
+The test suite includes **282 tests** covering:
+
+- **Configuration** (654 lines): Loading, validation, keyword resolution, parser validation
+- **Telegram Handler** (1215 lines): Message formatting, restricted mode, URL defanging, log files
+- **Discord Handler** (313 lines): Webhook sending, message chunking, rate limits
+- **Message Router** (934 lines): Keyword matching, destination routing, attachment checking, parsing
+- **RSS Handler** (569 lines): Feed parsing, deduplication, timestamp tracking
+- **OCR Handler** (269 lines): Text extraction from images
+- **Message Queue** (370 lines): Retry logic, exponential backoff
+- **Metrics** (397 lines): Counter tracking, persistence
+- **Integration Tests** (2536 lines): End-to-end flows including:
+  - Telegram → Discord/Telegram pipelines
+  - RSS → Discord/Telegram flows
+  - Queue retry processing with multiple items
+  - Media cleanup operations
+  - Rate limit coordination across destinations
+  - Mixed source processing
+
+**Overall coverage: 69%** across 1,480 statements in the src/ directory.
+
+Modules with highest coverage:
+- MessageData.py: 100%
+- DiscordHandler.py: 96%
+- MetricsCollector.py: 96%
+- MessageRouter.py: 93%
 
 ### Test Requirements
 
@@ -495,10 +631,11 @@ Both source types route to the same destination with independent keyword filteri
       "channels": [
         {
           "id": "@vxunderground",
-          "keywords": ["malware", "cat"],
+          "keywords": ["malware", "ransomware"],
           "restricted_mode": false,
           "parser": {"trim_front_lines": 1, "trim_back_lines": 2},
-          "ocr": true
+          "ocr": true,
+          "check_attachments": true
         }
       ],
       "rss": [
@@ -506,6 +643,7 @@ Both source types route to the same destination with independent keyword filteri
           "url": "https://example.com/rss",
           "name": "Example RSS Feed",
           "keywords": [],
+          "parser": {"keep_first_lines": 2}
         }
       ]
     },
@@ -526,11 +664,15 @@ Both source types route to the same destination with independent keyword filteri
   ]
 }
 ```
-- **Discord destination**: Monitors Telegram channel `@vxunderground` and RSS feed `https://example.com/rss`
-  - Forwards everything from the RSS feed
-  - For the Telegram channel, only forwards messages with `malware` or `cat` (including OCR-detected text)
-  - Trims 1 line from the front and 2 lines from the end of VXUG messages
-  - Sends to Discord webhook URL stored in `.env` as `DISCORD_WEBHOOK_ALERTS`
+- **Discord destination**: Monitors Telegram channel `@vxunderground` and RSS feed
+  - Telegram channel:
+    - Forwards messages with `malware` or `ransomware` keywords
+    - Checks OCR-extracted text and entire text-based attachments for keywords
+    - Trims 1 line from front and 2 lines from end
+  - RSS feed:
+    - Forwards all entries
+    - Keeps only first 2 lines (title and link, omits summary)
+  - Sends to Discord webhook URL in `.env` as `DISCORD_WEBHOOK_ALERTS`
 - **Telegram destination**: Monitors Telegram channel `@CTIUpdates`
   - Only forwards messages containing `breach`
   - Trims 1 line from the beginning of each message

@@ -284,7 +284,7 @@ class ConfigManager:
             # Log empty keywords (forward all messages)
             if not processed_channel['keywords']:
                 _logger.info(
-                    f"[ConfigManager] {name} -> {processed_channel['id']}: "
+                    f"[ConfigManager] {processed_channel['id']}: "
                     f"No keywords configured - ALL messages will be forwarded"
                 )
 
@@ -297,7 +297,7 @@ class ConfigManager:
                 # Check mutual exclusivity
                 if has_keep and has_trim:
                     _logger.error(
-                        f"[ConfigManager] {name} -> {processed_channel['id']}: "
+                        f"[ConfigManager] {processed_channel['id']}: "
                         f"Parser cannot use 'keep_first_lines' with 'trim_front_lines'/'trim_back_lines'. "
                         f"Ignoring trim options."
                     )
@@ -310,7 +310,7 @@ class ConfigManager:
                     keep = parser.get('keep_first_lines', 0)
                     if not isinstance(keep, int) or keep <= 0:
                         _logger.warning(
-                            f"[ConfigManager] {name} -> {processed_channel['id']}: "
+                            f"[ConfigManager] {processed_channel['id']}: "
                             f"'keep_first_lines' must be a positive integer, got {keep}. Parser disabled."
                         )
                         processed_channel.pop('parser', None)  # Remove invalid parser
@@ -384,7 +384,7 @@ class ConfigManager:
             rss_name = rss_entry.get('name', rss_url)
             if not rss_channel['keywords']:
                 _logger.info(
-                    f"[ConfigManager] {dest_name} -> RSS:{rss_name}: "
+                    f"[ConfigManager] RSS:{rss_name}: "
                     f"No keywords configured - ALL items will be forwarded"
                 )
 

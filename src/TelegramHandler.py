@@ -21,11 +21,11 @@ Telegram API Details:
     - Rate limiting via FloodWaitError with retry_after seconds
 
 Restricted Mode:
-    Security feature for CTI workflows that only allows specific document types:
-    - Allowed extensions: .txt, .csv, .log, .sql, .xml, .dat, .db, .mdb, .json
-    - Allowed MIME types: text/plain, text/csv, application/json, etc.
-    - Blocks: Photos, videos, and other potentially malicious media
-    - Both extension AND MIME type must match for security
+    Security feature for CTI workflows that only allows safe, non-malicious document types:
+    - Allowed extensions: .txt, .log, .csv, .json, .xml, .yml, .yaml, .md, .sql, .ini, .conf, .cfg, .env, .toml
+    - Allowed MIME types: text/plain, text/csv, application/json, text/xml, application/toml, etc.
+    - Blocks: Photos, videos, source code, binary files, and other potentially malicious media
+    - Both extension AND MIME type must match for security (prevents spoofing)
 
 URL Defanging:
     Converts Telegram URLs to non-clickable format for safe sharing:
@@ -43,6 +43,7 @@ from ConfigManager import ConfigManager
 from MessageData import MessageData
 from DestinationHandler import DestinationHandler
 from logger_setup import setup_logger
+from allowed_file_types import ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES
 
 _logger = setup_logger(__name__)
 
@@ -56,11 +57,13 @@ class TelegramHandler(DestinationHandler):
     Attributes:
         TELEGRAM_CAPTION_LIMIT: Max caption length (1024 chars)
         TELEGRAM_MESSAGE_LIMIT: Max message length (4096 chars)
-        ALLOWED_MIME_TYPES: Permitted MIME types in restricted mode
-        ALLOWED_EXTENSIONS: Permitted file extensions in restricted mode
         client: Telethon TelegramClient instance
         channels: Resolved channel entities (channel_id -> entity)
         msg_callback: Callback function for new messages
+
+    Note:
+        ALLOWED_EXTENSIONS and ALLOWED_MIME_TYPES are imported from allowed_file_types module
+        and shared with attachment checking functionality for consistency
     """
 
     # Telegram limits
@@ -71,16 +74,8 @@ class TelegramHandler(DestinationHandler):
     # Polling configuration
     DEFAULT_POLL_INTERVAL = 300  # seconds (5 minutes) - check for missed messages
 
-    # Define allowed file types for restricted mode
-    ALLOWED_MIME_TYPES = {
-        "text/plain", "text/csv", "text/xml", "application/sql",
-        "application/octet-stream", "application/x-sql", "application/x-msaccess",
-        "application/json"
-    }
-
-    ALLOWED_EXTENSIONS = {
-        '.txt', '.csv', '.log', '.sql', '.xml', '.dat', '.db', '.mdb', '.json'
-    }
+    # Restricted mode file types: imported from allowed_file_types module
+    # Both ALLOWED_EXTENSIONS and ALLOWED_MIME_TYPES are now shared constants
 
     def __init__(self, config: ConfigManager):
         """Initialize TelegramHandler with configuration.
@@ -619,11 +614,11 @@ class TelegramHandler(DestinationHandler):
             for attr in document.attributes:
                 if hasattr(attr, 'file_name') and attr.file_name:
                     file_extension = os.path.splitext(attr.file_name.lower())[1]
-                    if file_extension in self.ALLOWED_EXTENSIONS:
+                    if file_extension in ALLOWED_EXTENSIONS:
                         extension_allowed = True
                         break
 
-        if mime_type and mime_type in self.ALLOWED_MIME_TYPES:
+        if mime_type and mime_type in ALLOWED_MIME_TYPES:
             mime_allowed = True
 
         allowed = extension_allowed and mime_allowed

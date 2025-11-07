@@ -359,11 +359,15 @@ class Watchtower:
             if not message_data.media_path:
                 message_data.media_path = await self.telegram.download_media(message_data)
             if message_data.media_path and os.path.exists(message_data.media_path):
-                ocr_text = self.ocr.extract_text(message_data.media_path)
-                if ocr_text:
-                    message_data.ocr_enabled = True
-                    message_data.ocr_raw = ocr_text
-                    self.metrics.increment("ocr_processed")
+                # Only attempt OCR on image files
+                if self._is_image_file(message_data.media_path):
+                    ocr_text = self.ocr.extract_text(message_data.media_path)
+                    if ocr_text:
+                        message_data.ocr_enabled = True
+                        message_data.ocr_raw = ocr_text
+                        self.metrics.increment("ocr_processed")
+                else:
+                    _logger.debug(f"[Watchtower] Skipping OCR for non-image file: {message_data.media_path}")
 
         if message_data.source_type == "telegram" and message_data.original_message:
             telegram_msg_id = getattr(message_data.original_message, "id", None)
@@ -374,6 +378,19 @@ class Watchtower:
             )
             if defanged_url:
                 message_data.metadata['src_url_defanged'] = defanged_url
+
+    def _is_image_file(self, file_path: str) -> bool:
+        """Check if a file is an image based on its extension.
+
+        Args:
+            file_path: Path to the file to check
+
+        Returns:
+            bool: True if the file has an image extension, False otherwise
+        """
+        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif'}
+        file_ext = os.path.splitext(file_path)[1].lower()
+        return file_ext in image_extensions
 
     async def _handle_media_restrictions(self, message_data: MessageData, destinations: List[Dict]) -> bool:
         """Check media restrictions and download media if needed.
@@ -568,8 +585,8 @@ class Watchtower:
                 return []
 
             # Check if file has a supported text extension
-            from MessageRouter import SUPPORTED_TEXT_EXTENSIONS
-            if path.suffix.lower() not in SUPPORTED_TEXT_EXTENSIONS:
+            from allowed_file_types import ALLOWED_EXTENSIONS
+            if path.suffix.lower() not in ALLOWED_EXTENSIONS:
                 return []
 
             # Read file with encoding fallback

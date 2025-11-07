@@ -25,23 +25,13 @@ Telegram Channel ID Formats:
 """
 from typing import List, Dict, Optional
 from pathlib import Path
+import mimetypes
 from logger_setup import setup_logger
 from ConfigManager import ConfigManager
 from MessageData import MessageData
+from allowed_file_types import ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES
 
 _logger = setup_logger(__name__)
-
-# File extensions that can be checked for keywords in attachments
-SUPPORTED_TEXT_EXTENSIONS = {
-    # Text files
-    '.txt', '.log', '.md',
-    # Data files
-    '.json', '.csv', '.xml', '.yml', '.yaml',
-    # Source code
-    '.py', '.js', '.java', '.c', '.cpp', '.h', '.hpp', '.go', '.rs', '.sh', '.bash', '.ps1',
-    # Config files
-    '.ini', '.conf', '.cfg', '.env', '.toml'
-}
 
 
 class MessageRouter:
@@ -181,8 +171,8 @@ class MessageRouter:
                 # Combine message text and OCR text for keyword matching
                 searchable_text = f"{searchable_text}\n{message_data.ocr_raw}" if searchable_text else message_data.ocr_raw
 
-            # Check text-based attachments if enabled
-            if channel_config.get('check_attachments') and message_data.media_path:
+            # Check text-based attachments (enabled by default)
+            if channel_config.get('check_attachments', True) and message_data.media_path:
                 attachment_text = self._extract_attachment_text(message_data.media_path)
                 if attachment_text:
                     searchable_text = (
@@ -302,15 +292,20 @@ class MessageRouter:
     def _extract_attachment_text(self, media_path: Optional[str]) -> Optional[str]:
         """Extract searchable text from text-based attachment files.
 
-        Supports text files, data files, source code, and config files.
-        Reads entire file for complete keyword checking (supports 3GB+ files).
+        Supports safe, non-malicious text files (txt, log, csv, json, xml, yaml, md, sql,
+        ini, conf, cfg, env, toml). Reads entire file for complete keyword checking
+        (supports 3GB+ files).
+
+        Security: Files must pass BOTH extension and MIME type checks to be processed.
+        This prevents malicious files from being read even if they have spoofed extensions.
 
         Args:
             media_path: Path to downloaded media file
 
         Returns:
             Extracted text content (entire file), or None if:
-            - Not a text file type
+            - Extension not in allowed list
+            - MIME type not in allowed list
             - File doesn't exist
             - Read error occurred
         """
@@ -322,7 +317,18 @@ class MessageRouter:
             return None
 
         # Check file extension
-        if path.suffix.lower() not in SUPPORTED_TEXT_EXTENSIONS:
+        file_extension = path.suffix.lower()
+        if file_extension not in ALLOWED_EXTENSIONS:
+            _logger.debug(f"[MessageRouter] Skipping attachment with disallowed extension: {path.name}")
+            return None
+
+        # Check MIME type
+        mime_type, _ = mimetypes.guess_type(str(path))
+        if not mime_type or mime_type not in ALLOWED_MIME_TYPES:
+            _logger.debug(
+                f"[MessageRouter] Skipping attachment with disallowed MIME type: "
+                f"{path.name} (extension={file_extension}, mime={mime_type})"
+            )
             return None
 
         # Log file size for large files

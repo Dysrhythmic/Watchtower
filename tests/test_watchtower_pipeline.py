@@ -166,6 +166,73 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         self.assertFalse(message_data.ocr_enabled)
         self.assertIsNone(message_data.ocr_raw)
 
+    @patch('Watchtower.os.path.exists')
+    @patch('MetricsCollector.MetricsCollector')
+    @patch('MessageQueue.MessageQueue')
+    @patch('DiscordHandler.DiscordHandler')
+    @patch('TelegramHandler.TelegramHandler')
+    @patch('OCRHandler.OCRHandler')
+    @patch('MessageRouter.MessageRouter')
+    @patch('ConfigManager.ConfigManager')
+    def test_preprocess_skips_ocr_for_non_image_files(self, MockConfig, MockRouter, MockOCR,
+                                                       MockTelegram, MockDiscord, MockQueue,
+                                                       MockMetrics, mock_exists):
+        """
+        Given: Telegram message with text file (.txt), OCR enabled for channel
+        When: _preprocess_message() is called
+        Then: OCR extraction is skipped for non-image file, ocr_enabled remains False
+
+        Tests: src/Watchtower.py:362-370 (file type check before OCR)
+        """
+        from Watchtower import Watchtower
+
+        # Mock os.path.exists to return True for media file
+        mock_exists.return_value = True
+
+        mock_config = MockConfig.return_value
+        mock_config.telegram_api_id = "123"
+        mock_config.telegram_api_hash = "hash"
+        mock_config.telegram_session_name = "session"
+        mock_config.project_root = Path("/tmp")
+        mock_config.attachments_dir = Path("/tmp/attachments")
+        mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
+        mock_config.tmp_dir = Path("/tmp")
+
+        mock_router = MockRouter.return_value
+        mock_router.is_ocr_enabled_for_channel = Mock(return_value=True)
+
+        mock_ocr = MockOCR.return_value
+        mock_ocr.is_available = Mock(return_value=True)
+        mock_ocr.extract_text = Mock()
+
+        mock_telegram = MockTelegram.return_value
+        mock_telegram.download_media = AsyncMock(return_value="/tmp/attachments/document.txt")
+        mock_telegram.build_defanged_tg_url = Mock(return_value="hxxps://t[.]me/channel/1")
+
+        watchtower = Watchtower(sources=['telegram'])
+
+        message_data = MessageData(
+            source_type="telegram",
+            channel_id="123456",
+            channel_name="test_channel",
+            username="test_user",
+            timestamp=datetime.now(timezone.utc),
+            text="Check this document",
+            has_media=True,
+            media_path="/tmp/attachments/document.txt"
+        )
+        message_data.original_message = Mock()
+        message_data.original_message.id = 1
+
+        # When: Preprocess message
+        asyncio.run(watchtower._preprocess_message(message_data))
+
+        # Then: OCR not performed on non-image file
+        mock_ocr.extract_text.assert_not_called()
+        self.assertFalse(message_data.ocr_enabled)
+        self.assertIsNone(message_data.ocr_raw)
+
     @patch('MetricsCollector.MetricsCollector')
     @patch('MessageQueue.MessageQueue')
     @patch('DiscordHandler.DiscordHandler')

@@ -323,6 +323,21 @@ class ConfigManager:
             if processed_channel.get('ocr', False):
                 _logger.info(f"[ConfigManager] OCR enabled for channel {processed_channel['id']}")
 
+            # Log check_attachments status (enabled by default)
+            check_attachments = processed_channel.get('check_attachments', True)
+            if check_attachments is False:
+                _logger.info(f"[ConfigManager] Attachment checking disabled for channel {processed_channel['id']}")
+
+            # Log parser configuration
+            if processed_channel.get('parser'):
+                parser = processed_channel['parser']
+                if 'keep_first_lines' in parser:
+                    _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: keep first {parser['keep_first_lines']} lines")
+                elif 'trim_front_lines' in parser or 'trim_back_lines' in parser:
+                    front = parser.get('trim_front_lines', 0)
+                    back = parser.get('trim_back_lines', 0)
+                    _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: trim front={front}, back={back}")
+
         return processed_telegram_channels
 
     def _process_rss_sources(self, destination_config: Dict, dest_name: str, telegram_channels: List[Dict], rss_feed_index: Dict[str, str]):
@@ -362,6 +377,24 @@ class ConfigManager:
                 'source_type': SOURCE_TYPE_RSS
             }
             telegram_channels.append(rss_channel)
+
+            # Log RSS settings
+            rss_name = rss_entry.get('name', rss_url)
+            if not rss_channel['keywords']:
+                _logger.warning(
+                    f"[ConfigManager] {dest_name} -> RSS:{rss_name}: "
+                    f"No keywords configured - ALL items will be forwarded"
+                )
+
+            # Log parser configuration for RSS
+            if rss_channel.get('parser'):
+                parser = rss_channel['parser']
+                if 'keep_first_lines' in parser:
+                    _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: keep first {parser['keep_first_lines']} lines")
+                elif 'trim_front_lines' in parser or 'trim_back_lines' in parser:
+                    front = parser.get('trim_front_lines', 0)
+                    back = parser.get('trim_back_lines', 0)
+                    _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: trim front={front}, back={back}")
 
     def _load_keyword_file(self, filename: str) -> List[str]:
         """Load keywords from a JSON file in the config directory.

@@ -17,7 +17,7 @@ Features:
 - Validates required environment variables on startup
 - Flexible destination configuration (currently supports: Discord webhooks, Telegram channels)
 - Keyword files can be combined with inline keyword lists
-- RSS feed deduplication (same URL used by multiple destinations)
+- Keyword and RSS feed URL deduplication
 - Source-specific settings per destination (OCR, restricted mode, parsers, keywords)
 
 Configuration Flow:
@@ -30,7 +30,7 @@ Configuration Flow:
         d. Resolve keyword file references
     4. Build internal data structures:
         - destinations list: ALL destination configs (Discord webhooks, Telegram channels)
-        - rss_feeds list: Unique RSS feed sources (deduplicated by URL)
+        - rss_feeds list: Unique RSS feed sources, deduplicated so each is only polled once
 """
 import os
 import json
@@ -38,16 +38,6 @@ from typing import List, Dict, Optional, Set
 from dotenv import load_dotenv
 from pathlib import Path
 from logger_setup import setup_logger
-
-# Project directory structure (Watchtower/)
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-# Resolve config dir (Watchtower/config)
-_CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
-
-# Load .env file (Watchtower/config/.env) into environment
-_ENV_PATH = _CONFIG_DIR / ".env"
-load_dotenv(dotenv_path=_ENV_PATH)
 
 _logger = setup_logger(__name__)
 
@@ -73,6 +63,16 @@ class ConfigManager:
         Raises:
             ValueError: If required environment variables are missing or config is invalid
         """
+        # Project directory structure (Watchtower/)
+        self.project_root = Path(__file__).resolve().parents[1]
+
+        # Resolve config dir (Watchtower/config)
+        self.config_dir = Path(__file__).resolve().parents[1] / "config"
+
+        # Load .env file (Watchtower/config/.env) into environment
+        self.env_path = self.config_dir / ".env"
+        load_dotenv(dotenv_path=self.env_path)
+
         # Load Telegram API credentials from environment
         self.api_id = os.getenv('TELEGRAM_API_ID')
         self.api_hash = os.getenv('TELEGRAM_API_HASH')
@@ -81,7 +81,7 @@ class ConfigManager:
             raise ValueError("Missing required: TELEGRAM_API_ID, TELEGRAM_API_HASH")
 
         # Create temporary working directories if they don't exist
-        self.tmp_dir = _PROJECT_ROOT / "tmp"
+        self.tmp_dir = self.project_root / "tmp"
         self.attachments_dir = self.tmp_dir / "attachments"     # Downloaded media files
         self.attachments_dir.mkdir(parents=True, exist_ok=True)
         self.rsslog_dir = self.tmp_dir / "rsslog"               # RSS feed timestamp logs for polling
@@ -96,7 +96,7 @@ class ConfigManager:
         # Load and parse configuration file
         # CONFIG_FILE env var can override default config.json
         config_filename = os.getenv('CONFIG_FILE', 'config.json')
-        config_path = _CONFIG_DIR / config_filename
+        config_path = self.config_dir / config_filename
         self.destinations, self.rss_feeds = self._load_config(config_path)
 
         # Channel ID -> channel name mapping
@@ -111,16 +111,16 @@ class ConfigManager:
 
         Deduplication strategy:
         - Keywords: Deduplicated per source via list(set()) in _resolve_keywords()
-        - RSS feeds: Deduplicated globally by URL (same feed polled once, routed to multiple destinations)
-        - Telegram channels: NOT deduplicated (same channel can legitimately appear in multiple destinations)
+        - RSS feeds: Deduplicated URLs via storing as dictionary keys (same feed polled once, routed to multiple destinations)
+        - Telegram channels: Deduplication via storing them in sets in get_all_channel_ids() 
 
         Args:
             config_file: Path to config.json
 
         Returns:
             tuple[List[Dict], List[Dict]]: (destinations, rss_feeds)
-                - destinations: List of ALL destination configurations (Discord webhooks, Telegram channels, etc.)
-                - rss_feeds: List of unique RSS feed configurations
+                - destinations: List of all destination configurations (Discord webhooks, Telegram channels)
+                - rss_feeds: List of unique RSS feed URLs and their names for RSSHandler to poll and log
 
         Raises:
             ValueError: If config file not found or no valid destinations configured
@@ -131,8 +131,8 @@ class ConfigManager:
         with open(config_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
 
-        destinations: List[Dict] = [] # <-- review: should this be called destinations instead of destinations?
-        # Use dict for RSS deduplication: {rss_url: {rss_name, rss_url}}
+        destinations: List[Dict] = []
+        # Use a dictionary with RSS URLs as the keys for automatic deduplication
         rss_feed_index: Dict[str, Dict] = {}
 
         destination_list = config.get('destinations', [])
@@ -145,7 +145,7 @@ class ConfigManager:
         if not destinations:
             raise ValueError("[ConfigManager] No valid destinations configured")
 
-        # Convert RSS feed index to list (deduplicated by URL)
+        # Convert RSS feed index to list
         rss_feeds = list(rss_feed_index.values())
 
         return destinations, rss_feeds
@@ -345,7 +345,7 @@ class ConfigManager:
             return self._keyword_cache[filename]
 
         # Resolve path relative to config directory
-        kw_file = _CONFIG_DIR / filename
+        kw_file = self.config_dir / filename
 
         if not kw_file.exists():
             raise ValueError(f"Keyword file not found: {filename}")

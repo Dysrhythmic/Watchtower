@@ -25,7 +25,7 @@ Subcommand Usage:
 import os
 import json
 from pathlib import Path
-from logger_setup import setup_logger
+from LoggerSetup import setup_logger
 
 _logger = setup_logger(__name__)
 

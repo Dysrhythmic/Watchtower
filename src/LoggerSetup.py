@@ -11,7 +11,7 @@ Features:
 - Automatic color detection (disabled when output is redirected to file)
 
 Example:
-    from logger_setup import setup_logger
+    from LoggerSetup import setup_logger
     logger = setup_logger(__name__)
     logger.info("Message logged with consistent formatting")
     logger.error("Error messages appear in red!")

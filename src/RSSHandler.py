@@ -32,7 +32,7 @@ import feedparser
 from datetime import datetime, timezone
 from typing import Callable, Dict, Any, Optional
 from pathlib import Path
-from logger_setup import setup_logger
+from LoggerSetup import setup_logger
 from MessageData import MessageData
 from ConfigManager import ConfigManager
 

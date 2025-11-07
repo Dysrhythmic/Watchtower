@@ -68,8 +68,8 @@ import json
 import time
 from typing import List, Dict, Optional, TYPE_CHECKING
 from pathlib import Path
-from logger_setup import setup_logger
-from discover import discover_channels
+from LoggerSetup import setup_logger
+from Discover import discover_channels
 
 if TYPE_CHECKING:
     from MessageData import MessageData
@@ -586,7 +586,7 @@ class Watchtower:
                 return []
 
             # Check if file has a supported text extension
-            from allowed_file_types import ALLOWED_EXTENSIONS
+            from AllowedFileTypes import ALLOWED_EXTENSIONS
             if path.suffix.lower() not in ALLOWED_EXTENSIONS:
                 return []
 

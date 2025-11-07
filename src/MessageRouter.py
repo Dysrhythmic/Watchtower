@@ -26,10 +26,10 @@ Telegram Channel ID Formats:
 from typing import List, Dict, Optional
 from pathlib import Path
 import mimetypes
-from logger_setup import setup_logger
+from LoggerSetup import setup_logger
 from ConfigManager import ConfigManager
 from MessageData import MessageData
-from allowed_file_types import ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES
+from AllowedFileTypes import ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES
 
 _logger = setup_logger(__name__)
 

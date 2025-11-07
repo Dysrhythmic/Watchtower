@@ -15,7 +15,7 @@ Dependencies:
     If not installed, OCR features will be disabled but app continues to function.
 """
 from typing import Optional
-from logger_setup import setup_logger
+from LoggerSetup import setup_logger
 
 # Optional EasyOCR import (if missing, log and skip OCR)
 try:

@@ -21,7 +21,7 @@ import time
 import asyncio
 from dataclasses import dataclass
 from typing import List, Optional, Dict, TYPE_CHECKING
-from logger_setup import setup_logger
+from LoggerSetup import setup_logger
 
 if TYPE_CHECKING:
     from Watchtower import Watchtower

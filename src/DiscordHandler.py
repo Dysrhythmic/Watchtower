@@ -19,7 +19,7 @@ import os
 import json
 import requests
 from typing import Optional, Dict
-from logger_setup import setup_logger
+from LoggerSetup import setup_logger
 from MessageData import MessageData
 from DestinationHandler import DestinationHandler
 

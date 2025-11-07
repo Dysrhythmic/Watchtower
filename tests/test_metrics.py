@@ -281,7 +281,7 @@ class TestMetricsIntegration(unittest.TestCase):
             destination = {
                 'type': 'discord',
                 'name': 'Test',
-                'webhook_url': 'http://test.com',
+                'discord_webhook_url': 'http://test.com',
                 'parser': {}
             }
             content = app.discord.format_message(message_data, destination)
@@ -338,7 +338,7 @@ class TestMetricsIntegration(unittest.TestCase):
             destination = {
                 'type': 'discord',
                 'name': 'Test',
-                'webhook_url': 'http://test.com',
+                'discord_webhook_url': 'http://test.com',
                 'parser': {}
             }
             content = app.discord.format_message(message_data, destination)

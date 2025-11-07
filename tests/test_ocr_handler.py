@@ -200,9 +200,9 @@ class TestOCRMultipleDestinations(unittest.TestCase):
 
         mock_router = Mock()
         mock_router.get_destinations = Mock(return_value=[
-            {'name': 'Dest A', 'type': 'discord', 'webhook_url': 'url_a', 'parser': None,
+            {'name': 'Dest A', 'type': 'discord', 'discord_webhook_url': 'url_a', 'parser': None,
              'restricted_mode': False, 'ocr': True, 'keywords': []},
-            {'name': 'Dest B', 'type': 'discord', 'webhook_url': 'url_b', 'parser': None,
+            {'name': 'Dest B', 'type': 'discord', 'discord_webhook_url': 'url_b', 'parser': None,
              'restricted_mode': False, 'ocr': False, 'keywords': []}
         ])
         mock_router.is_ocr_enabled_for_channel = Mock(return_value=True)  # At least one dest has OCR

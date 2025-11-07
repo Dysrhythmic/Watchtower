@@ -40,7 +40,7 @@ class TestMessageQueueBasics(unittest.TestCase):
         Tests: src/MessageQueue.py:34-55 (enqueue logic)
         """
         queue = MessageQueue()
-        dest = {'type': 'discord', 'name': 'Test', 'webhook_url': 'http://test'}
+        dest = {'type': 'discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
         content = "Test message"
         media_path = "/tmp/test.jpg"
 
@@ -65,7 +65,7 @@ class TestMessageQueueBasics(unittest.TestCase):
         Tests: src/MessageQueue.py:52 (backoff calculation)
         """
         queue = MessageQueue()
-        dest = {'type': 'discord', 'name': 'Test', 'webhook_url': 'http://test'}
+        dest = {'type': 'discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
 
         now = time.time()
         queue.enqueue(dest, "Test", None)
@@ -83,7 +83,7 @@ class TestMessageQueueBasics(unittest.TestCase):
         Tests: src/MessageQueue.py:136-142 (queue size tracking)
         """
         queue = MessageQueue()
-        dest = {'type': 'discord', 'name': 'Test', 'webhook_url': 'http://test'}
+        dest = {'type': 'discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
 
         self.assertEqual(queue.get_queue_size(), 0)
 
@@ -102,7 +102,7 @@ class TestMessageQueueBasics(unittest.TestCase):
         Tests: src/MessageQueue.py:144-149 (queue clearing)
         """
         queue = MessageQueue()
-        dest = {'type': 'discord', 'name': 'Test', 'webhook_url': 'http://test'}
+        dest = {'type': 'discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
 
         queue.enqueue(dest, "Message 1", None)
         queue.enqueue(dest, "Message 2", None)
@@ -124,7 +124,7 @@ class TestMessageQueueRetryLogic(unittest.TestCase):
         Tests: src/MessageQueue.py:73-78 (successful retry removal)
         """
         queue = MessageQueue()
-        dest = {'type': 'discord', 'name': 'Test', 'webhook_url': 'http://test'}
+        dest = {'type': 'discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
 
         # Enqueue with immediate retry (past time)
         queue.enqueue(dest, "Test", None)
@@ -162,7 +162,7 @@ class TestMessageQueueRetryLogic(unittest.TestCase):
         Tests: src/MessageQueue.py:86-94 (exponential backoff)
         """
         queue = MessageQueue()
-        dest = {'type': 'discord', 'name': 'Test', 'webhook_url': 'http://test'}
+        dest = {'type': 'discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
 
         queue.enqueue(dest, "Test", None)
         queue._queue[0].next_retry_time = time.time() - 1  # Past due
@@ -202,7 +202,7 @@ class TestMessageQueueRetryLogic(unittest.TestCase):
         Tests: src/MessageQueue.py:79-85 (max retry enforcement)
         """
         queue = MessageQueue()
-        dest = {'type': 'discord', 'name': 'Test', 'webhook_url': 'http://test'}
+        dest = {'type': 'discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
 
         queue.enqueue(dest, "Test", None)
         # Set to max retries - 1 (next failure will drop)
@@ -260,7 +260,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         Tests: src/MessageQueue.py:111-116 (Discord retry)
         """
         queue = MessageQueue()
-        dest = {'type': 'discord', 'name': 'Test', 'webhook_url': 'http://test'}
+        dest = {'type': 'discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
 
         retry_item = RetryItem(
             destination=dest,
@@ -289,7 +289,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         Tests: src/MessageQueue.py:117-128 (Telegram retry)
         """
         queue = MessageQueue()
-        dest = {'type': 'telegram', 'name': 'Test', 'destination': '@testchannel'}
+        dest = {'type': 'telegram', 'name': 'Test', 'telegram_destination_channel': '@testchannel'}
 
         retry_item = RetryItem(
             destination=dest,
@@ -320,7 +320,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         Tests: src/MessageQueue.py:120-128 (Telegram resolve failure)
         """
         queue = MessageQueue()
-        dest = {'type': 'telegram', 'name': 'Test', 'destination': '@invalid'}
+        dest = {'type': 'telegram', 'name': 'Test', 'telegram_destination_channel': '@invalid'}
 
         retry_item = RetryItem(
             destination=dest,
@@ -346,7 +346,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         Tests: src/MessageQueue.py:130-132 (exception handling)
         """
         queue = MessageQueue()
-        dest = {'type': 'discord', 'name': 'Test', 'webhook_url': 'http://test'}
+        dest = {'type': 'discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
 
         retry_item = RetryItem(
             destination=dest,

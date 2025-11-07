@@ -280,7 +280,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
 
         # Destination with restricted mode
         destinations = [
-            {'type': 'telegram', 'restricted_mode': True, 'destination': '@channel'}
+            {'type': 'telegram', 'restricted_mode': True, 'telegram_destination_channel': '@channel'}
         ]
 
         # When: Check media restrictions
@@ -337,7 +337,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
         message_data.original_message = Mock()
 
         destinations = [
-            {'type': 'telegram', 'restricted_mode': True, 'destination': '@channel'}
+            {'type': 'telegram', 'restricted_mode': True, 'telegram_destination_channel': '@channel'}
         ]
 
         # When: Check media restrictions

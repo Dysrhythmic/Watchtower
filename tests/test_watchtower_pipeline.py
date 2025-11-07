@@ -399,7 +399,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         destination = {
             'type': 'discord',
             'name': 'Discord Feed',
-            'webhook_url': 'https://discord.com/api/webhooks/123/token',
+            'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
         }
 
@@ -463,7 +463,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         destination = {
             'type': 'telegram',
             'name': 'Telegram Feed',
-            'destination': '@target_channel',
+            'telegram_destination_channel': '@target_channel',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
         }
 
@@ -528,7 +528,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         destination = {
             'type': 'discord',
             'name': 'Discord Feed',
-            'webhook_url': 'https://discord.com/api/webhooks/123/token',
+            'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
         }
 
@@ -592,7 +592,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         destination = {
             'type': 'discord',
             'name': 'Discord Feed',
-            'webhook_url': 'https://discord.com/api/webhooks/123/token',
+            'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
         }
 
@@ -657,7 +657,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         destination = {
             'type': 'discord',
             'name': 'Discord Feed',
-            'webhook_url': 'https://discord.com/api/webhooks/123/token',
+            'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
         }
 
@@ -721,7 +721,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         destination = {
             'type': 'discord',
             'name': 'Discord Feed',
-            'webhook_url': 'https://discord.com/api/webhooks/123/token'
+            'discord_webhook_url': 'https://discord.com/api/webhooks/123/token'
         }
 
         content = "**Formatted Message**"
@@ -789,7 +789,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         destination = {
             'type': 'discord',
             'name': 'Discord Feed',
-            'webhook_url': 'https://discord.com/api/webhooks/123/token'
+            'discord_webhook_url': 'https://discord.com/api/webhooks/123/token'
         }
 
         content = "**Message with attachment**"
@@ -854,7 +854,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
             ocr_raw="OCR text from image"
         )
 
-        destination = {'webhook_url': 'https://discord.com/api/webhooks/123/token'}
+        destination = {'discord_webhook_url': 'https://discord.com/api/webhooks/123/token'}
 
         # When: Send to Discord
         asyncio.run(watchtower._send_to_discord(
@@ -914,7 +914,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         )
 
         destination = {
-            'webhook_url': 'https://discord.com/api/webhooks/123/token',
+            'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'name': 'Discord Feed'
         }
 
@@ -973,7 +973,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         )
 
         destination = {
-            'webhook_url': 'https://discord.com/api/webhooks/123/token',
+            'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'restricted_mode': True
         }
 
@@ -1039,7 +1039,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'destination': '@target_channel',
+            'telegram_destination_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 
@@ -1109,7 +1109,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'destination': '@target_channel',
+            'telegram_destination_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 
@@ -1175,7 +1175,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'destination': '@target_channel',
+            'telegram_destination_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 
@@ -1238,7 +1238,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'destination': '@target_channel',
+            'telegram_destination_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 
@@ -1302,7 +1302,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'destination': '@target_channel',
+            'telegram_destination_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 

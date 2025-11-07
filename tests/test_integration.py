@@ -180,10 +180,10 @@ class TestMessageRouting(unittest.TestCase):
 
         mock_config = create_mock_config({
             'get_all_channel_ids': Mock(return_value={"@test_channel"}),
-            'webhooks': [{
+            'destinations': [{
                 'name': 'Discord',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook',
+                'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test_channel',
                     'keywords': ['ransomware'],
@@ -231,11 +231,11 @@ class TestMessageRouting(unittest.TestCase):
 
         mock_config = create_mock_config({
             'get_all_channel_ids': Mock(return_value={"@test"}),
-            'webhooks': [
+            'destinations': [
                 {
                     'name': 'Discord 1',
                     'type': 'discord',
-                    'webhook_url': 'https://discord.com/webhook1',
+                    'discord_webhook_url': 'https://discord.com/webhook1',
                     'channels': [{
                         'id': '@test',
                         'keywords': ['CVE'],
@@ -247,7 +247,7 @@ class TestMessageRouting(unittest.TestCase):
                 {
                     'name': 'Discord 2',
                     'type': 'discord',
-                    'webhook_url': 'https://discord.com/webhook2',
+                    'discord_webhook_url': 'https://discord.com/webhook2',
                     'channels': [{
                         'id': '@test',
                         'keywords': ['CVE'],
@@ -288,10 +288,10 @@ class TestParserIntegration(unittest.TestCase):
 
         mock_config = create_mock_config({
             'get_all_channel_ids': Mock(return_value={"@test"}),
-            'webhooks': [{
+            'destinations': [{
                 'name': 'Discord',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook',
+                'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test',
                     'keywords': [],
@@ -359,10 +359,10 @@ class TestErrorHandling(unittest.TestCase):
 
         mock_config = create_mock_config({
             'get_all_channel_ids': Mock(return_value={"@test"}),
-            'webhooks': [{
+            'destinations': [{
                 'name': 'Test',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook',
+                'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test',
                     'keywords': [],
@@ -396,7 +396,7 @@ class TestErrorHandling(unittest.TestCase):
         from Watchtower import Watchtower
 
         mock_config = create_mock_config({
-            'webhooks': []  # Empty webhooks list
+            'destinations': []  # Empty webhooks list
         })
         mock_config_class.return_value = mock_config
 
@@ -427,10 +427,10 @@ class TestMediaHandling(unittest.TestCase):
 
         mock_config = create_mock_config({
             'get_all_channel_ids': Mock(return_value={"@test"}),
-            'webhooks': [{
+            'destinations': [{
                 'name': 'Discord',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook',
+                'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test',
                     'keywords': ['secret'],
@@ -534,10 +534,10 @@ class TestConfigurationVariations(unittest.TestCase):
 
         mock_config = create_mock_config({
             'get_all_channel_ids': Mock(return_value={"@chan1", "@chan2"}),
-            'webhooks': [{
+            'destinations': [{
                 'name': 'Discord',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook',
+                'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [
                     {
                         'id': '@chan1',
@@ -594,10 +594,10 @@ class TestConfigurationVariations(unittest.TestCase):
 
         mock_config = create_mock_config({
             'get_all_channel_ids': Mock(return_value={"@telegram_chan", "https://example.com/feed"}),
-            'webhooks': [{
+            'destinations': [{
                 'name': 'Discord',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook',
+                'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [
                     {
                         'id': '@telegram_chan',
@@ -778,7 +778,7 @@ class TestNewMetrics(unittest.TestCase):
             destination = {
                 'type': 'discord',
                 'name': 'Test',
-                'webhook_url': 'http://test.com',
+                'discord_webhook_url': 'http://test.com',
                 'parser': {}
             }
 
@@ -826,7 +826,7 @@ class TestNewMetrics(unittest.TestCase):
             destination = {
                 'type': 'discord',
                 'name': 'Test',
-                'webhook_url': 'http://test.com',
+                'discord_webhook_url': 'http://test.com',
                 'parser': {}
             }
 

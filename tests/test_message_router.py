@@ -75,7 +75,7 @@ class TestMessageRouter(unittest.TestCase):
         self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
-            'webhook_url': 'https://discord.com/webhook',
+            'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@test_channel',
                 'keywords': ['cve', 'ransomware'],
@@ -298,7 +298,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
-            'webhook_url': 'https://discord.com/webhook',
+            'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@restricted_channel',
                 'keywords': [],
@@ -327,7 +327,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
-            'webhook_url': 'https://discord.com/webhook',
+            'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@open_channel',
                 'keywords': [],
@@ -356,7 +356,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
-            'webhook_url': 'https://discord.com/webhook',
+            'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@ocr_channel',
                 'keywords': [],
@@ -385,7 +385,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
-            'webhook_url': 'https://discord.com/webhook',
+            'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@no_ocr_channel',
                 'keywords': [],
@@ -602,7 +602,7 @@ class TestParserKeywordIndependence(unittest.TestCase):
         self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
-            'webhook_url': 'https://discord.com/webhook',
+            'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@test_channel',
                 'keywords': ['keyword'],
@@ -732,7 +732,7 @@ class TestMultipleDestinationsConfig(unittest.TestCase):
             {
                 'name': 'Dest A (Restricted)',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook_a',
+                'discord_webhook_url': 'https://discord.com/webhook_a',
                 'channels': [{
                     'id': '@test_channel',
                     'keywords': [],
@@ -744,7 +744,7 @@ class TestMultipleDestinationsConfig(unittest.TestCase):
             {
                 'name': 'Dest B (Open)',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook_b',
+                'discord_webhook_url': 'https://discord.com/webhook_b',
                 'channels': [{
                     'id': '@test_channel',
                     'keywords': [],
@@ -855,9 +855,9 @@ class TestMultipleDestinationsConfig(unittest.TestCase):
         dest_b_parser = None
 
         mock_router.get_destinations = Mock(return_value=[
-            {'name': 'Dest A', 'type': 'discord', 'webhook_url': 'url_a',
+            {'name': 'Dest A', 'type': 'discord', 'discord_webhook_url': 'url_a',
              'parser': dest_a_parser, 'restricted_mode': False, 'ocr': False, 'keywords': []},
-            {'name': 'Dest B', 'type': 'discord', 'webhook_url': 'url_b',
+            {'name': 'Dest B', 'type': 'discord', 'discord_webhook_url': 'url_b',
              'parser': dest_b_parser, 'restricted_mode': False, 'ocr': False, 'keywords': []}
         ])
 

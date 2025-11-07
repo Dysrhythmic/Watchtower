@@ -311,7 +311,7 @@ class TestRetryQueueOrderingchunk(unittest.TestCase):
         destination = {
             'name': 'Test Discord',
             'type': 'discord',
-            'webhook_url': 'https://discord.com/webhook'
+            'discord_webhook_url': 'https://discord.com/webhook'
         }
 
         # Simulate a long message that was chunked into 3 parts

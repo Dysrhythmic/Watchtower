@@ -292,8 +292,9 @@ class MessageRouter:
     def _extract_attachment_text(self, media_path: Optional[str]) -> Optional[str]:
         """Extract searchable text from text-based attachment files.
 
-        Supports safe, non-malicious text files (txt, log, csv, json, xml, yaml, md, sql).
-        Reads entire file for complete keyword checking (supports 3GB+ files).
+        Supports safe, non-malicious text files (txt, log, csv, json, xml, yaml, md, sql,
+        ini, conf, cfg, env, toml). Reads entire file for complete keyword checking
+        (supports 3GB+ files).
 
         Security: Files must pass BOTH extension and MIME type checks to be processed.
         This prevents malicious files from being read even if they have spoofed extensions.

@@ -210,7 +210,13 @@ Watchtower automatically detects and processes these safe, non-malicious text-ba
 - `.yml`, `.yaml` - YAML configuration
 - `.sql` - SQL scripts
 
-**Security:** Both file extension AND MIME type are validated to prevent spoofed malicious files. Source code files, binary files, and config files that may contain secrets are **not** processed for security reasons.
+**Configuration Files:**
+- `.ini` - INI files
+- `.conf`, `.cfg` - Generic config files
+- `.env` - Environment variables
+- `.toml` - TOML config
+
+**Security:** Both file extension AND MIME type are validated to prevent spoofed malicious files. Source code files and binary files are **not** processed for security reasons.
 
 ### Configuration
 

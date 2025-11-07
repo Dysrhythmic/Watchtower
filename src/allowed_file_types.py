@@ -22,12 +22,17 @@ ALLOWED_EXTENSIONS = {
     '.yaml',  # YAML configuration (data format, not executable)
     '.md',    # Markdown documentation
     '.sql',   # SQL scripts (text-based)
+    '.ini',   # INI configuration files
+    '.conf',  # Generic configuration files
+    '.cfg',   # Configuration files
+    '.env',   # Environment variable files
+    '.toml',  # TOML configuration files
 }
 
 # MIME types allowed for attachment checking and restricted mode downloads
 # Corresponds to the file extensions above
 ALLOWED_MIME_TYPES = {
-    'text/plain',              # .txt, .log, .sql
+    'text/plain',              # .txt, .log, .sql, .ini, .conf, .cfg, .env
     'text/csv',                # .csv
     'text/xml',                # .xml
     'application/xml',         # .xml (alternate MIME type)
@@ -37,4 +42,6 @@ ALLOWED_MIME_TYPES = {
     'application/x-yaml',      # .yml, .yaml (another alternate)
     'text/markdown',           # .md
     'text/x-markdown',         # .md (alternate MIME type)
+    'application/toml',        # .toml
+    'text/toml',               # .toml (alternate MIME type)
 }

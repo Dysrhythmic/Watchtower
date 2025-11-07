@@ -22,8 +22,8 @@ Telegram API Details:
 
 Restricted Mode:
     Security feature for CTI workflows that only allows safe, non-malicious document types:
-    - Allowed extensions: .txt, .log, .csv, .json, .xml, .yml, .yaml, .md, .sql
-    - Allowed MIME types: text/plain, text/csv, application/json, text/xml, etc.
+    - Allowed extensions: .txt, .log, .csv, .json, .xml, .yml, .yaml, .md, .sql, .ini, .conf, .cfg, .env, .toml
+    - Allowed MIME types: text/plain, text/csv, application/json, text/xml, application/toml, etc.
     - Blocks: Photos, videos, source code, binary files, and other potentially malicious media
     - Both extension AND MIME type must match for security (prevents spoofing)
 

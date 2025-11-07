@@ -31,7 +31,13 @@ Configuration Flow:
     4. Build internal data structures:
         - destinations list: ALL destination configs (Discord webhooks, Telegram channels)
         - rss_feeds list: Unique RSS feed sources, deduplicated so each is only polled once
+
+Deduplication strategy:
+        - Keywords: Deduplicated per source via sets in _resolve_keywords()
+        - RSS feeds: Deduplicated URLs via storing as dictionary keys (same feed polled once, routed to multiple destinations) in _load_config()
+        - Telegram channels: Deduplication via sets in get_all_channel_ids() 
 """
+
 import os
 import json
 from typing import List, Dict, Optional, Set
@@ -98,7 +104,7 @@ class ConfigManager:
         self._keyword_cache: Dict[str, List[str]] = {}
 
         # Load and parse configuration file
-        # CONFIG_FILE env var can override default config.json
+        # Default to config.json if no CONFIG_FILE environment variable
         config_filename = os.getenv('CONFIG_FILE', 'config.json')
         config_path = self.config_dir / config_filename
         self.destinations, self.rss_feeds = self._load_config(config_path)
@@ -112,11 +118,6 @@ class ConfigManager:
         """Load and validate configuration file.
 
         Parses JSON configuration file and processes each destination entry.
-
-        Deduplication strategy:
-        - Keywords: Deduplicated per source via list(set()) in _resolve_keywords()
-        - RSS feeds: Deduplicated URLs via storing as dictionary keys (same feed polled once, routed to multiple destinations)
-        - Telegram channels: Deduplication via storing them in sets in get_all_channel_ids() 
 
         Args:
             config_file: Path to config.json
@@ -149,7 +150,7 @@ class ConfigManager:
         if not destinations:
             raise ValueError("[ConfigManager] No valid destinations configured")
 
-        # Convert RSS feed index to list (deduplicated by URL)
+        # Convert RSS feed index to list
         rss_feeds = [{'rss_url': url, 'rss_name': name} for url, name in rss_feed_index.items()]
 
         return destinations, rss_feeds
@@ -159,7 +160,7 @@ class ConfigManager:
         name = destination_config.get('name', 'Unnamed')
         dest_type = destination_config.get('type')
 
-        # Validate destination type - must be explicitly specified
+        # Validate destination type; must be explicitly specified
         if dest_type not in ['discord', 'telegram']:
             _logger.error(f"[ConfigManager] Invalid or missing destination type for '{name}': {dest_type}. Must be 'discord' or 'telegram'")
             return None
@@ -174,13 +175,13 @@ class ConfigManager:
         if telegram_channels is None:
             return None
 
-        # Process RSS sources (adds to global deduplication index)
-        # Note: RSS feeds are added as pseudo-channels to the telegram_channels list for unified routing
+        # Process RSS sources (adds to deduplication index)
+        # RSS feeds are added as pseudo-channels to the telegram_channels list for unified routing
         self._process_rss_sources(destination_config, name, telegram_channels, rss_feed_index)
 
-        # Must have at least one source (Telegram channel or RSS feed)
+        # Destinations must have at least one source
         if not telegram_channels:
-            _logger.warning(f"[ConfigManager] Destination {name} has no sources (telegram channels or rss)")
+            _logger.warning(f"[ConfigManager] Destination {name} has no sources")
             return None
 
         # Build destination entry (applicable to all destination types)
@@ -206,8 +207,8 @@ class ConfigManager:
         Both Discord and Telegram use env_key to reference environment variable names:
         - Discord: env_key contains webhook URL (e.g., https://discord.com/api/webhooks/...)
         - Telegram: env_key contains channel ID in one of two formats:
-            * Username format: "@channel_username" (e.g., "@my_channel")
-            * Numeric ID format: "-1001234567890" (channel ID, typically negative for supergroups)
+            * Username format: "@channel_username"
+            * Numeric ID format: "-1001234567890" 
 
         Returns:
             tuple[Optional[str], Optional[str]]: (discord_webhook_url, telegram_channel_id)
@@ -247,9 +248,6 @@ class ConfigManager:
         For each Telegram channel source, resolves keyword configuration (files + inline keywords),
         deduplicates them, and logs special settings like restricted_mode and OCR.
 
-        Note: This method is specific to Telegram channels. Future platform integrations
-        (Discord channels, Slack, etc.) would have their own processing methods.
-
         Args:
             destination_config: Destination configuration dict with 'channels' key containing Telegram channel configs
             name: Destination name (for logging purposes, NOT the Telegram channel name)
@@ -274,7 +272,7 @@ class ConfigManager:
             processed_channel['source_type'] = SOURCE_TYPE_TELEGRAM
             processed_telegram_channels.append(processed_channel)
 
-            # Log special settings
+            # Log settings specific to Telegram sources
             if processed_channel.get('restricted_mode', False):
                 _logger.info(f"[ConfigManager] Restricted mode enabled for channel {processed_channel['id']}")
             if processed_channel.get('ocr', False):
@@ -285,11 +283,11 @@ class ConfigManager:
     def _process_rss_sources(self, destination_config: Dict, dest_name: str, telegram_channels: List[Dict], rss_feed_index: Dict[str, str]):
         """Process RSS feed sources and add them as pseudo-channels to Telegram channels list.
 
-        RSS feeds are treated as "pseudo-channels" - they're added to the same channels list
-        as Telegram sources to enable unified message routing logic. This allows both Telegram
-        and RSS sources to use the same filtering/routing infrastructure.
+        RSS feeds are treated as "pseudo-channels" so they can be added to the same channels list
+        as Telegram sources to more easily allow both Telegram and RSS sources to use the same
+        filtering/routing infrastructure.
 
-        RSS feeds are deduplicated globally by URL. Each unique feed is polled once,
+        RSS feeds are deduplicated by URL across all destinations. Each unique feed is polled once,
         then routed to all destinations that want it. Each destination can specify different
         keywords/parsers for the same RSS feed, which is why RSS entries are added per-destination.
 
@@ -297,8 +295,8 @@ class ConfigManager:
             destination_config: Destination configuration dict with 'rss' key
             dest_name: Destination name (for logging)
             telegram_channels: Telegram channels list to append RSS pseudo-channels to (modified in-place
-                              for efficiency - avoids creating new list and concatenation overhead)
-            rss_feed_index: Global RSS feed deduplication index (modified in-place to track unique feeds)
+                              for efficiency to avoid creating a new list and concatenation overhead)
+            rss_feed_index: RSS feed deduplication index (modified in-place to track unique feeds)
         """
         rss_sources = destination_config.get('rss', [])
         for rss_entry in rss_sources:
@@ -307,13 +305,11 @@ class ConfigManager:
                 _logger.warning(f"[ConfigManager] RSS entry missing URL in {dest_name}")
                 continue
 
-            # Add to global RSS feed deduplication index if not already present
+            # Add to RSS feed deduplication index if not already present
             if rss_url not in rss_feed_index:
                 rss_feed_index[rss_url] = rss_entry.get('name', rss_url)
 
-            # Create pseudo-channel for routing
-            # Each destination can have different keywords/parsers for the same RSS feed URL
-            # Note: RSS feed URLs are used as the ID for RSS sources
+            # Create pseudo-channel for routing where feed URLs are used as the channel IDs
             rss_channel = {
                 'id': rss_url,
                 'keywords': self._resolve_keywords(rss_entry.get('keywords')),
@@ -334,7 +330,7 @@ class ConfigManager:
 
         Expected JSON format:
         {
-            "keywords": ["keyword1", " keyword2", "keyword3 "]
+            "keywords": ["keyword1", "keyword2", "keyword3"]
         }
 
         Args:
@@ -419,9 +415,8 @@ class ConfigManager:
             keywords.extend(inline)
 
         # Deduplicate keywords using set conversion
-        # Note: Stored as List[str] throughout (not Set[str]) because:
-        # - Order might matter for some matching algorithms
-        # - Lists are more commonly used in JSON config
+        # Note: Stored as in list rather than a set to begin with because:
+        # - Lists reflect the JSON config structure
         # - Deduplication at resolution time is efficient enough
         keywords = list(set(keywords))
 
@@ -431,7 +426,7 @@ class ConfigManager:
         """Get all unique Telegram channel IDs from destination config.
 
         Collects all Telegram channel IDs across all destinations, excluding RSS feeds.
-        Uses the explicit 'source_type' field to differentiate between Telegram channels
+        Uses the 'source_type' field to differentiate between Telegram channels
         and RSS pseudo-channels.
 
         Returns:

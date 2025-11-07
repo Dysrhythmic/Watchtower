@@ -36,7 +36,7 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
         self._rate_limits: Dict[str, float] = {}
 
     @abstractmethod
-    def _get_rate_limit_key(self, destination_identifier) -> str: # <-- why does this exist if it does nothing?
+    def _get_rate_limit_key(self, destination_identifier) -> str: # <-- review: why does this exist if it does nothing?
         """Get the unique key for rate limit tracking.
 
         Args:
@@ -47,13 +47,13 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
         """
         pass
 
-    def _check_and_wait_for_rate_limit(self, destination_identifier) -> None: # <-- when is this used? there are specific error codes or msgs that indicate when rate limits happen
+    def _check_and_wait_for_rate_limit(self, destination_identifier) -> None: # <-- review: when is this used? there are specific error codes or msgs that indicate when rate limits happen
         """Check if destination is rate limited and wait if necessary.
 
         Args:
             destination_identifier: webhook_url for Discord, chat_id for Telegram
         """
-        key = self._get_rate_limit_key(destination_identifier) # <-- this is calling a method that does nothing
+        key = self._get_rate_limit_key(destination_identifier) # <-- review: this is calling a method that does nothing
 
         if key in self._rate_limits:
             wait_until = self._rate_limits[key]
@@ -73,7 +73,7 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
             destination_identifier: webhook_url for Discord, chat_id for Telegram
             wait_seconds: How many seconds to wait before next attempt
         """
-        key = self._get_rate_limit_key(destination_identifier) # <-- this is calling a method that does nothing
+        key = self._get_rate_limit_key(destination_identifier) # <-- review: this is calling a method that does nothing
         rounded_wait = math.ceil(wait_seconds)
         expires_at = time.time() + rounded_wait
         self._rate_limits[key] = expires_at
@@ -121,7 +121,7 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
         return chunks
 
     @abstractmethod
-    def send_message(self, content: str, destination_identifier, media_path: Optional[str] = None) -> bool: # <-- why does this exist if it does nothing?
+    def send_message(self, content: str, destination_identifier, media_path: Optional[str] = None) -> bool: # <-- review: why does this exist if it does nothing?
         """Send message to destination.
 
         Args:
@@ -135,7 +135,7 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
         pass
 
     @abstractmethod
-    def format_message(self, message_data, destination: Dict) -> str: # <-- why does this exist if it does nothing?
+    def format_message(self, message_data, destination: Dict) -> str: # <-- review: why does this exist if it does nothing?
         """Format message for this destination platform.
 
         Args:

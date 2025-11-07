@@ -863,7 +863,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
 
         # Then: Metrics incremented
         mock_metrics.increment.assert_any_call("messages_sent_discord")
-        mock_metrics.increment.assert_any_call("ocr_sent")
+        mock_metrics.increment.assert_any_call("ocr_msgs_sent")
 
     @patch('MetricsCollector.MetricsCollector')
     @patch('MessageQueue.MessageQueue')
@@ -1249,7 +1249,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         # Then: Metrics incremented
         mock_metrics.increment.assert_any_call("messages_sent_telegram")
-        mock_metrics.increment.assert_any_call("ocr_sent")
+        mock_metrics.increment.assert_any_call("ocr_msgs_sent")
 
     @patch('MetricsCollector.MetricsCollector')
     @patch('MessageQueue.MessageQueue')

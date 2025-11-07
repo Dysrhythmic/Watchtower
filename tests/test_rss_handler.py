@@ -517,10 +517,10 @@ class TestRSSHandlerFeedPolling(unittest.TestCase):
             except asyncio.CancelledError:
                 pass
 
-        with self.assertLogs(level='ERROR') as log_context:
+        with self.assertLogs(level='WARNING') as log_context:
             asyncio.run(run_one_iteration())
 
-        # Error should be logged
+        # Warning should be logged (bozo errors are warnings, not errors)
         self.assertTrue(any("Parse error" in msg for msg in log_context.output))
 
     @patch('feedparser.parse')

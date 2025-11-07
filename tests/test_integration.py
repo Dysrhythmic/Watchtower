@@ -737,12 +737,12 @@ class TestTelegramCaptionHandling(unittest.TestCase):
 
 
 class TestNewMetrics(unittest.TestCase):
-    """Test new metrics: ocr_sent and time_ran."""
+    """Test new metrics: ocr_msgs_sent and seconds_ran."""
 
     @patch('TelegramHandler.TelegramClient')
     @patch('ConfigManager.ConfigManager')
-    def test_ocr_sent_metric_tracked(self, mock_config_class, mock_telegram_client):
-        """Test that ocr_sent metric is incremented when messages with OCR are sent."""
+    def test_ocr_msgs_sent_metric_tracked(self, mock_config_class, mock_telegram_client):
+        """Test that ocr_msgs_sent metric is incremented when messages with OCR are sent."""
         from Watchtower import Watchtower
         from MessageData import MessageData
         from MetricsCollector import MetricsCollector
@@ -785,13 +785,13 @@ class TestNewMetrics(unittest.TestCase):
             content = app.discord.format_message(message_data, destination)
             asyncio.run(app._send_to_discord(message_data, destination, content, False))
 
-        # Verify ocr_sent was incremented
-        self.assertEqual(app.metrics.get("ocr_sent"), 1)
+        # Verify ocr_msgs_sent was incremented
+        self.assertEqual(app.metrics.get("ocr_msgs_sent"), 1)
 
     @patch('TelegramHandler.TelegramClient')
     @patch('ConfigManager.ConfigManager')
-    def test_ocr_sent_not_tracked_without_ocr(self, mock_config_class, mock_telegram_client):
-        """Test that ocr_sent metric is NOT incremented when messages have no OCR."""
+    def test_ocr_msgs_sent_not_tracked_without_ocr(self, mock_config_class, mock_telegram_client):
+        """Test that ocr_msgs_sent metric is NOT incremented when messages have no OCR."""
         from Watchtower import Watchtower
         from MessageData import MessageData
         from MetricsCollector import MetricsCollector
@@ -833,13 +833,13 @@ class TestNewMetrics(unittest.TestCase):
             content = app.discord.format_message(message_data, destination)
             asyncio.run(app._send_to_discord(message_data, destination, content, False))
 
-        # Verify ocr_sent was NOT incremented
-        self.assertEqual(app.metrics.get("ocr_sent"), 0)
+        # Verify ocr_msgs_sent was NOT incremented
+        self.assertEqual(app.metrics.get("ocr_msgs_sent"), 0)
 
     @patch('TelegramHandler.TelegramClient')
     @patch('ConfigManager.ConfigManager')
-    def test_time_ran_metric_per_session(self, mock_config_class, mock_telegram_client):
-        """Test that time_ran metric is per-session, not cumulative."""
+    def test_seconds_ran_metric_per_session(self, mock_config_class, mock_telegram_client):
+        """Test that seconds_ran metric is per-session, not cumulative."""
         from Watchtower import Watchtower
         from MetricsCollector import MetricsCollector
         import asyncio
@@ -861,9 +861,9 @@ class TestNewMetrics(unittest.TestCase):
         app1._start_time = time.time() - 10
         asyncio.run(app1.shutdown())
 
-        first_time_ran = isolated_metrics.get("time_ran")
-        self.assertGreaterEqual(first_time_ran, 9)
-        self.assertLessEqual(first_time_ran, 12)
+        first_seconds_ran = isolated_metrics.get("seconds_ran")
+        self.assertGreaterEqual(first_seconds_ran, 9)
+        self.assertLessEqual(first_seconds_ran, 12)
 
         # Second session: 5 seconds (should REPLACE, not add to 10)
         app2 = Watchtower(sources=[], metrics=isolated_metrics)
@@ -871,10 +871,10 @@ class TestNewMetrics(unittest.TestCase):
         app2._start_time = time.time() - 5
         asyncio.run(app2.shutdown())
 
-        second_time_ran = isolated_metrics.get("time_ran")
+        second_seconds_ran = isolated_metrics.get("seconds_ran")
         # Should be ~5, NOT ~15 (if it were cumulative)
-        self.assertGreaterEqual(second_time_ran, 4)
-        self.assertLessEqual(second_time_ran, 7)
+        self.assertGreaterEqual(second_seconds_ran, 4)
+        self.assertLessEqual(second_seconds_ran, 7)
 
 
 if __name__ == '__main__':

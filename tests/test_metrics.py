@@ -7,7 +7,7 @@ to a JSON file for analysis.
 
 What This Tests:
     - Metric incrementing (messages_received, messages_sent, ocr_processed, etc.)
-    - Metric setting (time_ran, session data)
+    - Metric setting (seconds_ran, session data)
     - Metric retrieval (get(), get_all())
     - JSON persistence (save() to file)
     - Metrics reset/initialization
@@ -21,7 +21,7 @@ Test Pattern - Incrementing:
 Test Pattern - Setting:
     1. Call collector.set("metric_name", value)
     2. Assert collector.get("metric_name") equals value
-    3. For time_ran: use integer seconds value
+    3. For seconds_ran: use integer seconds value
 
 Test Pattern - Persistence:
     1. Create MetricsCollector with temp file
@@ -37,7 +37,7 @@ Mock Setup Template:
 
     collector = MetricsCollector(metrics_path)
     collector.increment("messages_received_telegram")
-    collector.set("time_ran", 3600)
+    collector.set("seconds_ran", 3600)
 
     # Cleanup
     metrics_path.unlink()
@@ -52,8 +52,8 @@ Common Metrics:
     - messages_sent_telegram: Messages delivered to Telegram
     - messages_queued_retry: Messages added to retry queue
     - ocr_processed: OCR extractions performed
-    - ocr_sent: Messages with OCR text delivered
-    - time_ran: Application runtime in seconds
+    - ocr_msgs_sent: Messages with OCR text delivered
+    - seconds_ran: Application runtime in seconds
 
 How to Add New Tests:
     1. Add test method starting with test_
@@ -184,12 +184,12 @@ class TestMetricsCollector(unittest.TestCase):
 
     def test_set_metric(self):
         """Test setting a metric to a specific value."""
-        self.metrics.set("time_ran", 100)
-        self.assertEqual(self.metrics.get("time_ran"), 100)
+        self.metrics.set("seconds_ran", 100)
+        self.assertEqual(self.metrics.get("seconds_ran"), 100)
 
         # Set again - should replace, not add
-        self.metrics.set("time_ran", 50)
-        self.assertEqual(self.metrics.get("time_ran"), 50)
+        self.metrics.set("seconds_ran", 50)
+        self.assertEqual(self.metrics.get("seconds_ran"), 50)
 
     def test_set_vs_increment(self):
         """Test that set replaces while increment adds."""
@@ -222,16 +222,16 @@ class TestMetricsCollector(unittest.TestCase):
 
         self.assertEqual(self.metrics.get("ocr_processed"), 3)
 
-    def test_metrics_time_ran_timer(self):
-        """Test time_ran timer metric uses set (not increment)."""
+    def test_metrics_seconds_ran_timer(self):
+        """Test seconds_ran timer metric uses set (not increment)."""
         # First session
-        self.metrics.set("time_ran", 100)
-        self.assertEqual(self.metrics.get("time_ran"), 100)
+        self.metrics.set("seconds_ran", 100)
+        self.assertEqual(self.metrics.get("seconds_ran"), 100)
 
         # Second session should replace, not add
-        self.metrics.set("time_ran", 200)
-        self.assertEqual(self.metrics.get("time_ran"), 200)
-        self.assertNotEqual(self.metrics.get("time_ran"), 300)
+        self.metrics.set("seconds_ran", 200)
+        self.assertEqual(self.metrics.get("seconds_ran"), 200)
+        self.assertNotEqual(self.metrics.get("seconds_ran"), 300)
 
 
 class TestMetricsIntegration(unittest.TestCase):
@@ -239,8 +239,8 @@ class TestMetricsIntegration(unittest.TestCase):
 
     @patch('TelegramHandler.TelegramClient')
     @patch('ConfigManager.ConfigManager')
-    def test_ocr_sent_metric_incremented(self, mock_config_class, mock_telegram_client):
-        """Test ocr_sent metric is incremented when OCR messages are sent."""
+    def test_ocr_msgs_sent_metric_incremented(self, mock_config_class, mock_telegram_client):
+        """Test ocr_msgs_sent metric is incremented when OCR messages are sent."""
         from Watchtower import Watchtower
         import asyncio
 
@@ -287,8 +287,8 @@ class TestMetricsIntegration(unittest.TestCase):
             content = app.discord.format_message(message_data, destination)
             asyncio.run(app._send_to_discord(message_data, destination, content, False))
 
-        # Verify ocr_sent incremented
-        self.assertEqual(app.metrics.get("ocr_sent"), 1)
+        # Verify ocr_msgs_sent incremented
+        self.assertEqual(app.metrics.get("ocr_msgs_sent"), 1)
 
         # Cleanup
         os.unlink(temp_metrics.name)
@@ -297,8 +297,8 @@ class TestMetricsIntegration(unittest.TestCase):
 
     @patch('TelegramHandler.TelegramClient')
     @patch('ConfigManager.ConfigManager')
-    def test_ocr_sent_not_incremented_without_ocr(self, mock_config_class, mock_telegram_client):
-        """Test ocr_sent metric NOT incremented for non-OCR messages."""
+    def test_ocr_msgs_sent_not_incremented_without_ocr(self, mock_config_class, mock_telegram_client):
+        """Test ocr_msgs_sent metric NOT incremented for non-OCR messages."""
         from Watchtower import Watchtower
         import asyncio
 
@@ -344,8 +344,8 @@ class TestMetricsIntegration(unittest.TestCase):
             content = app.discord.format_message(message_data, destination)
             asyncio.run(app._send_to_discord(message_data, destination, content, False))
 
-        # Verify ocr_sent NOT incremented
-        self.assertEqual(app.metrics.get("ocr_sent"), 0)
+        # Verify ocr_msgs_sent NOT incremented
+        self.assertEqual(app.metrics.get("ocr_msgs_sent"), 0)
 
         # Cleanup
         os.unlink(temp_metrics.name)
@@ -354,8 +354,8 @@ class TestMetricsIntegration(unittest.TestCase):
 
     @patch('TelegramHandler.TelegramClient')
     @patch('ConfigManager.ConfigManager')
-    def test_time_ran_metric_per_session(self, mock_config_class, mock_telegram_client):
-        """Test time_ran metric is per-session, not cumulative."""
+    def test_seconds_ran_metric_per_session(self, mock_config_class, mock_telegram_client):
+        """Test seconds_ran metric is per-session, not cumulative."""
         from Watchtower import Watchtower
         import asyncio
         import time
@@ -384,9 +384,9 @@ class TestMetricsIntegration(unittest.TestCase):
         app1._start_time = time.time() - 10
         asyncio.run(app1.shutdown())
 
-        first_time_ran = isolated_metrics.get("time_ran")
-        self.assertGreaterEqual(first_time_ran, 9)
-        self.assertLessEqual(first_time_ran, 12)
+        first_seconds_ran = isolated_metrics.get("seconds_ran")
+        self.assertGreaterEqual(first_seconds_ran, 9)
+        self.assertLessEqual(first_seconds_ran, 12)
 
         # Second session: 5 seconds (should REPLACE, not add)
         app2 = Watchtower(sources=[], metrics=isolated_metrics)
@@ -394,10 +394,10 @@ class TestMetricsIntegration(unittest.TestCase):
         app2._start_time = time.time() - 5
         asyncio.run(app2.shutdown())
 
-        second_time_ran = isolated_metrics.get("time_ran")
+        second_seconds_ran = isolated_metrics.get("seconds_ran")
         # Should be ~5, NOT ~15 (if cumulative)
-        self.assertGreaterEqual(second_time_ran, 4)
-        self.assertLessEqual(second_time_ran, 7)
+        self.assertGreaterEqual(second_seconds_ran, 4)
+        self.assertLessEqual(second_seconds_ran, 7)
 
         # Cleanup
         os.unlink(temp_metrics.name)

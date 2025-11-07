@@ -150,6 +150,16 @@ class ConfigManager:
         if not destinations:
             raise ValueError("[ConfigManager] No valid destinations configured")
 
+        # Check for duplicate destination names
+        destination_names = [d['name'] for d in destinations]
+        duplicates = [name for name in destination_names if destination_names.count(name) > 1]
+        if duplicates:
+            unique_duplicates = set(duplicates)
+            _logger.warning(
+                f"[ConfigManager] Duplicate destination names: {', '.join(unique_duplicates)}. "
+                f"This may cause confusion in logs."
+            )
+
         # Convert RSS feed index to list
         rss_feeds = [{'rss_url': url, 'rss_name': name} for url, name in rss_feed_index.items()]
 
@@ -270,6 +280,41 @@ class ConfigManager:
             processed_channel = dict(telegram_channel)
             processed_channel['keywords'] = self._resolve_keywords(telegram_channel.get('keywords'))
             processed_channel['source_type'] = SOURCE_TYPE_TELEGRAM
+
+            # Validate empty keywords (forward all messages)
+            if not processed_channel['keywords']:
+                _logger.warning(
+                    f"[ConfigManager] {name} -> {processed_channel['id']}: "
+                    f"No keywords configured - ALL messages will be forwarded"
+                )
+
+            # Validate parser configuration
+            parser = processed_channel.get('parser')
+            if parser and isinstance(parser, dict):
+                has_keep = 'keep_first_lines' in parser
+                has_trim = 'trim_front_lines' in parser or 'trim_back_lines' in parser
+
+                # Check mutual exclusivity
+                if has_keep and has_trim:
+                    _logger.error(
+                        f"[ConfigManager] {name} -> {processed_channel['id']}: "
+                        f"Parser cannot use 'keep_first_lines' with 'trim_front_lines'/'trim_back_lines'. "
+                        f"Ignoring trim options."
+                    )
+                    # Remove trim options to enforce mutual exclusivity
+                    parser.pop('trim_front_lines', None)
+                    parser.pop('trim_back_lines', None)
+
+                # Validate keep_first_lines value
+                if has_keep:
+                    keep = parser.get('keep_first_lines', 0)
+                    if not isinstance(keep, int) or keep <= 0:
+                        _logger.warning(
+                            f"[ConfigManager] {name} -> {processed_channel['id']}: "
+                            f"'keep_first_lines' must be a positive integer, got {keep}. Parser disabled."
+                        )
+                        processed_channel.pop('parser', None)  # Remove invalid parser
+
             processed_telegram_channels.append(processed_channel)
 
             # Log settings specific to Telegram sources

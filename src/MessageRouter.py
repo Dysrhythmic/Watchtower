@@ -24,11 +24,30 @@ Telegram Channel ID Formats:
     - Config accepts with or without -100 prefix
 """
 from typing import List, Dict, Optional
+from pathlib import Path
 from logger_setup import setup_logger
 from ConfigManager import ConfigManager
 from MessageData import MessageData
 
 _logger = setup_logger(__name__)
+
+# File extensions that can be checked for keywords in attachments
+SUPPORTED_TEXT_EXTENSIONS = {
+    # Text files
+    '.txt', '.log', '.md',
+    # Data files
+    '.json', '.csv', '.xml', '.yml', '.yaml',
+    # Source code
+    '.py', '.js', '.java', '.c', '.cpp', '.h', '.hpp', '.go', '.rs', '.sh', '.bash', '.ps1',
+    # Config files
+    '.ini', '.conf', '.cfg', '.env', '.toml'
+}
+
+# Default: read first 1MB of attachments for keyword checking
+DEFAULT_MAX_READ_BYTES = 1 * 1024 * 1024  # 1MB
+
+# Safety limit: max 100MB to prevent excessive memory usage
+MAX_ALLOWED_READ_BYTES = 100 * 1024 * 1024  # 100MB
 
 
 class MessageRouter:
@@ -168,6 +187,29 @@ class MessageRouter:
                 # Combine message text and OCR text for keyword matching
                 searchable_text = f"{searchable_text}\n{message_data.ocr_raw}" if searchable_text else message_data.ocr_raw
 
+            # Check text-based attachments if enabled
+            attachment_config = channel_config.get('check_attachments')
+            if attachment_config and message_data.media_path:
+                # Support both boolean and dict config formats
+                if isinstance(attachment_config, bool):
+                    # Boolean shorthand: true = enabled with default 1MB limit
+                    max_read = DEFAULT_MAX_READ_BYTES if attachment_config else 0
+                elif isinstance(attachment_config, dict):
+                    # Dict format: check enabled flag and custom max_read_bytes
+                    enabled = attachment_config.get('enabled', False)
+                    max_read = attachment_config.get('max_read_bytes', DEFAULT_MAX_READ_BYTES) if enabled else 0
+                else:
+                    max_read = 0
+
+                if max_read > 0:
+                    attachment_text = self._extract_attachment_text(message_data.media_path, max_read)
+                    if attachment_text:
+                        searchable_text = (
+                            f"{searchable_text}\n{attachment_text}"
+                            if searchable_text
+                            else attachment_text
+                        )
+
             # Perform keyword matching
             keywords = channel_config.get('keywords')
             if not keywords:
@@ -184,67 +226,152 @@ class MessageRouter:
     def parse_msg(self, message_data: MessageData, parser_config: Optional[Dict]) -> MessageData:
         """Apply text parsing rules to message.
 
-        Parser trims lines from beginning/end of message text using dictionary format:
-        {"trim_front_lines": N, "trim_back_lines": M}
+        Parser supports (mutually exclusive):
+        - keep_first_lines: Keep only first N lines, discard rest
+        - trim_front_lines + trim_back_lines: Remove N lines from each end
 
         Args:
             message_data: Original message
-            parser_config: Parser configuration dict with trim_front_lines and trim_back_lines keys
+            parser_config: Parser configuration dict
 
         Returns:
             New MessageData with modified text
         """
         text = message_data.text or ""
-        if not text:
+        if not text or not isinstance(parser_config, dict):
             return message_data
 
-        # Dict config: trim from both ends
-        if isinstance(parser_config, dict):
-            front = int(parser_config.get('trim_front_lines', 0) or 0)
-            back = int(parser_config.get('trim_back_lines', 0) or 0)
+        # OPTION 1: keep_first_lines (takes precedence if present)
+        if 'keep_first_lines' in parser_config:
+            keep = int(parser_config.get('keep_first_lines', 0) or 0)
 
-            # Validate values
-            if front < 0 or back < 0:
-                _logger.warning(f"[MessageRouter] Invalid parser config: values must be >= 0, got front={front}, back={back}")
-                return message_data
-
-            # Skip parsing if both are 0
-            if front == 0 and back == 0:
+            if keep <= 0:
+                _logger.warning(f"[MessageRouter] Invalid keep_first_lines={keep}, must be > 0")
                 return message_data
 
             lines = text.split('\n')
-            if front > 0:
-                lines = lines[front:]
-            if back > 0:
-                lines = lines[:-back]
-            new_text = '\n'.join(lines)
-            if not new_text:
-                parts = []
-                if front > 0: parts.append(f"first {front}")
-                if back > 0: parts.append(f"last {back}")
-                hint = " and ".join(parts) if parts else "all"
-                new_text = f"**[Message content removed by parser: {hint} line(s) stripped]**"
-            return MessageData(
-                source_type=message_data.source_type,
-                channel_id=message_data.channel_id,
-                channel_name=message_data.channel_name,
-                username=message_data.username,
-                timestamp=message_data.timestamp,
-                text=new_text,
-                has_media=message_data.has_media,
-                media_type=message_data.media_type,
-                media_path=message_data.media_path,
-                reply_context=message_data.reply_context,
-                original_message=message_data.original_message,
-                ocr_enabled=message_data.ocr_enabled,
-                ocr_raw=message_data.ocr_raw,
-                metadata=message_data.metadata
+            kept_lines = lines[:keep]
+
+            # Add notice if lines were omitted
+            if len(lines) > keep:
+                omitted_count = len(lines) - keep
+                new_text = '\n'.join(kept_lines) + f"\n\n**[{omitted_count} more line(s) omitted by parser]**"
+            else:
+                # Message has fewer lines than keep limit
+                new_text = '\n'.join(kept_lines)
+
+            return self._create_parsed_message(message_data, new_text)
+
+        # OPTION 2: trim_front_lines + trim_back_lines
+        front = int(parser_config.get('trim_front_lines', 0) or 0)
+        back = int(parser_config.get('trim_back_lines', 0) or 0)
+
+        # Validate values
+        if front < 0 or back < 0:
+            _logger.warning(f"[MessageRouter] Invalid parser values: front={front}, back={back} must be >= 0")
+            return message_data
+
+        # Skip parsing if both are 0
+        if front == 0 and back == 0:
+            return message_data
+
+        lines = text.split('\n')
+        if front > 0:
+            lines = lines[front:]
+        if back > 0:
+            lines = lines[:-back]
+
+        new_text = '\n'.join(lines)
+        if not new_text:
+            parts = []
+            if front > 0: parts.append(f"first {front}")
+            if back > 0: parts.append(f"last {back}")
+            hint = " and ".join(parts)
+            new_text = f"**[Message content removed by parser: {hint} line(s) stripped]**"
+
+        return self._create_parsed_message(message_data, new_text)
+
+    def _create_parsed_message(self, original: MessageData, new_text: str) -> MessageData:
+        """Create new MessageData with modified text, preserving all other fields.
+
+        Args:
+            original: Original MessageData
+            new_text: Modified text content
+
+        Returns:
+            New MessageData instance with updated text
+        """
+        return MessageData(
+            source_type=original.source_type,
+            channel_id=original.channel_id,
+            channel_name=original.channel_name,
+            username=original.username,
+            timestamp=original.timestamp,
+            text=new_text,
+            has_media=original.has_media,
+            media_type=original.media_type,
+            media_path=original.media_path,
+            reply_context=original.reply_context,
+            original_message=original.original_message,
+            ocr_enabled=original.ocr_enabled,
+            ocr_raw=original.ocr_raw,
+            metadata=original.metadata
+        )
+
+    def _extract_attachment_text(self, media_path: Optional[str], max_bytes: int = DEFAULT_MAX_READ_BYTES) -> Optional[str]:
+        """Extract searchable text from text-based attachment files.
+
+        Supports text files, data files, source code, and config files.
+        Large files (3GB+) are supported - only first max_bytes are read.
+
+        Args:
+            media_path: Path to downloaded media file
+            max_bytes: Maximum bytes to read (default 1MB, max 100MB)
+
+        Returns:
+            Extracted text content (up to max_bytes), or None if:
+            - Not a text file type
+            - File doesn't exist
+            - Read error occurred
+        """
+        if not media_path:
+            return None
+
+        path = Path(media_path)
+        if not path.exists():
+            return None
+
+        # Check file extension
+        if path.suffix.lower() not in SUPPORTED_TEXT_EXTENSIONS:
+            return None
+
+        # Validate and cap max_bytes at safety limit
+        max_bytes = min(max_bytes, MAX_ALLOWED_READ_BYTES)
+
+        # Log if file is larger than read limit
+        file_size = path.stat().st_size
+        if file_size > max_bytes:
+            _logger.info(
+                f"[MessageRouter] Reading first {max_bytes / (1024*1024):.1f}MB "
+                f"of {file_size / (1024*1024):.1f}MB attachment: {path.name}"
             )
 
-        # Invalid or None - return unchanged
-        if parser_config is not None:
-            _logger.warning(f"[MessageRouter] Invalid parser config type: {type(parser_config)}, expected dict or None")
-        return message_data
+        # Read file content with encoding fallback
+        try:
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read(max_bytes)
+
+            _logger.debug(
+                f"[MessageRouter] Extracted {len(content)} chars from {path.name} "
+                f"for keyword checking"
+            )
+            return content
+
+        except Exception as e:
+            _logger.warning(
+                f"[MessageRouter] Failed to read attachment {path.name}: {e}"
+            )
+            return None
 
     def _make_dest_entry(self, destination: Dict, channel_config: Dict, matched: List[str]) -> Dict:
         """Create normalized destination entry with routing metadata.

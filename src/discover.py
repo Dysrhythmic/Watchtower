@@ -174,7 +174,7 @@ def _print_diff_output(new_channels, removed_channel_ids, existing_channel_ids, 
     if not has_changes:
         _logger.info("")
         _logger.info("=" * 70)
-        _logger.info("✓ NO CHANGES DETECTED")
+        _logger.info("NO CHANGES DETECTED")
         _logger.info("=" * 70)
         _logger.info(f"  All {len(existing_channel_ids)} configured channels are accessible.")
         _logger.info(f"  No new channels discovered.")
@@ -291,7 +291,7 @@ async def discover_channels(diff_mode=False, generate_config=False):
     await client.start()
     _logger.info("[Discover] Connected to Telegram")
 
-    _logger.info("[Discover] Fetching all dialogs (channels, groups, bots, users)...")
+    _logger.info("[Discover] Fetching all dialogs (channels, groups, bots, users):")
     dialogs = await client.get_dialogs()
 
     channels = []
@@ -339,24 +339,10 @@ async def discover_channels(diff_mode=False, generate_config=False):
             entity_type = ch.get('type', 'Unknown')
             type_counts[entity_type] = type_counts.get(entity_type, 0) + 1
 
-        _logger.info(f"\n[Discover] Found {len(channels)} total dialogs:")
+        _logger.info(f"[Discover] Found {len(channels)} total dialogs:")
         for entity_type, count in sorted(type_counts.items()):
-            _logger.info(f"  - {entity_type}: {count}")
+            _logger.info(f"  {entity_type}: {count}")
 
     # Only generate config file if --generate flag was provided
     if generate_config:
         _save_discovered_config(channels, config_dir)
-        _logger.info("")
-        _logger.info("=" * 70)
-        _logger.info("NEXT STEPS:")
-        _logger.info("=" * 70)
-        _logger.info("1. Review the generated config: config/config_discovered.json")
-        _logger.info("2. Add your Discord webhook URL to .env as DISCORD_WEBHOOK_URL")
-        _logger.info("3. Optionally add keywords to filter messages per channel")
-        _logger.info("4. Rename config_discovered.json to config.json (or merge with existing)")
-        _logger.info("5. Run: python3 src/Watchtower.py monitor --sources telegram")
-        _logger.info("=" * 70)
-    else:
-        _logger.info("")
-        _logger.info("To generate a config file from these channels, run:")
-        _logger.info("  python3 src/Watchtower.py discover --generate")

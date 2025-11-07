@@ -31,6 +31,7 @@ class TestMediaDownload(unittest.TestCase):
         self.mock_config.api_id = "123456"
         self.mock_config.api_hash = "test_hash"
         self.mock_config.project_root = Path("/tmp/test")
+        self.mock_config.config_dir = self.mock_config.project_root / "config"
 
     @patch('TelegramHandler.TelegramClient')
     def test_download_media_success(self, MockClient):

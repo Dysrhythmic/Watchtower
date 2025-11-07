@@ -36,6 +36,8 @@ Test Pattern - URL Building:
 Mock Setup Template:
     mock_config = Mock()
     mock_config.project_root = Path("/tmp")
+        self.mock_config.config_dir = self.mock_config.project_root / "config"
+    mock_config.config_dir = Path("/tmp/config")
     mock_config.api_id = "123456"
     mock_config.api_hash = "abc123hash"
 
@@ -83,6 +85,7 @@ class TestTelegramHandler(unittest.TestCase):
         """Create TelegramHandler with mocked config."""
         mock_config = Mock()
         mock_config.project_root = Path("/tmp")
+        mock_config.config_dir = Path("/tmp/config")
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
 
@@ -228,6 +231,7 @@ class TestTelegramSendOperations(unittest.TestCase):
         self.mock_config.api_id = "123456"
         self.mock_config.api_hash = "test_hash"
         self.mock_config.project_root = Path("/tmp/test")
+        self.mock_config.config_dir = self.mock_config.project_root / "config"
 
     @patch('TelegramHandler.TelegramClient')
     def test_send_copy_text_only_under_4096(self, MockClient):
@@ -524,6 +528,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
         self.mock_config.api_id = "123456"
         self.mock_config.api_hash = "test_hash"
         self.mock_config.project_root = Path("/tmp/test")
+        self.mock_config.config_dir = self.mock_config.project_root / "config"
 
     @patch('TelegramHandler.TelegramClient')
     def test_document_with_extension_and_mime_match_allowed(self, MockClient):
@@ -677,6 +682,7 @@ class TestTelegramReplyContext(unittest.TestCase):
         self.mock_config.api_id = "123456"
         self.mock_config.api_hash = "test_hash"
         self.mock_config.project_root = Path("/tmp/test")
+        self.mock_config.config_dir = self.mock_config.project_root / "config"
 
     @patch('TelegramHandler.TelegramClient')
     def test_reply_context_success(self, MockClient):
@@ -896,6 +902,7 @@ class TestTelegramLogFunctionality(unittest.TestCase):
 
         mock_config = Mock()
         mock_config.project_root = self.temp_dir
+        mock_config.config_dir = self.temp_dir / "config"
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
         mock_config.telegramlog_dir = self.telegramlog_dir

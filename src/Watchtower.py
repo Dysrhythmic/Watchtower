@@ -613,20 +613,20 @@ def _get_channel_identifier(telegram_entity, dialog_id):
         return f"@{telegram_entity.username}"
     return str(dialog_id)
 
-def _load_existing_config(config_dir: Path):
+def _load_existing_config(config_dir: Path, config_filename='config.json'):
     """Load existing config and return set of channel IDs.
 
     Used by discover --diff to compare discovered channels with existing config.
 
     Args:
         config_dir: Path to config directory
+        config_filename: Name of config file (defaults to 'config.json')
 
     Returns:
         tuple: (existing_channel_ids set, existing_channel_details dict)
                Returns (None, None) on error
     """
-    config_file_name = os.getenv('CONFIG_FILE', 'config.json')
-    config_path = config_dir / config_file_name
+    config_path = config_dir / config_filename
 
     if not config_path.exists():
         logger.info(f"[Discover] No existing config found at {config_path}")
@@ -770,15 +770,30 @@ async def discover_channels(diff_mode=False, generate_config=False):
     """
     from telethon import TelegramClient
     from telethon.tl.types import Channel, Chat, User
-    from dotenv import load_dotenv
+    from ConfigManager import ConfigManager
 
-    project_root = Path(__file__).resolve().parents[1]
-    config_dir = project_root / "config"
-    env_path = config_dir / ".env"
-    load_dotenv(dotenv_path=env_path)
-
-    api_id = os.getenv('TELEGRAM_API_ID')
-    api_hash = os.getenv('TELEGRAM_API_HASH')
+    # Use ConfigManager for paths and env vars (may fail if config.json invalid/missing, but we only need env vars)
+    config = None
+    config_filename = 'config.json'
+    try:
+        config = ConfigManager()
+        config_dir = config.config_dir
+        api_id = config.api_id
+        api_hash = config.api_hash
+        # Get config filename from env var (already loaded by ConfigManager)
+        config_filename = os.getenv('CONFIG_FILE', 'config.json')
+    except Exception as e:
+        logger.warning(f"[Discover] Could not load full config (this is OK for discovery): {e}")
+        logger.info("[Discover] Loading minimal config for discovery...")
+        # Minimal bootstrap if full config unavailable
+        from dotenv import load_dotenv
+        project_root = Path(__file__).resolve().parents[1]
+        config_dir = project_root / "config"
+        env_path = config_dir / ".env"
+        load_dotenv(dotenv_path=env_path)
+        api_id = os.getenv('TELEGRAM_API_ID')
+        api_hash = os.getenv('TELEGRAM_API_HASH')
+        config_filename = os.getenv('CONFIG_FILE', 'config.json')
 
     if not api_id or not api_hash:
         logger.error("[Discover] Missing TELEGRAM_API_ID or TELEGRAM_API_HASH in .env file")
@@ -825,7 +840,7 @@ async def discover_channels(diff_mode=False, generate_config=False):
         return
 
     if diff_mode:
-        existing_channel_ids, existing_channel_details = _load_existing_config(config_dir)
+        existing_channel_ids, existing_channel_details = _load_existing_config(config_dir, config_filename)
         if existing_channel_ids is None:
             return
 

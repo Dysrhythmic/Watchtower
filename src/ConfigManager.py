@@ -41,6 +41,10 @@ from logger_setup import setup_logger
 
 _logger = setup_logger(__name__)
 
+# Source type constants for channel identification
+SOURCE_TYPE_TELEGRAM = 'telegram'
+SOURCE_TYPE_RSS = 'rss'
+
 
 class ConfigManager:
     """Manages configuration from environment variables and JSON configuration files.
@@ -132,8 +136,8 @@ class ConfigManager:
             config = json.load(f)
 
         destinations: List[Dict] = []
-        # Use a dictionary with RSS URLs as the keys for automatic deduplication
-        rss_feed_index: Dict[str, Dict] = {}
+        # Use dict for RSS deduplication: {rss_url: rss_name}
+        rss_feed_index: Dict[str, str] = {}
 
         destination_list = config.get('destinations', [])
 
@@ -145,12 +149,12 @@ class ConfigManager:
         if not destinations:
             raise ValueError("[ConfigManager] No valid destinations configured")
 
-        # Convert RSS feed index to list
-        rss_feeds = list(rss_feed_index.values())
+        # Convert RSS feed index to list (deduplicated by URL)
+        rss_feeds = [{'rss_url': url, 'rss_name': name} for url, name in rss_feed_index.items()]
 
         return destinations, rss_feeds
 
-    def _process_destination_config(self, destination_config: Dict, rss_feed_index: Dict[str, Dict]) -> Optional[Dict]:
+    def _process_destination_config(self, destination_config: Dict, rss_feed_index: Dict[str, str]) -> Optional[Dict]:
         """Process a single destination configuration entry."""
         name = destination_config.get('name', 'Unnamed')
         dest_type = destination_config.get('type')
@@ -267,6 +271,7 @@ class ConfigManager:
             # Create a copy and resolve keywords (returns List[str], deduplicated)
             processed_channel = dict(telegram_channel)
             processed_channel['keywords'] = self._resolve_keywords(telegram_channel.get('keywords'))
+            processed_channel['source_type'] = SOURCE_TYPE_TELEGRAM
             processed_telegram_channels.append(processed_channel)
 
             # Log special settings
@@ -277,7 +282,7 @@ class ConfigManager:
 
         return processed_telegram_channels
 
-    def _process_rss_sources(self, destination_config: Dict, dest_name: str, telegram_channels: List[Dict], rss_feed_index: Dict[str, Dict]):
+    def _process_rss_sources(self, destination_config: Dict, dest_name: str, telegram_channels: List[Dict], rss_feed_index: Dict[str, str]):
         """Process RSS feed sources and add them as pseudo-channels to Telegram channels list.
 
         RSS feeds are treated as "pseudo-channels" - they're added to the same channels list
@@ -304,10 +309,7 @@ class ConfigManager:
 
             # Add to global RSS feed deduplication index if not already present
             if rss_url not in rss_feed_index:
-                rss_feed_index[rss_url] = {
-                    'rss_name': rss_entry.get('name', rss_url),
-                    'rss_url': rss_url
-                }
+                rss_feed_index[rss_url] = rss_entry.get('name', rss_url)
 
             # Create pseudo-channel for routing
             # Each destination can have different keywords/parsers for the same RSS feed URL
@@ -315,20 +317,24 @@ class ConfigManager:
             rss_channel = {
                 'id': rss_url,
                 'keywords': self._resolve_keywords(rss_entry.get('keywords')),
-                'parser': rss_entry.get('parser')
+                'parser': rss_entry.get('parser'),
+                'source_type': SOURCE_TYPE_RSS
             }
             telegram_channels.append(rss_channel)
 
     def _load_keyword_file(self, filename: str) -> List[str]:
         """Load keywords from a JSON file in the config directory.
 
-        JSON format provides structured data and allows for future extensions
-        (e.g., keyword metadata, categories). Alternative formats like plain text
-        (one keyword per line) could be simpler but less extensible.
+        JSON format is used (rather than plain text) for several reasons:
+        - Explicit whitespace control: " CVE" vs "CVE" (leading spaces visible in quotes)
+        - Word boundary matching: Use spaces to avoid false positives (e.g., " breach " won't match "breached")
+        - Protected from editor auto-formatting (trailing space preservation)
+        - Clear in diffs when whitespace changes are intentional
+        - Extensible for future metadata (e.g., keyword weight, categories, regex flags)
 
         Expected JSON format:
         {
-            "keywords": ["keyword1", "keyword2", ...]
+            "keywords": ["keyword1", " keyword2", "keyword3 "]
         }
 
         Args:
@@ -425,11 +431,8 @@ class ConfigManager:
         """Get all unique Telegram channel IDs from destination config.
 
         Collects all Telegram channel IDs across all destinations, excluding RSS feeds.
-        RSS feeds are identified by URLs starting with 'http://' or 'https://'.
-
-        Note: This fragile detection (checking URL prefix) could be improved by:
-        - Adding an explicit 'source_type' field to channel dicts
-        - Using source type constants (SOURCE_TYPE_TELEGRAM, SOURCE_TYPE_RSS)
+        Uses the explicit 'source_type' field to differentiate between Telegram channels
+        and RSS pseudo-channels.
 
         Returns:
             Set[str]: Unique Telegram channel IDs (usernames like @channel or numeric IDs like -1001234567890)
@@ -437,8 +440,7 @@ class ConfigManager:
         telegram_channel_ids = set()
         for destination in self.destinations:
             for channel in destination['channels']:
-                channel_id = channel['id']
-                # Exclude RSS feeds (identified by HTTP/HTTPS URLs)
-                if not channel_id.startswith('http://') and not channel_id.startswith('https://'):
-                    telegram_channel_ids.add(channel_id)
+                # Only include Telegram sources, exclude RSS pseudo-channels
+                if channel.get('source_type') == SOURCE_TYPE_TELEGRAM:
+                    telegram_channel_ids.add(channel['id'])
         return telegram_channel_ids

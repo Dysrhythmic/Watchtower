@@ -227,7 +227,7 @@ Watchtower automatically detects and processes these text-based file types:
 
 ### Configuration
 
-**Simple (boolean) - uses 1MB default:**
+**Enabled:**
 ```json
 {
   "channels": [{
@@ -237,25 +237,6 @@ Watchtower automatically detects and processes these text-based file types:
   }]
 }
 ```
-
-**Advanced (custom read limit):**
-```json
-{
-  "channels": [{
-    "id": "@channel",
-    "keywords": ["credentials", "password"],
-    "check_attachments": {
-      "enabled": true,
-      "max_read_bytes": 10485760
-    }
-  }]
-}
-```
-
-The `max_read_bytes` value is in bytes:
-- `1048576` = 1MB (default)
-- `10485760` = 10MB
-- `104857600` = 100MB (maximum allowed)
 
 **Disabled (default, backward compatible):**
 ```json
@@ -267,12 +248,12 @@ The `max_read_bytes` value is in bytes:
 }
 ```
 
-Omitting `check_attachments` disables the feature for that channel.
+Omitting `check_attachments` or setting it to `false` disables the feature for that channel.
 
 ### Behavior
 
-- **Large file support**: Files up to 2GB+ are supported (only first N bytes read for keyword checking)
-- **Memory efficient**: Only the configured amount is read into memory (default 1MB)
+- **Complete file checking**: Entire file is read and checked for keywords (no partial reads)
+- **Large file support**: Supports 3GB+ text files from Telegram (entire file is checked)
 - **Smart filtering**: Binary files and unsupported types are automatically skipped
 - **Encoding resilient**: Invalid UTF-8 characters are gracefully handled
 - **Combined search**: Attachment text is added to message text + OCR for comprehensive keyword matching
@@ -282,10 +263,7 @@ Omitting `check_attachments` disables the feature for that channel.
 **Monitor threat intelligence channels sharing IOC dumps:**
 ```json
 {
-  "check_attachments": {
-    "enabled": true,
-    "max_read_bytes": 5242880
-  },
+  "check_attachments": true,
   "keywords": ["malicious", "C2", "backdoor"]
 }
 ```
@@ -301,10 +279,7 @@ Omitting `check_attachments` disables the feature for that channel.
 **Scan source code snippets for security issues:**
 ```json
 {
-  "check_attachments": {
-    "enabled": true,
-    "max_read_bytes": 1048576
-  },
+  "check_attachments": true,
   "keywords": ["password", "api_key", "secret"]
 }
 ```
@@ -660,10 +635,7 @@ Both source types route to the same destination with independent keyword filteri
           "restricted_mode": false,
           "parser": {"trim_front_lines": 1, "trim_back_lines": 2},
           "ocr": true,
-          "check_attachments": {
-            "enabled": true,
-            "max_read_bytes": 5242880
-          }
+          "check_attachments": true
         }
       ],
       "rss": [
@@ -695,7 +667,7 @@ Both source types route to the same destination with independent keyword filteri
 - **Discord destination**: Monitors Telegram channel `@vxunderground` and RSS feed
   - Telegram channel:
     - Forwards messages with `malware` or `ransomware` keywords
-    - Checks OCR-extracted text and text-based attachments (up to 5MB read)
+    - Checks OCR-extracted text and entire text-based attachments for keywords
     - Trims 1 line from front and 2 lines from end
   - RSS feed:
     - Forwards all entries

@@ -43,12 +43,6 @@ SUPPORTED_TEXT_EXTENSIONS = {
     '.ini', '.conf', '.cfg', '.env', '.toml'
 }
 
-# Default: read first 1MB of attachments for keyword checking
-DEFAULT_MAX_READ_BYTES = 1 * 1024 * 1024  # 1MB
-
-# Safety limit: max 100MB to prevent excessive memory usage
-MAX_ALLOWED_READ_BYTES = 100 * 1024 * 1024  # 100MB
-
 
 class MessageRouter:
     """Routes messages to destinations based on channel and keyword configuration.
@@ -188,27 +182,14 @@ class MessageRouter:
                 searchable_text = f"{searchable_text}\n{message_data.ocr_raw}" if searchable_text else message_data.ocr_raw
 
             # Check text-based attachments if enabled
-            attachment_config = channel_config.get('check_attachments')
-            if attachment_config and message_data.media_path:
-                # Support both boolean and dict config formats
-                if isinstance(attachment_config, bool):
-                    # Boolean shorthand: true = enabled with default 1MB limit
-                    max_read = DEFAULT_MAX_READ_BYTES if attachment_config else 0
-                elif isinstance(attachment_config, dict):
-                    # Dict format: check enabled flag and custom max_read_bytes
-                    enabled = attachment_config.get('enabled', False)
-                    max_read = attachment_config.get('max_read_bytes', DEFAULT_MAX_READ_BYTES) if enabled else 0
-                else:
-                    max_read = 0
-
-                if max_read > 0:
-                    attachment_text = self._extract_attachment_text(message_data.media_path, max_read)
-                    if attachment_text:
-                        searchable_text = (
-                            f"{searchable_text}\n{attachment_text}"
-                            if searchable_text
-                            else attachment_text
-                        )
+            if channel_config.get('check_attachments') and message_data.media_path:
+                attachment_text = self._extract_attachment_text(message_data.media_path)
+                if attachment_text:
+                    searchable_text = (
+                        f"{searchable_text}\n{attachment_text}"
+                        if searchable_text
+                        else attachment_text
+                    )
 
             # Perform keyword matching
             keywords = channel_config.get('keywords')
@@ -318,18 +299,17 @@ class MessageRouter:
             metadata=original.metadata
         )
 
-    def _extract_attachment_text(self, media_path: Optional[str], max_bytes: int = DEFAULT_MAX_READ_BYTES) -> Optional[str]:
+    def _extract_attachment_text(self, media_path: Optional[str]) -> Optional[str]:
         """Extract searchable text from text-based attachment files.
 
         Supports text files, data files, source code, and config files.
-        Large files (3GB+) are supported - only first max_bytes are read.
+        Reads entire file for complete keyword checking (supports 3GB+ files).
 
         Args:
             media_path: Path to downloaded media file
-            max_bytes: Maximum bytes to read (default 1MB, max 100MB)
 
         Returns:
-            Extracted text content (up to max_bytes), or None if:
+            Extracted text content (entire file), or None if:
             - Not a text file type
             - File doesn't exist
             - Read error occurred
@@ -345,21 +325,17 @@ class MessageRouter:
         if path.suffix.lower() not in SUPPORTED_TEXT_EXTENSIONS:
             return None
 
-        # Validate and cap max_bytes at safety limit
-        max_bytes = min(max_bytes, MAX_ALLOWED_READ_BYTES)
-
-        # Log if file is larger than read limit
+        # Log file size for large files
         file_size = path.stat().st_size
-        if file_size > max_bytes:
+        if file_size > 100 * 1024 * 1024:  # Log if > 100MB
             _logger.info(
-                f"[MessageRouter] Reading first {max_bytes / (1024*1024):.1f}MB "
-                f"of {file_size / (1024*1024):.1f}MB attachment: {path.name}"
+                f"[MessageRouter] Reading {file_size / (1024*1024):.1f}MB attachment for keyword checking: {path.name}"
             )
 
-        # Read file content with encoding fallback
+        # Read entire file content with encoding fallback
         try:
             with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read(max_bytes)
+                content = f.read()
 
             _logger.debug(
                 f"[MessageRouter] Extracted {len(content)} chars from {path.name} "

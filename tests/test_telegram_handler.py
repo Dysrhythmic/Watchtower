@@ -1225,6 +1225,69 @@ class TestTelegramLogCleanup(unittest.TestCase):
         self.assertTrue((self.telegramlog_dir / "README.md").exists())
         self.assertTrue((self.telegramlog_dir / "data.json").exists())
 
+    def test_extract_username_from_sender_user_with_names_no_username(self):
+        """Test _extract_username_from_sender for User with first/last name but no username."""
+        from telethon.tl.types import User
+
+        user = Mock(spec=User)
+        user.username = None
+        user.first_name = "John"
+        user.last_name = "Doe"
+
+        result = TelegramHandler._extract_username_from_sender(user)
+        self.assertEqual(result, "John Doe")
+
+    def test_extract_username_from_sender_user_first_name_only(self):
+        """Test _extract_username_from_sender for User with only first name."""
+        from telethon.tl.types import User
+
+        user = Mock(spec=User)
+        user.username = None
+        user.first_name = "Alice"
+        user.last_name = None
+
+        result = TelegramHandler._extract_username_from_sender(user)
+        self.assertEqual(result, "Alice")
+
+    def test_extract_username_from_sender_channel_without_username(self):
+        """Test _extract_username_from_sender for Channel without username."""
+        from telethon.tl.types import Channel
+
+        channel = Mock(spec=Channel)
+        channel.username = None
+
+        result = TelegramHandler._extract_username_from_sender(channel)
+        self.assertEqual(result, "Channel")
+
+    def test_get_media_type_other(self):
+        """Test _get_media_type returns 'Other' for unknown media types."""
+        from telethon.tl.types import MessageMediaGeo  # Or any other media type
+
+        unknown_media = Mock()  # Not Photo or Document
+        result = TelegramHandler._get_media_type(unknown_media)
+        self.assertEqual(result, "Other")
+
+    def test_build_message_url_no_message_id(self):
+        """Test build_message_url returns None when message_id is None."""
+        result = TelegramHandler.build_message_url("@channel", "@channel", None)
+        self.assertIsNone(result)
+
+    def test_build_message_url_private_without_prefix(self):
+        """Test build_message_url handles channel ID without -100 prefix."""
+        result = TelegramHandler.build_message_url("1234567890", None, 42)
+        self.assertEqual(result, "https://t.me/c/1234567890/42")
+
+    def test_build_message_url_with_negative_sign(self):
+        """Test build_message_url handles channel ID with negative sign but no -100."""
+        result = TelegramHandler.build_message_url("-1234567890", None, 42)
+        self.assertEqual(result, "https://t.me/c/1234567890/42")
+
+    def test_build_defanged_tg_url_none_url(self):
+        """Test build_defanged_tg_url returns None when URL is None."""
+        # When message_id is None, build_message_url returns None
+        result = TelegramHandler.build_defanged_tg_url("@channel", "@channel", None)
+        self.assertIsNone(result)
+
 
 if __name__ == '__main__':
     unittest.main()

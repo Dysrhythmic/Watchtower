@@ -1324,5 +1324,141 @@ class TestWatchtowerShutdown(unittest.TestCase):
     """
 
 
+class TestWatchtowerUtilityFunctions(unittest.TestCase):
+    """Test module-level utility functions in Watchtower."""
+
+    def test_get_entity_type_and_name_broadcast_channel(self):
+        """Test _get_entity_type_and_name for broadcast channel."""
+        from Watchtower import _get_entity_type_and_name
+        from telethon.tl.types import Channel
+
+        channel = Mock(spec=Channel)
+        channel.broadcast = True
+        channel.megagroup = False
+        channel.title = "Test Channel"
+
+        entity_type, entity_name = _get_entity_type_and_name(channel)
+        self.assertEqual(entity_type, "Channel")
+        self.assertEqual(entity_name, "Test Channel")
+
+    def test_get_entity_type_and_name_supergroup(self):
+        """Test _get_entity_type_and_name for supergroup."""
+        from Watchtower import _get_entity_type_and_name
+        from telethon.tl.types import Channel
+
+        channel = Mock(spec=Channel)
+        channel.broadcast = False
+        channel.megagroup = True
+        channel.title = "Test Supergroup"
+
+        entity_type, entity_name = _get_entity_type_and_name(channel)
+        self.assertEqual(entity_type, "Supergroup")
+        self.assertEqual(entity_name, "Test Supergroup")
+
+    def test_get_entity_type_and_name_regular_group(self):
+        """Test _get_entity_type_and_name for regular group (Channel with neither flag)."""
+        from Watchtower import _get_entity_type_and_name
+        from telethon.tl.types import Channel
+
+        channel = Mock(spec=Channel)
+        channel.broadcast = False
+        channel.megagroup = False
+        channel.title = "Test Group"
+
+        entity_type, entity_name = _get_entity_type_and_name(channel)
+        self.assertEqual(entity_type, "Group")
+        self.assertEqual(entity_name, "Test Group")
+
+    def test_get_entity_type_and_name_chat(self):
+        """Test _get_entity_type_and_name for Chat."""
+        from Watchtower import _get_entity_type_and_name
+        from telethon.tl.types import Chat
+
+        chat = Mock(spec=Chat)
+        chat.title = "Test Chat"
+
+        entity_type, entity_name = _get_entity_type_and_name(chat)
+        self.assertEqual(entity_type, "Group")
+        self.assertEqual(entity_name, "Test Chat")
+
+    def test_get_entity_type_and_name_bot(self):
+        """Test _get_entity_type_and_name for bot User."""
+        from Watchtower import _get_entity_type_and_name
+        from telethon.tl.types import User
+
+        user = Mock(spec=User)
+        user.bot = True
+        user.username = "test_bot"
+        user.first_name = "Test"
+        user.last_name = None
+
+        entity_type, entity_name = _get_entity_type_and_name(user)
+        self.assertEqual(entity_type, "Bot")
+        self.assertEqual(entity_name, "@test_bot")
+
+    def test_get_entity_type_and_name_user_with_username(self):
+        """Test _get_entity_type_and_name for regular User with username."""
+        from Watchtower import _get_entity_type_and_name
+        from telethon.tl.types import User
+
+        user = Mock(spec=User)
+        user.bot = False
+        user.username = "testuser"
+        user.first_name = "John"
+        user.last_name = "Doe"
+
+        entity_type, entity_name = _get_entity_type_and_name(user)
+        self.assertEqual(entity_type, "User")
+        self.assertEqual(entity_name, "@testuser")
+
+    def test_get_entity_type_and_name_user_with_full_name(self):
+        """Test _get_entity_type_and_name for User without username but with full name."""
+        from Watchtower import _get_entity_type_and_name
+        from telethon.tl.types import User
+
+        user = Mock(spec=User)
+        user.bot = False
+        user.username = None
+        user.first_name = "Jane"
+        user.last_name = "Smith"
+        user.id = 123456
+
+        entity_type, entity_name = _get_entity_type_and_name(user)
+        self.assertEqual(entity_type, "User")
+        self.assertEqual(entity_name, "Jane Smith")
+
+    def test_get_entity_type_and_name_user_first_name_only(self):
+        """Test _get_entity_type_and_name for User with only first name."""
+        from Watchtower import _get_entity_type_and_name
+        from telethon.tl.types import User
+
+        user = Mock(spec=User)
+        user.bot = False
+        user.username = None
+        user.first_name = "Alice"
+        user.last_name = None
+        user.id = 789
+
+        entity_type, entity_name = _get_entity_type_and_name(user)
+        self.assertEqual(entity_type, "User")
+        self.assertEqual(entity_name, "Alice")
+
+    def test_get_entity_type_and_name_user_no_name(self):
+        """Test _get_entity_type_and_name for User without any name."""
+        from Watchtower import _get_entity_type_and_name
+        from telethon.tl.types import User
+
+        user = Mock(spec=User)
+        user.bot = False
+        user.username = None
+        user.first_name = None
+        user.last_name = None
+        user.id = 999
+
+        entity_type, entity_name = _get_entity_type_and_name(user)
+        self.assertEqual(entity_type, "User")
+        self.assertEqual(entity_name, "User999")
+
+
 if __name__ == '__main__':
     unittest.main()

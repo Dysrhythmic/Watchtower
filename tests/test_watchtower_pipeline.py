@@ -1316,6 +1316,477 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         self.assertEqual(status, "queued for retry")
         mock_metrics.increment.assert_any_call("messages_queued_retry")
 
+class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
+    """Tests for file size limit checking and matched line extraction."""
+
+    @patch('MetricsCollector.MetricsCollector')
+    @patch('MessageQueue.MessageQueue')
+    @patch('DiscordHandler.DiscordHandler')
+    @patch('TelegramHandler.TelegramHandler')
+    @patch('OCRHandler.OCRHandler')
+    @patch('MessageRouter.MessageRouter')
+    @patch('ConfigManager.ConfigManager')
+    def test_extract_matched_lines_from_attachment(self, MockConfig, MockRouter, MockOCR,
+                                                     MockTelegram, MockDiscord, MockQueue, MockMetrics):
+        """
+        Given: Text attachment file with lines matching keywords
+        When: _extract_matched_lines_from_attachment() is called
+        Then: Lines matching keywords are extracted and returned
+
+        Tests: src/Watchtower.py:533-574 (matched line extraction)
+        """
+        from Watchtower import Watchtower
+        import tempfile
+
+        mock_config = MockConfig.return_value
+        mock_config.telegram_api_id = "123"
+        mock_config.telegram_api_hash = "hash"
+        mock_config.telegram_session_name = "session"
+        mock_config.project_root = Path("/tmp")
+        mock_config.attachments_dir = Path("/tmp/attachments")
+        mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
+        mock_config.tmp_dir = Path("/tmp")
+
+        watchtower = Watchtower(sources=['telegram'])
+
+        # Create test file with matched and unmatched lines
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write("This is a normal line\n")
+            f.write("This line contains malware keyword\n")
+            f.write("Another normal line\n")
+            f.write("This line has exploit in it\n")
+            f.write("Final normal line\n")
+            temp_path = f.name
+
+        try:
+            # When: Extract matched lines
+            keywords = ['malware', 'exploit']
+            matched_lines = watchtower._extract_matched_lines_from_attachment(temp_path, keywords)
+
+            # Then: Only lines with keywords are returned
+            self.assertEqual(len(matched_lines), 2)
+            self.assertIn('malware', matched_lines[0])
+            self.assertIn('exploit', matched_lines[1])
+        finally:
+            os.unlink(temp_path)
+
+    @patch('MetricsCollector.MetricsCollector')
+    @patch('MessageQueue.MessageQueue')
+    @patch('DiscordHandler.DiscordHandler')
+    @patch('TelegramHandler.TelegramHandler')
+    @patch('OCRHandler.OCRHandler')
+    @patch('MessageRouter.MessageRouter')
+    @patch('ConfigManager.ConfigManager')
+    def test_extract_matched_lines_case_insensitive(self, MockConfig, MockRouter, MockOCR,
+                                                      MockTelegram, MockDiscord, MockQueue, MockMetrics):
+        """
+        Given: Text file with keywords in various cases
+        When: _extract_matched_lines_from_attachment() is called
+        Then: Matching is case-insensitive
+
+        Tests: src/Watchtower.py:567 (case-insensitive matching)
+        """
+        from Watchtower import Watchtower
+        import tempfile
+
+        mock_config = MockConfig.return_value
+        mock_config.telegram_api_id = "123"
+        mock_config.telegram_api_hash = "hash"
+        mock_config.telegram_session_name = "session"
+        mock_config.project_root = Path("/tmp")
+        mock_config.attachments_dir = Path("/tmp/attachments")
+        mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
+        mock_config.tmp_dir = Path("/tmp")
+
+        watchtower = Watchtower(sources=['telegram'])
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write("This has MALWARE in caps\n")
+            f.write("This has MaLwArE in mixed case\n")
+            f.write("This has malware in lowercase\n")
+            temp_path = f.name
+
+        try:
+            keywords = ['malware']
+            matched_lines = watchtower._extract_matched_lines_from_attachment(temp_path, keywords)
+
+            # Then: All 3 lines matched despite case differences
+            self.assertEqual(len(matched_lines), 3)
+        finally:
+            os.unlink(temp_path)
+
+    @patch('MetricsCollector.MetricsCollector')
+    @patch('MessageQueue.MessageQueue')
+    @patch('DiscordHandler.DiscordHandler')
+    @patch('TelegramHandler.TelegramHandler')
+    @patch('OCRHandler.OCRHandler')
+    @patch('MessageRouter.MessageRouter')
+    @patch('ConfigManager.ConfigManager')
+    def test_extract_matched_lines_unsupported_file_type(self, MockConfig, MockRouter, MockOCR,
+                                                           MockTelegram, MockDiscord, MockQueue, MockMetrics):
+        """
+        Given: File with unsupported extension (not in SUPPORTED_TEXT_EXTENSIONS)
+        When: _extract_matched_lines_from_attachment() is called
+        Then: Returns empty list (skips unsupported files)
+
+        Tests: src/Watchtower.py:556-557 (file type filtering)
+        """
+        from Watchtower import Watchtower
+        import tempfile
+
+        mock_config = MockConfig.return_value
+        mock_config.telegram_api_id = "123"
+        mock_config.telegram_api_hash = "hash"
+        mock_config.telegram_session_name = "session"
+        mock_config.project_root = Path("/tmp")
+        mock_config.attachments_dir = Path("/tmp/attachments")
+        mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
+        mock_config.tmp_dir = Path("/tmp")
+
+        watchtower = Watchtower(sources=['telegram'])
+
+        # Binary file (unsupported extension)
+        with tempfile.NamedTemporaryFile(suffix='.exe', delete=False) as f:
+            f.write(b'\x00\x01\x02binary data')
+            temp_path = f.name
+
+        try:
+            keywords = ['malware']
+            matched_lines = watchtower._extract_matched_lines_from_attachment(temp_path, keywords)
+
+            # Then: Empty list (unsupported file type)
+            self.assertEqual(matched_lines, [])
+        finally:
+            os.unlink(temp_path)
+
+    @patch('MetricsCollector.MetricsCollector')
+    @patch('MessageQueue.MessageQueue')
+    @patch('DiscordHandler.DiscordHandler')
+    @patch('TelegramHandler.TelegramHandler')
+    @patch('OCRHandler.OCRHandler')
+    @patch('MessageRouter.MessageRouter')
+    @patch('ConfigManager.ConfigManager')
+    def test_check_file_size_within_limit(self, MockConfig, MockRouter, MockOCR,
+                                            MockTelegram, MockDiscord, MockQueue, MockMetrics):
+        """
+        Given: Attachment file smaller than destination limit
+        When: _check_file_size_and_modify_content() is called
+        Then: Content unchanged, should_include_media=True
+
+        Tests: src/Watchtower.py:606-607 (file within limit)
+        """
+        from Watchtower import Watchtower
+        import tempfile
+
+        mock_config = MockConfig.return_value
+        mock_config.telegram_api_id = "123"
+        mock_config.telegram_api_hash = "hash"
+        mock_config.telegram_session_name = "session"
+        mock_config.project_root = Path("/tmp")
+        mock_config.attachments_dir = Path("/tmp/attachments")
+        mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
+        mock_config.tmp_dir = Path("/tmp")
+
+        watchtower = Watchtower(sources=['telegram'])
+
+        # Small file (1KB)
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write("Small file content\n" * 10)
+            temp_path = f.name
+
+        try:
+            content = "**Test Message**"
+            file_size_limit = 10 * 1024 * 1024  # 10MB limit
+            destination = {'keywords': ['test']}
+
+            # When: Check file size
+            modified_content, should_include = watchtower._check_file_size_and_modify_content(
+                content, temp_path, file_size_limit, destination
+            )
+
+            # Then: Content unchanged, media should be included
+            self.assertEqual(modified_content, content)
+            self.assertTrue(should_include)
+        finally:
+            os.unlink(temp_path)
+
+    @patch('MetricsCollector.MetricsCollector')
+    @patch('MessageQueue.MessageQueue')
+    @patch('DiscordHandler.DiscordHandler')
+    @patch('TelegramHandler.TelegramHandler')
+    @patch('OCRHandler.OCRHandler')
+    @patch('MessageRouter.MessageRouter')
+    @patch('ConfigManager.ConfigManager')
+    def test_check_file_size_exceeds_limit_with_matched_lines(self, MockConfig, MockRouter, MockOCR,
+                                                                MockTelegram, MockDiscord, MockQueue,
+                                                                MockMetrics):
+        """
+        Given: Attachment file larger than destination limit, with matched keyword lines
+        When: _check_file_size_and_modify_content() is called
+        Then: Matched lines appended to content with header, should_include_media=False
+
+        Tests: src/Watchtower.py:609-633 (file exceeds limit with matches)
+        """
+        from Watchtower import Watchtower
+        import tempfile
+
+        mock_config = MockConfig.return_value
+        mock_config.telegram_api_id = "123"
+        mock_config.telegram_api_hash = "hash"
+        mock_config.telegram_session_name = "session"
+        mock_config.project_root = Path("/tmp")
+        mock_config.attachments_dir = Path("/tmp/attachments")
+        mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
+        mock_config.tmp_dir = Path("/tmp")
+
+        watchtower = Watchtower(sources=['telegram'])
+
+        # Create large file (10MB) with matched lines
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.log', delete=False) as f:
+            # Write enough data to exceed 1MB limit
+            for i in range(100000):
+                if i % 10000 == 0:
+                    f.write(f"Line {i}: Contains malware signature\n")
+                else:
+                    f.write(f"Line {i}: Normal log entry\n")
+            temp_path = f.name
+
+        try:
+            content = "**Test Message**"
+            file_size_limit = 1 * 1024 * 1024  # 1MB limit (file is larger)
+            destination = {'keywords': ['malware']}
+
+            # When: Check file size
+            modified_content, should_include = watchtower._check_file_size_and_modify_content(
+                content, temp_path, file_size_limit, destination
+            )
+
+            # Then: Content includes matched lines, media should NOT be included
+            self.assertIn("**From Attachment:**", modified_content)
+            self.assertIn("malware", modified_content)
+            self.assertFalse(should_include)
+        finally:
+            os.unlink(temp_path)
+
+    @patch('MetricsCollector.MetricsCollector')
+    @patch('MessageQueue.MessageQueue')
+    @patch('DiscordHandler.DiscordHandler')
+    @patch('TelegramHandler.TelegramHandler')
+    @patch('OCRHandler.OCRHandler')
+    @patch('MessageRouter.MessageRouter')
+    @patch('ConfigManager.ConfigManager')
+    def test_check_file_size_exceeds_limit_many_matched_lines(self, MockConfig, MockRouter, MockOCR,
+                                                                MockTelegram, MockDiscord, MockQueue,
+                                                                MockMetrics):
+        """
+        Given: Large file with >20 matched keyword lines
+        When: _check_file_size_and_modify_content() is called
+        Then: Only first 20 lines included, with truncation notice
+
+        Tests: src/Watchtower.py:622-631 (matched line truncation)
+        """
+        from Watchtower import Watchtower
+        import tempfile
+
+        mock_config = MockConfig.return_value
+        mock_config.telegram_api_id = "123"
+        mock_config.telegram_api_hash = "hash"
+        mock_config.telegram_session_name = "session"
+        mock_config.project_root = Path("/tmp")
+        mock_config.attachments_dir = Path("/tmp/attachments")
+        mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
+        mock_config.tmp_dir = Path("/tmp")
+
+        watchtower = Watchtower(sources=['telegram'])
+
+        # Create file with 30 matched lines
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            for i in range(30):
+                f.write(f"Matched line {i}: Contains malware\n")
+            # Add padding to exceed size limit
+            f.write("X" * (2 * 1024 * 1024))  # 2MB of padding
+            temp_path = f.name
+
+        try:
+            content = "**Original Message**"
+            file_size_limit = 1 * 1024 * 1024  # 1MB limit
+            destination = {'keywords': ['malware']}
+
+            # When: Check file size
+            modified_content, should_include = watchtower._check_file_size_and_modify_content(
+                content, temp_path, file_size_limit, destination
+            )
+
+            # Then: Only first 20 lines + truncation notice
+            self.assertIn("**From Attachment:**", modified_content)
+            self.assertIn("[...10 more matched line(s) omitted]", modified_content)
+            self.assertFalse(should_include)
+        finally:
+            os.unlink(temp_path)
+
+    @patch('MetricsCollector.MetricsCollector')
+    @patch('MessageQueue.MessageQueue')
+    @patch('DiscordHandler.DiscordHandler')
+    @patch('TelegramHandler.TelegramHandler')
+    @patch('OCRHandler.OCRHandler')
+    @patch('MessageRouter.MessageRouter')
+    @patch('ConfigManager.ConfigManager')
+    def test_send_to_discord_with_oversized_attachment(self, MockConfig, MockRouter, MockOCR,
+                                                         MockTelegram, MockDiscord, MockQueue, MockMetrics):
+        """
+        Given: Message with attachment exceeding Discord file size limit
+        When: _send_to_discord() is called
+        Then: Matched lines appended to message, attachment not sent
+
+        Tests: src/Watchtower.py:472-477 (Discord file size checking integration)
+        """
+        from Watchtower import Watchtower
+        import tempfile
+
+        mock_config = MockConfig.return_value
+        mock_config.telegram_api_id = "123"
+        mock_config.telegram_api_hash = "hash"
+        mock_config.telegram_session_name = "session"
+        mock_config.project_root = Path("/tmp")
+        mock_config.attachments_dir = Path("/tmp/attachments")
+        mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
+        mock_config.tmp_dir = Path("/tmp")
+
+        mock_discord = MockDiscord.return_value
+        mock_discord.send_message = Mock(return_value=True)
+        mock_discord.FILE_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB limit
+
+        watchtower = Watchtower(sources=['telegram'])
+
+        # Create large file (2MB) with matched lines
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write("Line with malware keyword\n")
+            f.write("X" * (2 * 1024 * 1024))  # 2MB padding
+            temp_path = f.name
+
+        try:
+            message_data = MessageData(
+                source_type="telegram",
+                channel_id="123456",
+                channel_name="test_channel",
+                username="test_user",
+                timestamp=datetime.now(timezone.utc),
+                text="Check this file",
+                has_media=True,
+                media_type="document",
+                media_path=temp_path
+            )
+
+            destination = {
+                'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
+                'keywords': ['malware']
+            }
+
+            content = "**Original Message**"
+
+            # When: Send to Discord with oversized attachment
+            status = asyncio.run(watchtower._send_to_discord(
+                message_data, destination, content, include_media=True
+            ))
+
+            # Then: Discord send called with modified content (no attachment)
+            args, _ = mock_discord.send_message.call_args
+            sent_content = args[0]
+            sent_media = args[2]
+
+            self.assertIn("**From Attachment:**", sent_content)
+            self.assertIsNone(sent_media)  # No media sent
+            self.assertEqual(status, "sent")
+        finally:
+            os.unlink(temp_path)
+
+    @patch('MetricsCollector.MetricsCollector')
+    @patch('MessageQueue.MessageQueue')
+    @patch('DiscordHandler.DiscordHandler')
+    @patch('TelegramHandler.TelegramHandler')
+    @patch('OCRHandler.OCRHandler')
+    @patch('MessageRouter.MessageRouter')
+    @patch('ConfigManager.ConfigManager')
+    def test_send_to_telegram_with_oversized_attachment(self, MockConfig, MockRouter, MockOCR,
+                                                          MockTelegram, MockDiscord, MockQueue, MockMetrics):
+        """
+        Given: Message with attachment exceeding Telegram file size limit
+        When: _send_to_telegram() is called
+        Then: Matched lines appended to message, attachment not sent
+
+        Tests: src/Watchtower.py:515-519 (Telegram file size checking integration)
+        """
+        from Watchtower import Watchtower
+        import tempfile
+
+        mock_config = MockConfig.return_value
+        mock_config.telegram_api_id = "123"
+        mock_config.telegram_api_hash = "hash"
+        mock_config.telegram_session_name = "session"
+        mock_config.project_root = Path("/tmp")
+        mock_config.attachments_dir = Path("/tmp/attachments")
+        mock_config.rsslog_dir = Path("/tmp/rsslog")
+        mock_config.telegramlog_dir = Path("/tmp/telegramlog")
+        mock_config.tmp_dir = Path("/tmp")
+
+        mock_telegram = MockTelegram.return_value
+        mock_telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
+        mock_telegram.send_copy = AsyncMock(return_value=True)
+        mock_telegram.FILE_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB limit for testing
+
+        watchtower = Watchtower(sources=['telegram'])
+
+        # Create large file (2MB) with matched lines
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.log', delete=False) as f:
+            f.write("Log entry with exploit signature\n")
+            f.write("X" * (2 * 1024 * 1024))  # 2MB padding
+            temp_path = f.name
+
+        try:
+            message_data = MessageData(
+                source_type="telegram",
+                channel_id="123456",
+                channel_name="source_channel",
+                username="test_user",
+                timestamp=datetime.now(timezone.utc),
+                text="Check this log",
+                has_media=True,
+                media_type="document",
+                media_path=temp_path
+            )
+
+            destination = {
+                'type': 'telegram',
+                'telegram_destination_channel': '@target_channel',
+                'keywords': ['exploit']
+            }
+
+            content = "**Original Message**"
+
+            # When: Send to Telegram with oversized attachment
+            status = asyncio.run(watchtower._send_to_telegram(
+                message_data, destination, content, include_media=True
+            ))
+
+            # Then: Telegram send called with modified content (no attachment)
+            args, _ = mock_telegram.send_copy.call_args
+            sent_content = args[1]
+            sent_media = args[2]
+
+            self.assertIn("**From Attachment:**", sent_content)
+            self.assertIsNone(sent_media)  # No media sent
+            self.assertEqual(status, "sent")
+        finally:
+            os.unlink(temp_path)
+
+
 class TestWatchtowerShutdown(unittest.TestCase):
     """
     Tests for Watchtower shutdown behavior.

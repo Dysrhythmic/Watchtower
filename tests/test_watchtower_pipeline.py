@@ -1867,7 +1867,7 @@ class TestWatchtowerUtilityFunctions(unittest.TestCase):
 
     def test_get_entity_type_and_name_broadcast_channel(self):
         """Test _get_entity_type_and_name for broadcast channel."""
-        from Watchtower import _get_entity_type_and_name
+        from discover import _get_entity_type_and_name
         from telethon.tl.types import Channel
 
         channel = Mock(spec=Channel)
@@ -1881,7 +1881,7 @@ class TestWatchtowerUtilityFunctions(unittest.TestCase):
 
     def test_get_entity_type_and_name_supergroup(self):
         """Test _get_entity_type_and_name for supergroup."""
-        from Watchtower import _get_entity_type_and_name
+        from discover import _get_entity_type_and_name
         from telethon.tl.types import Channel
 
         channel = Mock(spec=Channel)
@@ -1895,7 +1895,7 @@ class TestWatchtowerUtilityFunctions(unittest.TestCase):
 
     def test_get_entity_type_and_name_regular_group(self):
         """Test _get_entity_type_and_name for regular group (Channel with neither flag)."""
-        from Watchtower import _get_entity_type_and_name
+        from discover import _get_entity_type_and_name
         from telethon.tl.types import Channel
 
         channel = Mock(spec=Channel)
@@ -1909,7 +1909,7 @@ class TestWatchtowerUtilityFunctions(unittest.TestCase):
 
     def test_get_entity_type_and_name_chat(self):
         """Test _get_entity_type_and_name for Chat."""
-        from Watchtower import _get_entity_type_and_name
+        from discover import _get_entity_type_and_name
         from telethon.tl.types import Chat
 
         chat = Mock(spec=Chat)
@@ -1921,7 +1921,7 @@ class TestWatchtowerUtilityFunctions(unittest.TestCase):
 
     def test_get_entity_type_and_name_bot(self):
         """Test _get_entity_type_and_name for bot User."""
-        from Watchtower import _get_entity_type_and_name
+        from discover import _get_entity_type_and_name
         from telethon.tl.types import User
 
         user = Mock(spec=User)
@@ -1936,7 +1936,7 @@ class TestWatchtowerUtilityFunctions(unittest.TestCase):
 
     def test_get_entity_type_and_name_user_with_username(self):
         """Test _get_entity_type_and_name for regular User with username."""
-        from Watchtower import _get_entity_type_and_name
+        from discover import _get_entity_type_and_name
         from telethon.tl.types import User
 
         user = Mock(spec=User)
@@ -1951,7 +1951,7 @@ class TestWatchtowerUtilityFunctions(unittest.TestCase):
 
     def test_get_entity_type_and_name_user_with_full_name(self):
         """Test _get_entity_type_and_name for User without username but with full name."""
-        from Watchtower import _get_entity_type_and_name
+        from discover import _get_entity_type_and_name
         from telethon.tl.types import User
 
         user = Mock(spec=User)
@@ -1967,7 +1967,7 @@ class TestWatchtowerUtilityFunctions(unittest.TestCase):
 
     def test_get_entity_type_and_name_user_first_name_only(self):
         """Test _get_entity_type_and_name for User with only first name."""
-        from Watchtower import _get_entity_type_and_name
+        from discover import _get_entity_type_and_name
         from telethon.tl.types import User
 
         user = Mock(spec=User)
@@ -1983,7 +1983,7 @@ class TestWatchtowerUtilityFunctions(unittest.TestCase):
 
     def test_get_entity_type_and_name_user_no_name(self):
         """Test _get_entity_type_and_name for User without any name."""
-        from Watchtower import _get_entity_type_and_name
+        from discover import _get_entity_type_and_name
         from telethon.tl.types import User
 
         user = Mock(spec=User)

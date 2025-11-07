@@ -6,7 +6,6 @@ storage. Tracks application statistics like message counts, routing success/fail
 rates, and queue sizes.
 
 Features:
-- Per-session metrics (reset on each startup)
 - Periodic persistence to JSON file (every 60 seconds by default)
 - Counter-based metrics (increment, set, get)
 - Thread-safe for single-process use
@@ -20,9 +19,8 @@ Performance:
     - SSD-friendly for Raspberry Pi and similar devices
 
 Metrics Persistence:
-    - Metrics are PER-SESSION ONLY (reset on each startup)
     - Saved to metrics.json at shutdown for logging/archival purposes
-    - NOT loaded on startup - each session starts fresh at zero
+    - On startup each session starts fresh at zero
 
 Common Metrics:
     - messages_received_telegram: Messages from Telegram
@@ -62,7 +60,7 @@ class MetricsCollector:
         """Initialize metrics collector.
 
         Metrics are per-session (reset on each startup). The metrics file is used
-        for saving at shutdown but is NOT loaded on startup.
+        for saving at shutdown but is not loaded on startup.
 
         Args:
             metrics_file: Path to metrics JSON file (e.g., tmp/metrics.json)
@@ -71,7 +69,7 @@ class MetricsCollector:
         self.metrics: Dict[str, int] = defaultdict(int)
         self._last_save_time = time.time()
         self._dirty = False  # Track if metrics changed since last save
-        _logger.info("[MetricsCollector] Starting with fresh metrics (per-session)")
+        _logger.info("[MetricsCollector] Starting with fresh metrics")
 
     def _save_metrics(self) -> None:
         """Save current metrics to file immediately.

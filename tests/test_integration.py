@@ -20,6 +20,7 @@ def create_mock_config(extra_attrs=None):
     mock_config.rsslog_dir = Path("/tmp/rsslog")
     mock_config.telegramlog_dir = Path("/tmp/telegramlog")
     mock_config.project_root = Path("/tmp")
+    mock_config.config_dir = Path("/tmp/config")
     mock_config.api_id = "123"
     mock_config.api_hash = "abc"
     mock_config.get_all_channel_ids = Mock(return_value=set())

@@ -488,6 +488,7 @@ class TestIsMediaRestrictedBugFix(unittest.TestCase):
         """Set up test handler."""
         mock_config = Mock()
         mock_config.project_root = Path("/tmp")
+        mock_config.config_dir = Path("/tmp/config")
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
 

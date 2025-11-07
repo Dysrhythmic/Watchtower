@@ -251,6 +251,7 @@ class TestMetricsIntegration(unittest.TestCase):
         mock_config.rsslog_dir = mock_config.tmp_dir / "rsslog"
         mock_config.telegramlog_dir = mock_config.tmp_dir / "telegramlog"
         mock_config.project_root = mock_config.tmp_dir
+        mock_config.config_dir = mock_config.tmp_dir / "config"
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
         mock_config.get_all_channel_ids = Mock(return_value=set())
@@ -309,6 +310,7 @@ class TestMetricsIntegration(unittest.TestCase):
         mock_config.rsslog_dir = mock_config.tmp_dir / "rsslog"
         mock_config.telegramlog_dir = mock_config.tmp_dir / "telegramlog"
         mock_config.project_root = mock_config.tmp_dir
+        mock_config.config_dir = mock_config.tmp_dir / "config"
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
         mock_config.get_all_channel_ids = Mock(return_value=set())
@@ -367,6 +369,7 @@ class TestMetricsIntegration(unittest.TestCase):
         mock_config.rsslog_dir = mock_config.tmp_dir / "rsslog"
         mock_config.telegramlog_dir = mock_config.tmp_dir / "telegramlog"
         mock_config.project_root = mock_config.tmp_dir
+        mock_config.config_dir = mock_config.tmp_dir / "config"
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
         mock_config.get_all_channel_ids = Mock(return_value=set())

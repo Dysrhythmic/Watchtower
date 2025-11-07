@@ -3,12 +3,18 @@ DestinationHandler - Abstract base class for message delivery platforms
 
 This module defines the common interface and shared functionality for all destination
 handlers (Discord, Telegram, etc.). Provides rate limiting, text chunking, and
-standardized message sending operations. # <-- review: is there anything else that could be abstracted to this class?
+standardized message sending operations.
 
-Features:
-- Automatic rate limit tracking and enforcement
+Current shared abstractions:
+- Rate limit tracking and enforcement (preemptive waiting)
 - Text chunking for platform message length limits
 - Abstract interface for platform-specific implementations
+
+Potential future abstractions:
+- Media file validation (size, type checking)
+- Retry logic with exponential backoff
+- URL defanging utilities
+- Logging standardization
 
 Implementations:
     - DiscordHandler: Discord webhook delivery
@@ -16,15 +22,19 @@ Implementations:
 """
 import time
 import math
-from abc import ABC, abstractmethod
+from abc import ABC as AbstractBaseClass, abstractmethod
 from typing import List, Dict, Optional
 from logger_setup import setup_logger
 
-logger = setup_logger(__name__)
+_logger = setup_logger(__name__)
 
 
-class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be instantiated? Also, ABC is a bad name, can we import it as something more descriptive?
+class DestinationHandler(AbstractBaseClass):
     """Abstract base class for destination handlers (Discord, Telegram, etc.).
+
+    This class uses Python's Abstract Base Class (ABC) pattern to define an interface
+    that all destination handlers must implement. Classes inheriting from this cannot
+    be instantiated directly - they must implement all @abstractmethod decorated methods.
 
     Provides shared functionality for rate limiting and text chunking. Subclasses
     must implement platform-specific send and format operations.
@@ -36,24 +46,42 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
         self._rate_limits: Dict[str, float] = {}
 
     @abstractmethod
-    def _get_rate_limit_key(self, destination_identifier) -> str: # <-- review: why does this exist if it does nothing?
+    def _get_rate_limit_key(self, destination_identifier) -> str:
         """Get the unique key for rate limit tracking.
+
+        This abstract method (marked with @abstractmethod) must be implemented by subclasses.
+        The 'pass' statement is intentional - it's a template that subclasses override.
+
+        Different platforms may have different rate limit bucketing strategies:
+        - Discord: Rate limits per webhook URL
+        - Telegram: Rate limits per chat_id
 
         Args:
             destination_identifier: webhook_url for Discord, chat_id for Telegram
 
         Returns:
-            str: Unique key for this destination
+            str: Unique key for this destination's rate limit bucket
         """
         pass
 
-    def _check_and_wait_for_rate_limit(self, destination_identifier) -> None: # <-- review: when is this used? there are specific error codes or msgs that indicate when rate limits happen
-        """Check if destination is rate limited and wait if necessary.
+    def _check_and_wait_for_rate_limit(self, destination_identifier) -> None:
+        """Check if destination is rate limited and wait if necessary (preemptive check).
+
+        This method is called BEFORE attempting to send a message to check if we're
+        still rate limited from a previous failed attempt. This is "preemptive" waiting.
+
+        The actual rate limit detection happens in subclass implementations when they
+        receive platform-specific error responses:
+        - Discord: HTTP 429 with 'retry_after' header
+        - Telegram: Error code 429 with 'retry_after' in response
+
+        When a rate limit error is detected, subclasses call _store_rate_limit() to
+        record the wait time, which this method then enforces on subsequent sends.
 
         Args:
             destination_identifier: webhook_url for Discord, chat_id for Telegram
         """
-        key = self._get_rate_limit_key(destination_identifier) # <-- review: this is calling a method that does nothing
+        key = self._get_rate_limit_key(destination_identifier)
 
         if key in self._rate_limits:
             wait_until = self._rate_limits[key]
@@ -61,7 +89,7 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
 
             if now < wait_until:
                 wait_time = wait_until - now
-                logger.info(f"[{self.__class__.__name__}] Rate limited, waiting {wait_time:.1f}s before sending")
+                _logger.info(f"[{self.__class__.__name__}] Rate limited, waiting {wait_time:.1f}s before sending")
                 time.sleep(wait_time)
                 # Clean up expired rate limit
                 del self._rate_limits[key]
@@ -73,12 +101,12 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
             destination_identifier: webhook_url for Discord, chat_id for Telegram
             wait_seconds: How many seconds to wait before next attempt
         """
-        key = self._get_rate_limit_key(destination_identifier) # <-- review: this is calling a method that does nothing
+        key = self._get_rate_limit_key(destination_identifier)
         rounded_wait = math.ceil(wait_seconds)
         expires_at = time.time() + rounded_wait
         self._rate_limits[key] = expires_at
 
-        logger.warning(
+        _logger.warning(
             f"[{self.__class__.__name__}] Rate limited: "
             f"retry_after={wait_seconds}s, waiting={rounded_wait}s"
         )
@@ -121,8 +149,15 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
         return chunks
 
     @abstractmethod
-    def send_message(self, content: str, destination_identifier, media_path: Optional[str] = None) -> bool: # <-- review: why does this exist if it does nothing?
+    def send_message(self, content: str, destination_identifier, media_path: Optional[str] = None) -> bool:
         """Send message to destination.
+
+        This abstract method (marked with @abstractmethod) must be implemented by subclasses.
+        The 'pass' statement is intentional - it's a template that subclasses override.
+
+        Subclasses implement platform-specific sending logic:
+        - Discord: POST to webhook URL with JSON payload
+        - Telegram: Use Telegram Bot API send methods
 
         Args:
             content: Message text to send
@@ -135,8 +170,15 @@ class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be insta
         pass
 
     @abstractmethod
-    def format_message(self, message_data, destination: Dict) -> str: # <-- review: why does this exist if it does nothing?
+    def format_message(self, message_data, destination: Dict) -> str:
         """Format message for this destination platform.
+
+        This abstract method (marked with @abstractmethod) must be implemented by subclasses.
+        The 'pass' statement is intentional - it's a template that subclasses override.
+
+        Subclasses implement platform-specific formatting:
+        - Discord: Markdown formatting
+        - Telegram: HTML or Markdown formatting
 
         Args:
             message_data: MessageData to format

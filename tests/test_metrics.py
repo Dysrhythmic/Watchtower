@@ -254,7 +254,7 @@ class TestMetricsIntegration(unittest.TestCase):
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
         mock_config.get_all_channel_ids = Mock(return_value=set())
-        mock_config.webhooks = []
+        mock_config.destinations = []
         mock_config_class.return_value = mock_config
 
         # Create isolated metrics
@@ -312,7 +312,7 @@ class TestMetricsIntegration(unittest.TestCase):
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
         mock_config.get_all_channel_ids = Mock(return_value=set())
-        mock_config.webhooks = []
+        mock_config.destinations = []
         mock_config_class.return_value = mock_config
 
         # Create isolated metrics
@@ -370,7 +370,7 @@ class TestMetricsIntegration(unittest.TestCase):
         mock_config.api_id = "123"
         mock_config.api_hash = "abc"
         mock_config.get_all_channel_ids = Mock(return_value=set())
-        mock_config.webhooks = []
+        mock_config.destinations = []
         mock_config_class.return_value = mock_config
 
         # Create isolated metrics

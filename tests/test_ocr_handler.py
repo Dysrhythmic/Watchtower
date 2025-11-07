@@ -166,11 +166,11 @@ class TestOCRMultipleDestinations(unittest.TestCase):
         mock_config.attachments_dir.exists.return_value = True
         mock_config.attachments_dir.glob.return_value = []
 
-        mock_config.webhooks = [
+        mock_config.destinations = [
             {
                 'name': 'Dest A (OCR enabled)',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook_a',
+                'discord_webhook_url': 'https://discord.com/webhook_a',
                 'channels': [{
                     'id': '@test_channel',
                     'keywords': [],
@@ -182,7 +182,7 @@ class TestOCRMultipleDestinations(unittest.TestCase):
             {
                 'name': 'Dest B (OCR disabled)',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook_b',
+                'discord_webhook_url': 'https://discord.com/webhook_b',
                 'channels': [{
                     'id': '@test_channel',
                     'keywords': [],

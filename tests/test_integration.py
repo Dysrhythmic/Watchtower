@@ -23,7 +23,7 @@ def create_mock_config(extra_attrs=None):
     mock_config.api_id = "123"
     mock_config.api_hash = "abc"
     mock_config.get_all_channel_ids = Mock(return_value=set())
-    mock_config.webhooks = []
+    mock_config.destinations = []
 
     if extra_attrs:
         for key, value in extra_attrs.items():
@@ -45,10 +45,10 @@ class TestTelegramToDiscordFlow(unittest.TestCase):
         # Setup config
         mock_config = create_mock_config({
             'get_all_channel_ids': Mock(return_value={"@test_channel"}),
-            'webhooks': [{
+            'destinations': [{
                 'name': 'Discord Dest',
                 'type': 'discord',
-                'webhook_url': 'https://discord.com/webhook',
+                'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test_channel',
                     'keywords': ['CVE'],
@@ -82,7 +82,7 @@ class TestTelegramToDiscordFlow(unittest.TestCase):
 
         # Verify Discord formatting and send work
         formatted = app.discord.format_message(msg, destinations[0])
-        success = app.discord.send_message(formatted, mock_config.webhooks[0]['webhook_url'], None)
+        success = app.discord.send_message(formatted, mock_config.destinations[0]['discord_webhook_url'], None)
 
         self.assertTrue(success)
         mock_post.assert_called_once()
@@ -112,11 +112,11 @@ class TestRetryQueueIntegration(unittest.TestCase):
         destination = {
             'name': 'Test',
             'type': 'discord',
-            'webhook_url': 'https://discord.com/webhook'
+            'discord_webhook_url': 'https://discord.com/webhook'
         }
 
         # First send fails with 429
-        success = app.discord.send_message("Test message", destination['webhook_url'], None)
+        success = app.discord.send_message("Test message", destination['discord_webhook_url'], None)
         self.assertFalse(success)
 
         # Should be enqueueable

@@ -147,12 +147,12 @@ class MessageQueue:
             if dest['type'] == 'discord':
                 return watchtower.discord.send_message(
                     retry_item.formatted_content,
-                    dest['webhook_url'],
+                    dest['discord_webhook_url'],
                     retry_item.media_path
                 )
             elif dest['type'] == 'telegram':
                 # Telegram sending requires async
-                channel_spec = dest['destination']
+                channel_spec = dest['telegram_destination_channel']
                 chat_id = await watchtower.telegram.resolve_destination(channel_spec)
                 if chat_id:
                     result = await watchtower.telegram.send_copy(

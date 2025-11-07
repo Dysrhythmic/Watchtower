@@ -14,8 +14,8 @@ What This Tests:
     - RSS feed routing
 
 Test Pattern - Keyword Matching:
-    1. Create mock ConfigManager with webhooks list
-    2. Configure channel with keywords in webhooks[0]['channels'][0]['keywords']
+    1. Create mock ConfigManager with destinations list
+    2. Configure channel with keywords in destinations[0]['channels'][0]['keywords']
     3. Create MessageData with text that should/shouldn't match
     4. Call router.get_destinations(msg)
     5. Assert correct number of matching destinations
@@ -28,10 +28,10 @@ Test Pattern - Parser Testing:
 
 Mock Setup Template:
     self.mock_config = Mock()
-    self.mock_config.webhooks = [{
+    self.mock_config.destinations = [{
         'name': 'Destination Name',
         'type': 'discord',  # or 'telegram'
-        'webhook_url': 'https://discord.com/webhook',  # for Discord
+        'discord_webhook_url': 'https://discord.com/webhook',  # for Discord
         'channels': [{
             'id': '@channel_name',  # or numeric ID
             'keywords': ['keyword1', 'keyword2'],  # or [] for all messages
@@ -72,7 +72,7 @@ class TestMessageRouter(unittest.TestCase):
     def setUp(self):
         """Create MessageRouter with mocked config."""
         self.mock_config = Mock()
-        self.mock_config.webhooks = [{
+        self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
             'webhook_url': 'https://discord.com/webhook',
@@ -103,7 +103,7 @@ class TestMessageRouter(unittest.TestCase):
 
     def test_empty_keywords_forwards_all(self):
         """Test empty keywords list forwards all messages."""
-        self.mock_config.webhooks[0]['channels'][0]['keywords'] = []
+        self.mock_config.destinations[0]['channels'][0]['keywords'] = []
 
         msg = MessageData(
             source_type="telegram",
@@ -157,7 +157,7 @@ class TestMessageRouter(unittest.TestCase):
 
     def test_channel_match_numeric_id(self):
         """Test channel matching with numeric ID."""
-        self.mock_config.webhooks[0]['channels'][0]['id'] = "-1001234567890"
+        self.mock_config.destinations[0]['channels'][0]['id'] = "-1001234567890"
 
         msg = MessageData(
             source_type="telegram",
@@ -173,7 +173,7 @@ class TestMessageRouter(unittest.TestCase):
 
     def test_keyword_matching_ocr_text(self):
         """Test keyword matching includes OCR text."""
-        self.mock_config.webhooks[0]['channels'][0]['ocr'] = True
+        self.mock_config.destinations[0]['channels'][0]['ocr'] = True
 
         msg = MessageData(
             source_type="telegram",
@@ -258,7 +258,7 @@ class TestMessageRouter(unittest.TestCase):
 
     def test_rss_source_routing(self):
         """Test routing RSS source messages."""
-        self.mock_config.webhooks[0]['channels'][0]['id'] = "https://example.com/feed.xml"
+        self.mock_config.destinations[0]['channels'][0]['id'] = "https://example.com/feed.xml"
 
         msg = MessageData(
             source_type="rss",
@@ -295,7 +295,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         Tests: src/MessageRouter.py:24-25 (restricted mode True branch)
         """
         # Configure webhook with restricted channel
-        self.mock_config.webhooks = [{
+        self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
             'webhook_url': 'https://discord.com/webhook',
@@ -324,7 +324,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         Tests: src/MessageRouter.py:26 (restricted mode False branch)
         """
         # Configure webhook with non-restricted channel
-        self.mock_config.webhooks = [{
+        self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
             'webhook_url': 'https://discord.com/webhook',
@@ -353,7 +353,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         Tests: src/MessageRouter.py:33-34 (OCR enabled True branch)
         """
         # Configure webhook with OCR enabled
-        self.mock_config.webhooks = [{
+        self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
             'webhook_url': 'https://discord.com/webhook',
@@ -382,7 +382,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         Tests: src/MessageRouter.py:35 (OCR enabled False branch)
         """
         # Configure webhook with OCR disabled
-        self.mock_config.webhooks = [{
+        self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
             'webhook_url': 'https://discord.com/webhook',
@@ -599,7 +599,7 @@ class TestParserKeywordIndependence(unittest.TestCase):
     def setUp(self):
         """Create MessageRouter with mocked config."""
         self.mock_config = Mock()
-        self.mock_config.webhooks = [{
+        self.mock_config.destinations = [{
             'name': 'Test Dest',
             'type': 'discord',
             'webhook_url': 'https://discord.com/webhook',
@@ -728,7 +728,7 @@ class TestMultipleDestinationsConfig(unittest.TestCase):
         mock_config.attachments_dir.exists.return_value = True
         mock_config.attachments_dir.glob.return_value = []
 
-        mock_config.webhooks = [
+        mock_config.destinations = [
             {
                 'name': 'Dest A (Restricted)',
                 'type': 'discord',

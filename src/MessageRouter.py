@@ -60,7 +60,7 @@ class MessageRouter:
         Returns:
             bool: True if any destination monitoring this channel has restricted_mode=True
         """
-        for webhook in self.config.webhooks:
+        for webhook in self.config.destinations:
             for channel in webhook['channels']:
                 if self._channel_matches(channel_id, channel_name, channel['id']):
                     if channel.get('restricted_mode', False):
@@ -80,7 +80,7 @@ class MessageRouter:
         Returns:
             bool: True if any destination monitoring this channel has ocr=True
         """
-        for webhook in self.config.webhooks:
+        for webhook in self.config.destinations:
             for channel in webhook['channels']:
                 if self._channel_matches(channel_id, channel_name, channel['id']):
                     if channel.get('ocr', False):
@@ -123,8 +123,8 @@ class MessageRouter:
                 - restricted_mode: Whether restricted mode is enabled
                 - parser: Parser configuration dict (or None)
                 - ocr: Whether OCR is enabled
-                - webhook_url: (Discord only) Webhook URL
-                - destination: (Telegram only) Channel ID
+                - discord_webhook_url: (Discord only) Webhook URL
+                - telegram_destination_channel: (Telegram only) Channel ID
 
         Example:
             >>> msg = MessageData(channel_id="@security", text="CVE-2024-1234 vulnerability")
@@ -137,7 +137,7 @@ class MessageRouter:
         # STEP 1: Check if this channel is configured anywhere
         # Early exit if channel is not monitored by any destination
         channel_is_configured = False
-        for webhook in self.config.webhooks:
+        for webhook in self.config.destinations:
             for channel in webhook.get('channels', []):
                 if self._channel_matches(message_data.channel_id, message_data.channel_name, channel['id']):
                     channel_is_configured = True
@@ -150,7 +150,7 @@ class MessageRouter:
             return destinations
 
         # STEP 2: Collect all matching destinations
-        for webhook in self.config.webhooks:
+        for webhook in self.config.destinations:
             # Find the channel configuration for this destination (if it monitors this channel)
             channel_config = None
             for channel in webhook['channels']:
@@ -269,9 +269,9 @@ class MessageRouter:
             'ocr': channel_config.get('ocr', False),
         }
         if base['type'] == 'discord':
-            base['webhook_url'] = webhook['webhook_url']
+            base['discord_webhook_url'] = webhook['discord_webhook_url']
         else:
-            base['destination'] = webhook['destination']
+            base['telegram_destination_channel'] = webhook['telegram_destination_channel']
         return base
 
     def _channel_matches(self, channel_id: str, channel_name: str, config_id: str) -> bool:

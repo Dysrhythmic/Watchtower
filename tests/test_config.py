@@ -20,7 +20,7 @@ Test Pattern - Config Loading:
     3. Patch os.getenv to return environment variable values
     4. Patch Path.exists to return True for required files
     5. Create ConfigManager() instance
-    6. Assert webhooks, rss_feeds populated correctly
+    6. Assert destinations, rss_feeds populated correctly
 
 Test Pattern - Keyword Files:
     1. Create keyword file content: {"keywords": ["word1", "word2"]}
@@ -99,8 +99,8 @@ class TestConfigManager(unittest.TestCase):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        self.assertEqual(len(config.webhooks), 1)
-                        self.assertEqual(config.webhooks[0]['name'], "Test")
+                        self.assertEqual(len(config.destinations), 1)
+                        self.assertEqual(config.destinations[0]['name'], "Test")
 
     def test_combine_keyword_files_and_inline(self):
         """Test combining keyword files + inline keywords."""
@@ -131,7 +131,7 @@ class TestConfigManager(unittest.TestCase):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        keywords = config.webhooks[0]['channels'][0]['keywords']
+                        keywords = config.destinations[0]['channels'][0]['keywords']
                         self.assertEqual(len(keywords), 4)
                         self.assertIn("file1", keywords)
                         self.assertIn("inline1", keywords)
@@ -155,27 +155,28 @@ class TestConfigManager(unittest.TestCase):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
                         # Verify env var was used
-                        self.assertEqual(config.webhooks[0]['webhook_url'], env_webhook)
+                        self.assertEqual(config.destinations[0]['discord_webhook_url'], env_webhook)
 
     def test_malformed_json_handling(self):
         """Test handling of malformed JSON config file."""
         malformed_json = '{"destinations": [{"name": "Test", invalid json}'
 
         with patch('builtins.open', mock_open(read_data=malformed_json)):
-            with patch.object(Path, 'exists', return_value=True):
-                with patch.object(Path, 'mkdir'):
-                    # Should raise JSONDecodeError
-                    with self.assertRaises(json.JSONDecodeError):
-                        config = ConfigManager()
+            with patch('os.getenv', return_value="test_value"):  # Mock env vars
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        # Should raise JSONDecodeError
+                        with self.assertRaises(json.JSONDecodeError):
+                            config = ConfigManager()
 
     def test_missing_config_file(self):
         """Test handling when config file doesn't exist."""
-        def mock_getenv(key):
+        def mock_getenv(key, default=None):
             if key == "TELEGRAM_API_ID":
                 return "123456"
             elif key == "TELEGRAM_API_HASH":
                 return "abcdef123456"
-            return None
+            return default
 
         with patch('os.getenv', side_effect=mock_getenv):
             with patch.object(Path, 'exists', return_value=False):
@@ -235,41 +236,41 @@ class TestConfigManager(unittest.TestCase):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        self.assertEqual(len(config.webhooks), 1)
+                        self.assertEqual(len(config.destinations), 1)
                         self.assertEqual(
-                            config.webhooks[0]['channels'][0]['id'],
+                            config.destinations[0]['channels'][0]['id'],
                             "https://example.com/feed.xml"
                         )
 
     def test_destination_validation_errors(self):
         """Test validation of invalid destination configs."""
-        # Missing type field - defaults to 'discord' so it loads successfully
+        # With explicit type field, config loads successfully
         config_data = {
             "destinations": [{
                 "name": "Test",
-                # "type": "discord",  # Missing but defaults to 'discord'
+                "type": "discord",  # Type must be explicit
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{"id": "@test", "keywords": {"inline": []}}]
             }]
         }
 
-        def mock_getenv(key):
+        def mock_getenv(key, default=None):
             if key == "TELEGRAM_API_ID":
                 return "123456"
             elif key == "TELEGRAM_API_HASH":
                 return "abcdef123456"
             elif key == "DISCORD_WEBHOOK":
                 return "https://discord.com/webhook"
-            return None
+            return default
 
         with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
             with patch('os.getenv', side_effect=mock_getenv):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
-                        # Config loads successfully - type defaults to 'discord'
+                        # Config loads successfully with explicit type
                         config = ConfigManager()
-                        self.assertEqual(len(config.webhooks), 1)
-                        self.assertEqual(config.webhooks[0]['type'], 'discord')
+                        self.assertEqual(len(config.destinations), 1)
+                        self.assertEqual(config.destinations[0]['type'], 'discord')
 
     def test_env_variable_validation(self):
         """Test handling when required env vars are missing."""
@@ -317,14 +318,14 @@ class TestConfigManager(unittest.TestCase):
             else:
                 return mock_open(read_data=json.dumps(config_data))()
 
-        def mock_getenv(key):
+        def mock_getenv(key, default=None):
             if key == "TELEGRAM_API_ID":
                 return "123456"
             elif key == "TELEGRAM_API_HASH":
                 return "abcdef123456"
             elif key == "DISCORD_WEBHOOK":
                 return "https://discord.com/webhook"
-            return None
+            return default
 
         with patch('builtins.open', mock_open_multi):
             with patch('os.getenv', side_effect=mock_getenv):
@@ -341,12 +342,12 @@ class TestConfigManager(unittest.TestCase):
             "destinations": []
         }
 
-        def mock_getenv(key):
+        def mock_getenv(key, default=None):
             if key == "TELEGRAM_API_ID":
                 return "123456"
             elif key == "TELEGRAM_API_HASH":
                 return "abcdef123456"
-            return None
+            return default
 
         with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
             with patch('os.getenv', side_effect=mock_getenv):
@@ -376,7 +377,7 @@ class TestConfigManager(unittest.TestCase):
             ]
         }
 
-        def mock_getenv(key):
+        def mock_getenv(key, default=None):
             if key == "TELEGRAM_API_ID":
                 return "123456"
             elif key == "TELEGRAM_API_HASH":
@@ -385,16 +386,16 @@ class TestConfigManager(unittest.TestCase):
                 return "https://discord.com/webhook1"
             elif key == "DISCORD_WEBHOOK_2":
                 return "https://discord.com/webhook2"
-            return None
+            return default
 
         with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
             with patch('os.getenv', side_effect=mock_getenv):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        self.assertEqual(len(config.webhooks), 2)
-                        self.assertEqual(config.webhooks[0]['name'], "Discord 1")
-                        self.assertEqual(config.webhooks[1]['name'], "Discord 2")
+                        self.assertEqual(len(config.destinations), 2)
+                        self.assertEqual(config.destinations[0]['name'], "Discord 1")
+                        self.assertEqual(config.destinations[1]['name'], "Discord 2")
 
     def test_channel_with_parser_config(self):
         """Test loading channel with parser configuration."""
@@ -419,7 +420,7 @@ class TestConfigManager(unittest.TestCase):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        parser = config.webhooks[0]['channels'][0]['parser']
+                        parser = config.destinations[0]['channels'][0]['parser']
                         self.assertEqual(parser['trim_front_lines'], 1)
                         self.assertEqual(parser['trim_back_lines'], 2)
 
@@ -443,7 +444,7 @@ class TestConfigManager(unittest.TestCase):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        self.assertTrue(config.webhooks[0]['channels'][0]['ocr'])
+                        self.assertTrue(config.destinations[0]['channels'][0]['ocr'])
 
     def test_channel_with_restricted_mode(self):
         """Test loading channel with restricted mode enabled."""
@@ -465,7 +466,7 @@ class TestConfigManager(unittest.TestCase):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        self.assertTrue(config.webhooks[0]['channels'][0]['restricted_mode'])
+                        self.assertTrue(config.destinations[0]['channels'][0]['restricted_mode'])
 
     def test_empty_inline_keywords(self):
         """Test channel with empty inline keywords list."""
@@ -486,7 +487,7 @@ class TestConfigManager(unittest.TestCase):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        keywords = config.webhooks[0]['channels'][0]['keywords']
+                        keywords = config.destinations[0]['channels'][0]['keywords']
                         self.assertEqual(len(keywords), 0)
 
     def test_multiple_keyword_files(self):
@@ -521,7 +522,7 @@ class TestConfigManager(unittest.TestCase):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        keywords = config.webhooks[0]['channels'][0]['keywords']
+                        keywords = config.destinations[0]['channels'][0]['keywords']
                         self.assertEqual(len(keywords), 4)
                         self.assertIn("kw1", keywords)
                         self.assertIn("kw3", keywords)
@@ -546,7 +547,7 @@ class TestConfigManager(unittest.TestCase):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
                         self.assertEqual(
-                            config.webhooks[0]['channels'][0]['id'],
+                            config.destinations[0]['channels'][0]['id'],
                             "-1001234567890"
                         )
 
@@ -561,14 +562,14 @@ class TestConfigManager(unittest.TestCase):
             }]
         }
 
-        def mock_getenv(key):
+        def mock_getenv(key, default=None):
             if key == "TELEGRAM_API_ID":
                 return "123456"
             elif key == "TELEGRAM_API_HASH":
                 return "abcdef123456"
             elif key == "DISCORD_WEBHOOK":
                 return "https://discord.com/webhook"
-            return None
+            return default
 
         with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
             with patch('os.getenv', side_effect=mock_getenv):
@@ -642,7 +643,7 @@ class TestConfigManager(unittest.TestCase):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
                         config = ConfigManager()
-                        keywords = config.webhooks[0]['channels'][0]['keywords']
+                        keywords = config.destinations[0]['channels'][0]['keywords']
                         # Should have 3 unique keywords, not 4
                         keyword_count = keywords.count("duplicate")
                         # Depending on implementation, might be deduplicated or not

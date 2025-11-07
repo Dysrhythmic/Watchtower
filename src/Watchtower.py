@@ -468,7 +468,7 @@ class Watchtower:
                 content += f"\n**[Media type {parsed_message.media_type} could not be forwarded to Discord]**"
 
         media_path = parsed_message.media_path if include_media else None
-        success = self.discord.send_message(content, destination['webhook_url'], media_path)
+        success = self.discord.send_message(content, destination['discord_webhook_url'], media_path)
 
         if success:
             self.metrics.increment("messages_sent_discord")
@@ -502,7 +502,7 @@ class Watchtower:
             str: Status "sent", "queued for retry", or "failed"
         """
         media_path = self._get_media_for_send(parsed_message, destination, include_media)
-        channel_specifier = destination['destination']
+        channel_specifier = destination['telegram_destination_channel']
 
         destination_chat_id = await self.telegram.resolve_destination(channel_specifier)
         if destination_chat_id is None:

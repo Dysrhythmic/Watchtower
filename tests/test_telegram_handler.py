@@ -1142,7 +1142,7 @@ class TestTelegramLogCleanup(unittest.TestCase):
         mock_config.telegramlog_dir = self.telegramlog_dir
         mock_config.tmp_dir = self.temp_dir
         mock_config.attachments_dir = self.attachments_dir
-        mock_config.webhooks = []
+        mock_config.destinations = []
         mock_config.rss_feeds = []
 
         # Create Watchtower instance using dependency injection

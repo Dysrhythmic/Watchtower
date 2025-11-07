@@ -18,7 +18,7 @@ Potential future abstractions:
 
 Implementations:
     - DiscordHandler: Discord webhook delivery
-    - TelegramHandler: Telegram bot API delivery
+    - TelegramHandler: Telethon API delivery
 """
 import time
 import math
@@ -33,8 +33,8 @@ class DestinationHandler(AbstractBaseClass):
     """Abstract base class for destination handlers (Discord, Telegram, etc.).
 
     This class uses Python's Abstract Base Class (ABC) pattern to define an interface
-    that all destination handlers must implement. Classes inheriting from this cannot
-    be instantiated directly - they must implement all @abstractmethod decorated methods.
+    that all destination handlers must implement. Classes inheriting from this must implement
+    all @abstractmethod decorated methods.
 
     Provides shared functionality for rate limiting and text chunking. Subclasses
     must implement platform-specific send and format operations.
@@ -49,8 +49,8 @@ class DestinationHandler(AbstractBaseClass):
     def _get_rate_limit_key(self, destination_identifier) -> str:
         """Get the unique key for rate limit tracking.
 
-        This abstract method (marked with @abstractmethod) must be implemented by subclasses.
-        The 'pass' statement is intentional - it's a template that subclasses override.
+        This abstract method must be implemented by subclasses.
+        The 'pass' statement is intentional, it's a template that subclasses override.
 
         Different platforms may have different rate limit bucketing strategies:
         - Discord: Rate limits per webhook URL
@@ -65,10 +65,10 @@ class DestinationHandler(AbstractBaseClass):
         pass
 
     def _check_and_wait_for_rate_limit(self, destination_identifier) -> None:
-        """Check if destination is rate limited and wait if necessary (preemptive check).
+        """Check if destination is rate limited and wait if necessary.
 
         This method is called BEFORE attempting to send a message to check if we're
-        still rate limited from a previous failed attempt. This is "preemptive" waiting.
+        still rate limited from a previous failed attempt.
 
         The actual rate limit detection happens in subclass implementations when they
         receive platform-specific error responses:
@@ -115,18 +115,14 @@ class DestinationHandler(AbstractBaseClass):
         """Split text into chunks respecting max length and newline boundaries.
 
         Attempts to split at newlines when possible to preserve message structure.
-        If no newline is found within max_length, performs hard split.
+        If no newline is found within max_length, performs hard split at max length.
 
         Args:
             text: Text to split into chunks
             max_length: Maximum characters per chunk
 
         Returns:
-            List[str]: Text chunks, each ≤ max_length characters
-
-        Example:
-            >>> handler._chunk_text("Line1\\nLine2\\nLine3", max_length=10)
-            ["Line1", "Line2", "Line3"]
+            List[str]: Text chunks, each <= max_length characters
         """
         if len(text) <= max_length:
             return [text]
@@ -140,7 +136,7 @@ class DestinationHandler(AbstractBaseClass):
             # Try to split at newline to preserve message structure
             split_point = text.rfind('\n', 0, max_length)
             if split_point == -1:
-                # No newline found - perform hard split at max_length
+                # No newline found, perform hard split at max_length
                 split_point = max_length
 
             chunks.append(text[:split_point])
@@ -152,12 +148,12 @@ class DestinationHandler(AbstractBaseClass):
     def send_message(self, content: str, destination_identifier, media_path: Optional[str] = None) -> bool:
         """Send message to destination.
 
-        This abstract method (marked with @abstractmethod) must be implemented by subclasses.
-        The 'pass' statement is intentional - it's a template that subclasses override.
+        This abstract method must be implemented by subclasses.
+        The 'pass' statement is intentional, it's a template that subclasses override.
 
         Subclasses implement platform-specific sending logic:
         - Discord: POST to webhook URL with JSON payload
-        - Telegram: Use Telegram Bot API send methods
+        - Telegram: Use Telethon API send methods
 
         Args:
             content: Message text to send
@@ -173,12 +169,12 @@ class DestinationHandler(AbstractBaseClass):
     def format_message(self, message_data, destination: Dict) -> str:
         """Format message for this destination platform.
 
-        This abstract method (marked with @abstractmethod) must be implemented by subclasses.
-        The 'pass' statement is intentional - it's a template that subclasses override.
+        This abstract method must be implemented by subclasses.
+        The 'pass' statement is intentional, it's a template that subclasses override.
 
         Subclasses implement platform-specific formatting:
         - Discord: Markdown formatting
-        - Telegram: HTML or Markdown formatting
+        - Telegram: HTML formatting
 
         Args:
             message_data: MessageData to format

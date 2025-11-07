@@ -25,13 +25,13 @@ Metrics Persistence:
     - NOT loaded on startup - each session starts fresh at zero
 
 Common Metrics:
-    - messages_received_telegram: Messages from Telegram (this session)
-    - messages_received_rss: Messages from RSS feeds (this session)
-    - messages_routed_success: Successfully delivered messages (this session)
-    - messages_routed_failed: Failed delivery attempts (this session)
-    - messages_no_destination: Messages with no matching destinations (this session)
-    - telegram_missed_messages: Messages found via polling (this session)
-    - time_ran: Session duration in seconds (this session)
+    - messages_received_telegram: Messages from Telegram
+    - messages_received_rss: Messages from RSS feeds
+    - total_msgs_routed_success: Successfully delivered messages
+    - total_msgs_routed_failed: Failed delivery attempts
+    - total_msgs_no_destination: Messages with no matching destinations
+    - telegram_missed_messages: Messages found via polling
+    - time_ran: Session duration in seconds
 """
 import json
 import time

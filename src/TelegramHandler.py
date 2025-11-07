@@ -92,7 +92,8 @@ class TelegramHandler(DestinationHandler):
         """
         super().__init__()
         self.config = config
-        session_path = str(self.config.project_root / "config" / "watchtower_session.session")
+        project_root = Path(__file__).resolve().parents[1]
+        session_path = str(project_root / "config" / "watchtower_session.session")
         self.client = TelegramClient(session_path, config.api_id, config.api_hash)
         self.channels = {}  # channel_id -> entity mapping for Telegram API
         self.msg_callback = None
@@ -343,7 +344,7 @@ class TelegramHandler(DestinationHandler):
         Note:
             - Logs warnings when missed messages are detected
             - Updates telegram logs after processing each message
-            - Increments 'telegram_missed_messages' metric when applicable
+            - Increments 'telegram_missed_messages_caught' metric when applicable
         """
         import asyncio
 
@@ -410,7 +411,7 @@ class TelegramHandler(DestinationHandler):
 
                             missed_count = len(messages_to_process)
                             if metrics_collector:
-                                metrics_collector.increment("telegram_missed_messages", missed_count)
+                                metrics_collector.increment("telegram_missed_messages_caught", missed_count)
                             logger.warning(
                                 f"[TelegramHandler] Processed {missed_count} missed messages "
                                 f"from {channel_name} (newest_id={newest_msg_id})"

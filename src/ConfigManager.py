@@ -2,23 +2,23 @@
 ConfigManager - Configuration loading and validation
 
 This module loads and validates configuration from multiple sources:
-- Environment variables (.env file): Telegram API credentials, webhook URLs
-- JSON config file (config.json): Destination mappings, channel configs, keyword files
-- Keyword files: External JSON files with keyword lists for filtering
+- Environment variables (config/.env file): Telegram API credentials and destination channels, Discord webhook URLs, JSON configuration file path
+- JSON configuration file (defaults to config/config.json): Maps destinations to sources, configure options for each source
+- Keyword files (config/*.json): JSON files with keyword lists for filtering
 
 Configuration Structure:
     config/
-    ├── .env                    # API credentials, webhook URLs (git-ignored)
+    ├── .env                    # Environment variables
     ├── config.json             # Main configuration
-    ├── kw-general.json         # Keyword lists (example)
-    └── kw-work.json
+    ├── kw-general.json         # Keyword list (example)
+    └── kw-work.json            # Keyword list (example)
 
 Features:
 - Validates required environment variables on startup
-- Flexible destination configuration (Discord webhooks, Telegram channels)
-- Keyword file references with caching
+- Flexible destination configuration (currently supports: Discord webhooks, Telegram channels)
+- Keyword files can be combined with inline keyword lists
 - RSS feed deduplication (same URL used by multiple destinations)
-- Per-destination channel-specific settings (OCR, restricted mode, parsers)
+- Source-specific settings per destination (OCR, restricted mode, parsers, keywords)
 
 Configuration Flow:
     1. Load environment variables from .env
@@ -28,7 +28,7 @@ Configuration Flow:
         b. Load channel source configurations
         c. Load RSS feed configurations
         d. Resolve keyword file references
-    4. Build internal data structures (webhooks list, rss_feeds list)
+    4. Build internal data structures (webhooks list, rss_feeds list) # <-- review: are these the only data structures used for this? one is a src and 1 is a destination
 """
 import os
 import json
@@ -37,28 +37,27 @@ from dotenv import load_dotenv
 from pathlib import Path
 from logger_setup import setup_logger
 
-# Resolve config dir (always project-root/config)
+# Project directory structure (Watchtower/)
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+# Resolve config dir (Watchtower/config)
 _CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
 
-# Load .env file into environment
+# Load .env file (Watchtower/config/.env) into environment
 _ENV_PATH = _CONFIG_DIR / ".env"
 load_dotenv(dotenv_path=_ENV_PATH)
 
-logger = setup_logger(__name__)
+logger = setup_logger(__name__) # <--  review: should logger be _logger? review the usage of prefixing variables with underscores to ensure consistency
 
 
 class ConfigManager:
-    """Manages configuration from environment variables and JSON config files.
+    """Manages configuration from environment variables and JSON configuration files.
 
-    Loads configuration on initialization and validates all required settings.
-    Raises ValueError if configuration is invalid or incomplete.
+    Loads configuration on initialization and validates all required settings. # <-- review: does it validate all config settings? does it alert on missing options or duplicate destinations?
     """
 
     def __init__(self):
-        """Initialize ConfigManager by loading all configuration sources.
-
-        Loads environment variables, parses config.json, validates settings,
-        and creates temporary working directories.
+        """Initialize by loading all configuration sources and creating temporary working directories.
 
         Raises:
             ValueError: If required environment variables are missing or config is invalid
@@ -70,42 +69,39 @@ class ConfigManager:
         if not self.api_id or not self.api_hash:
             raise ValueError("Missing required: TELEGRAM_API_ID, TELEGRAM_API_HASH")
 
-        # Project directory structure
-        self.project_root = Path(__file__).resolve().parents[1]
-
-        # Temporary working directories (created if they don't exist)
-        self.tmp_dir = self.project_root / "tmp"
-        self.attachments_dir = self.tmp_dir / "attachments"  # Downloaded media files
-        self.rsslog_dir = self.tmp_dir / "rsslog"  # RSS feed timestamp logs
-        self.telegramlog_dir = self.tmp_dir / "telegramlog"  # Telegram message ID logs
+        # Create temporary working directories if they don't exist
+        self.tmp_dir = _PROJECT_ROOT / "tmp"
+        self.attachments_dir = self.tmp_dir / "attachments"     # Downloaded media files
         self.attachments_dir.mkdir(parents=True, exist_ok=True)
+        self.rsslog_dir = self.tmp_dir / "rsslog"               # RSS feed timestamp logs for polling
         self.rsslog_dir.mkdir(parents=True, exist_ok=True)
+        self.telegramlog_dir = self.tmp_dir / "telegramlog"     # Telegram message ID logs for polling
         self.telegramlog_dir.mkdir(parents=True, exist_ok=True)
 
         # Keyword file cache: filename -> List[keywords]
-        # Avoids re-parsing JSON files when multiple destinations use same keyword file
+        # Avoid re-parsing keyword files when multiple destinations use same one
         self._keyword_cache: Dict[str, List[str]] = {}
 
         # Load and parse config.json
-        config_path = _CONFIG_DIR / "config.json"
+        config_path = _CONFIG_DIR / "config.json" # <-- review: this should be based on the env var "CONFIG_FILE", config.json is just a default
         self.webhooks, self.rss_feeds = self._load_config(config_path)
 
-        # Channel ID -> friendly name mapping (populated at runtime)
+        # Channel ID -> channel name mapping
         self.channel_names: Dict[str, str] = {}
 
         logger.info(f"[ConfigManager] Loaded {len(self.webhooks)} destinations and {len(self.rss_feeds)} RSS feeds")
 
     def _load_config(self, config_file: Path) -> tuple[List[Dict], List[Dict]]:
-        """Load and validate configuration from config.json.
+        """Load and validate configuration
 
         Parses JSON configuration file and processes each destination entry.
-        Deduplicates RSS feeds (same URL appearing in multiple destinations).
+        Deduplicates RSS feeds (same URL appearing in multiple destinations). # <-- review: does it deduplicate keywords? does this happen elsewhere? should it? what about telegram channels?
 
         Args:
             config_file: Path to config.json
 
         Returns:
-            tuple[List[Dict], List[Dict]]: (webhooks, rss_feeds)
+            tuple[List[Dict], List[Dict]]: (webhooks, rss_feeds) # <-- review: webhooks are NOT the only destination types, does it also do with telegram channels?
                 - webhooks: List of destination configurations
                 - rss_feeds: List of unique RSS feed configurations
 
@@ -118,7 +114,7 @@ class ConfigManager:
         with open(config_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
 
-        webhooks: List[Dict] = []
+        webhooks: List[Dict] = [] # <-- review: should this be called destinations instead of webhooks?
         # Use dict for RSS deduplication: {rss_url: {rss_name, rss_url}}
         rss_feed_index: Dict[str, Dict] = {}
 
@@ -140,15 +136,15 @@ class ConfigManager:
     def _process_destination_config(self, destination_config: Dict, rss_feed_index: Dict[str, Dict]) -> Optional[Dict]:
         """Process a single destination configuration entry."""
         name = destination_config.get('name', 'Unnamed')
-        dest_type = destination_config.get('type', 'discord')
+        dest_type = destination_config.get('type', 'discord') # <-- review: we shouldn't have discord as the default, we should throw an error if the type isn't an accepted value
 
         # Resolve destination endpoint
-        discord_webhook_url, telegram_destinations = self._resolve_destination_endpoint(destination_config, name, dest_type)
-        if discord_webhook_url is None and telegram_destinations is None:
+        discord_webhook_url, telegram_dst_channel = self._resolve_destination_endpoint(destination_config, name, dest_type)
+        if discord_webhook_url is None and telegram_dst_channel is None:
             return None
 
-        # Process channel sources
-        channels = self._process_channel_sources(destination_config, name)
+        # Process Telegram channel sources
+        channels = self._process_channel_sources(destination_config, name) # <-- review: use "telegram_channels" when talking specifically about Telegram channels
         if channels is None:
             return None
 
@@ -160,16 +156,16 @@ class ConfigManager:
             logger.warning(f"[ConfigManager] Destination {name} has no sources (channels or rss)")
             return None
 
-        # Build webhook entry
+        # Build webhook entry # <-- review: are these specific to webhooks or for all destinations?
         entry = {
             'name': name,
             'type': dest_type,
-            'channels': channels
+            'channels': channels # <-- review: use "telegram_channels" when talking specifically about Telegram channels
         }
         if dest_type == 'discord':
-            entry['webhook_url'] = discord_webhook_url
+            entry['webhook_url'] = discord_webhook_url # <-- review: why do we have a "webhook_url" and a "destination" key for entry, webhooks are destinations?
         else:
-            entry['destination'] = telegram_destinations
+            entry['destination'] = telegram_dst_channel # <-- review: why do we have a "destination" key just for telegram destination channels? we have multiple destination types. be more specific
 
         return entry
 
@@ -178,7 +174,7 @@ class ConfigManager:
 
         Both Discord and Telegram use env_key:
         - Discord: env_key contains webhook URL
-        - Telegram: env_key contains single channel ID (e.g., "@channel" or "-1001234567890")
+        - Telegram: env_key contains single channel ID (e.g., "@channel" or "-1001234567890") # <-- review: are these the only channel ID format cases?
         """
         if dest_type == 'discord':
             if 'env_key' in destination_config:
@@ -186,7 +182,7 @@ class ConfigManager:
                 if not discord_webhook_url:
                     logger.warning(f"[ConfigManager] Missing environment variable {destination_config['env_key']} for {name}")
                     return None, None
-                return discord_webhook_url, None
+                return discord_webhook_url, None # <-- review: is returning a tuple like this the best way?
             else:
                 logger.warning(f"[ConfigManager] No env_key for Discord webhook {name}")
                 return None, None
@@ -197,29 +193,29 @@ class ConfigManager:
                 if not channel_id:
                     logger.warning(f"[ConfigManager] Missing environment variable {destination_config['env_key']} for {name}")
                     return None, None
-                return None, channel_id
+                return None, channel_id # <-- review: is returning a tuple like this the best way?
             else:
                 logger.warning(f"[ConfigManager] No env_key specified for Telegram destination {name}")
                 return None, None
 
         else:
             logger.warning(f"[ConfigManager] Unknown destination type for {name}: {dest_type}")
-            return None, None
+            return None, None # <-- review: is returning a tuple like this the best way?
 
-    def _process_channel_sources(self, destination_config: Dict, name: str) -> Optional[List[Dict]]:
+    def _process_channel_sources(self, destination_config: Dict, name: str) -> Optional[List[Dict]]: # <-- review: if this is specific to telegram channels then rename it, we should be prepared for channels from other apps to be added in the future
         """Process Telegram channel sources and resolve their keywords.
 
-        For each channel source, resolves keyword configuration (files + inline),
+        For each channel source, resolves keyword configuration (files + inline), # <-- review: does it deduplicate them as well?
         and logs special settings like restricted_mode and OCR.
 
         Args:
-            destination_config: Destination configuration dict with 'channels' key
-            name: Destination name (for logging)
+            destination_config: Destination configuration dict with 'channels' key # <-- review: use "telegram_channels" when talking specifically about Telegram channels
+            name: Destination name (for logging) # <-- review: telegram channel name is more specific than destination name
 
         Returns:
             List of processed channel dicts with resolved keywords, or None if invalid
         """
-        channels = destination_config.get('channels', [])
+        channels = destination_config.get('channels', []) # <-- review: use "telegram_channels" when talking specifically about Telegram channels
         if not channels:
             return []
 
@@ -228,11 +224,11 @@ class ConfigManager:
             return None
 
         # Resolve keywords for each channel
-        processed_channels = []
-        for channel in channels:
+        processed_channels = [] # <-- review: use "telegram_channels" when talking specifically about Telegram channels
+        for channel in channels: # <-- review: use "telegram_channels" when talking specifically about Telegram channels
             # Create a copy and resolve keywords
             processed_channel = dict(channel)
-            processed_channel['keywords'] = self._resolve_keywords(channel.get('keywords'))
+            processed_channel['keywords'] = self._resolve_keywords(channel.get('keywords')) # <-- review: should this be a list or a set?
             processed_channels.append(processed_channel)
 
             # Log settings
@@ -252,8 +248,8 @@ class ConfigManager:
         Args:
             destination_config: Destination configuration dict with 'rss' key
             dest_name: Destination name (for logging)
-            channels: Channel list to append RSS pseudo-channels to (modified in-place)
-            rss_feed_index: Global RSS feed deduplication index (modified in-place)
+            channels: Channel list to append RSS pseudo-channels to (modified in-place) # <-- review: explain pseudo-channels and why they are necessary, and why modified in-place?
+            rss_feed_index: Global RSS feed deduplication index (modified in-place) # <-- review: why modified in-place?
         """
         rss_sources = destination_config.get('rss', [])
         for rss_entry in rss_sources:
@@ -262,15 +258,15 @@ class ConfigManager:
                 logger.warning(f"[ConfigManager] RSS entry missing URL in {dest_name}")
                 continue
 
-            # Add to global RSS feed deduplication index (only if not already present)
+            # Add to global RSS feed deduplication index if not already present
             if rss_url not in rss_feed_index:
                 rss_feed_index[rss_url] = {
                     'rss_name': rss_entry.get('name', rss_url),
                     'rss_url': rss_url
                 }
 
-            # Create pseudo-channel for routing (per-destination keywords/parser)
-            # Note: 'id' field contains the RSS URL for RSS sources
+            # Create pseudo-channel for routing (per-destination keywords/parser) # <-- review: explain the per-destination comment
+            # Note: URLs are used as the ID for RSS sources
             rss_channel = {
                 'id': rss_url,
                 'keywords': self._resolve_keywords(rss_entry.get('keywords')),
@@ -302,14 +298,14 @@ class ConfigManager:
 
         try:
             with open(kw_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                data = json.load(f) # <-- review: is JSON the best type for these files?
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in keyword file {filename}: {e}")
 
         if 'keywords' not in data:
             raise ValueError(f"Invalid keyword file format in {filename}: missing 'keywords' key")
 
-        keywords = data['keywords']
+        keywords = data['keywords'] # <-- review: should this be a list or set?
         if not isinstance(keywords, list):
             raise ValueError(f"Invalid keyword file format in {filename}: 'keywords' must be an array")
 
@@ -325,7 +321,7 @@ class ConfigManager:
         """Resolve keywords from config (files + inline).
 
         Args:
-            keyword_config: Either None or a dict with 'files' and/or 'inline' keys
+            keyword_config: Either None or a dict with 'files' and/or 'inline' keywords
 
         Returns:
             List of resolved keyword strings (empty list = forward all messages)
@@ -363,11 +359,11 @@ class ConfigManager:
             keywords.extend(inline)
 
         # Deduplicate keywords (simple set-based deduplication)
-        keywords = list(set(keywords))
+        keywords = list(set(keywords)) # <-- review: this is where they are deduplicated, but is this good or should they have been in sets to begin with?
 
         return keywords
 
-    def get_all_channel_ids(self) -> Set[str]:
+    def get_all_channel_ids(self) -> Set[str]: # <-- review: is this the best way to handle telegram and rss source IDs?
         """Get all unique channel IDs from destination config (Telegram sources only).
 
         Collects all non-RSS channel IDs across all destinations. RSS feeds

@@ -3,7 +3,7 @@ DestinationHandler - Abstract base class for message delivery platforms
 
 This module defines the common interface and shared functionality for all destination
 handlers (Discord, Telegram, etc.). Provides rate limiting, text chunking, and
-standardized message sending operations.
+standardized message sending operations. # <-- review: is there anything else that could be abstracted to this class?
 
 Features:
 - Automatic rate limit tracking and enforcement
@@ -23,7 +23,7 @@ from logger_setup import setup_logger
 logger = setup_logger(__name__)
 
 
-class DestinationHandler(ABC):
+class DestinationHandler(ABC): # <-- review: Does this ensure it cannot be instantiated? Also, ABC is a bad name, can we import it as something more descriptive?
     """Abstract base class for destination handlers (Discord, Telegram, etc.).
 
     Provides shared functionality for rate limiting and text chunking. Subclasses
@@ -36,7 +36,7 @@ class DestinationHandler(ABC):
         self._rate_limits: Dict[str, float] = {}
 
     @abstractmethod
-    def _get_rate_limit_key(self, destination_identifier) -> str:
+    def _get_rate_limit_key(self, destination_identifier) -> str: # <-- why does this exist if it does nothing?
         """Get the unique key for rate limit tracking.
 
         Args:
@@ -47,13 +47,13 @@ class DestinationHandler(ABC):
         """
         pass
 
-    def _check_and_wait_for_rate_limit(self, destination_identifier) -> None:
+    def _check_and_wait_for_rate_limit(self, destination_identifier) -> None: # <-- when is this used? there are specific error codes or msgs that indicate when rate limits happen
         """Check if destination is rate limited and wait if necessary.
 
         Args:
             destination_identifier: webhook_url for Discord, chat_id for Telegram
         """
-        key = self._get_rate_limit_key(destination_identifier)
+        key = self._get_rate_limit_key(destination_identifier) # <-- this is calling a method that does nothing
 
         if key in self._rate_limits:
             wait_until = self._rate_limits[key]
@@ -73,7 +73,7 @@ class DestinationHandler(ABC):
             destination_identifier: webhook_url for Discord, chat_id for Telegram
             wait_seconds: How many seconds to wait before next attempt
         """
-        key = self._get_rate_limit_key(destination_identifier)
+        key = self._get_rate_limit_key(destination_identifier) # <-- this is calling a method that does nothing
         rounded_wait = math.ceil(wait_seconds)
         expires_at = time.time() + rounded_wait
         self._rate_limits[key] = expires_at
@@ -121,7 +121,7 @@ class DestinationHandler(ABC):
         return chunks
 
     @abstractmethod
-    def send_message(self, content: str, destination_identifier, media_path: Optional[str] = None) -> bool:
+    def send_message(self, content: str, destination_identifier, media_path: Optional[str] = None) -> bool: # <-- why does this exist if it does nothing?
         """Send message to destination.
 
         Args:
@@ -135,7 +135,7 @@ class DestinationHandler(ABC):
         pass
 
     @abstractmethod
-    def format_message(self, message_data, destination: Dict) -> str:
+    def format_message(self, message_data, destination: Dict) -> str: # <-- why does this exist if it does nothing?
         """Format message for this destination platform.
 
         Args:

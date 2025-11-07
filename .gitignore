@@ -1,3 +1,5 @@
+.vscode
+.claude
 .env
 *.session
 *.session-journal

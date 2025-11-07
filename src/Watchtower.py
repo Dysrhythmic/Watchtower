@@ -214,11 +214,10 @@ class Watchtower:
         logger.info("[Watchtower] Initiating graceful shutdown...")
         self._shutdown_requested = True
 
-        # Calculate and save time_ran metric (per-session)
+        # Calculate and save seconds_ran metric
         if self._start_time is not None:
             runtime_seconds = int(time.time() - self._start_time)
-            self.metrics.set("time_ran", runtime_seconds)
-            logger.info(f"[Watchtower] Application ran for {runtime_seconds} seconds")
+            self.metrics.set("seconds_ran", runtime_seconds)
 
         # Force save metrics before shutdown (in case periodic save hasn't triggered)
         self.metrics.force_save()
@@ -229,15 +228,6 @@ class Watchtower:
         if metrics_summary:
             logger.info(
                 f"[Watchtower] Final metrics for this session:\n"
-                f"  messages_received_telegram: Telegram messages received (this session)\n"
-                f"  messages_received_rss: RSS messages received (this session)\n"
-                f"  messages_no_destination: Messages with no destinations (both sources)\n"
-                f"  messages_routed_success: Messages successfully routed (both sources)\n"
-                f"  messages_sent_discord: Messages sent to Discord (from any source)\n"
-                f"  messages_sent_telegram: Messages sent to Telegram (from any source)\n"
-                f"  ocr_sent: Messages with OCR text successfully sent (any destination)\n"
-                f"  telegram_missed_messages: Missed messages caught by polling\n"
-                f"  time_ran: Session duration in seconds\n"
                 f"\n{json.dumps(metrics_summary, indent=2)}"
             )
 
@@ -322,7 +312,7 @@ class Watchtower:
             destinations = self.router.get_destinations(message_data)
             if not destinations:
                 logger.info(f"[Watchtower] Message from {message_data.channel_name} by {message_data.username} has no destinations")
-                self.metrics.increment("messages_no_destination")
+                self.metrics.increment("total_msgs_no_destination")
                 return False
 
             media_passes_restrictions = await self._handle_media_restrictions(message_data, destinations)
@@ -334,9 +324,9 @@ class Watchtower:
                     success_count += 1
 
             if success_count > 0:
-                self.metrics.increment("messages_routed_success")
+                self.metrics.increment("total_msgs_routed_success")
             else:
-                self.metrics.increment("messages_routed_failed")
+                self.metrics.increment("total_msgs_routed_failed")
 
             return success_count > 0
 
@@ -483,7 +473,7 @@ class Watchtower:
         if success:
             self.metrics.increment("messages_sent_discord")
             if parsed_message.ocr_raw:
-                self.metrics.increment("ocr_sent")
+                self.metrics.increment("ocr_msgs_sent")
             return "sent"
         else:
             # Enqueue for retry
@@ -524,7 +514,7 @@ class Watchtower:
             if ok:
                 self.metrics.increment("messages_sent_telegram")
                 if parsed_message.ocr_raw:
-                    self.metrics.increment("ocr_sent")
+                    self.metrics.increment("ocr_msgs_sent")
                 return "sent"
             else:
                 # Send failed, enqueue for retry

@@ -17,11 +17,11 @@ Destinations:
 - Forwards all new messages to the provided Discord webhook(s) or Telegram channel(s)
 - Automatically splits long messages into 2000-character chunks (Discord character limit)
 - Includes attached media and reply context in messages
-- Telegram channels can be set in `restricted_mode` to only forward text type media to avoid potential malicious/explicit media from being downloaded and sent
+- Telegram channels can be set in `restricted_mode` to only forward safe text files (txt, log, csv, json, xml, yaml, md, sql) and block malicious/explicit media
 - For each destination, all channels have their own keyword filtering and other configuration for the most flexible routing control
 - Enhanced message parser with two modes: trim lines from ends or keep only first N lines
 - OCR integration for Telegram messages to run keyword filters against extracted text
-- Attachment keyword checking for text-based files (txt, json, csv, source code, config files, and more)
+- Attachment keyword checking for safe text-based files (enabled by default, validates both extension and MIME type)
 - Configuration validation with duplicate destination detection and helpful warnings about default values
 - RSS feed monitoring support
 - Comprehensive test suite with 282 tests covering unit and integration scenarios
@@ -192,11 +192,11 @@ This removes the first line and last 2 lines from each message.
 
 ## Attachment Keyword Checking
 
-Text-based attachments can be checked for keywords in addition to message text and OCR. This is useful for analyzing text dumps, JSON files, source code, and configuration files shared in channels.
+Text-based attachments can be checked for keywords in addition to message text and OCR. This feature is **enabled by default** and uses the same safe file type list as `restricted_mode` to prevent processing malicious files.
 
 ### Supported File Types
 
-Watchtower automatically detects and processes these text-based file types:
+Watchtower automatically detects and processes these safe, non-malicious text-based file types:
 
 **Text & Documentation:**
 - `.txt` - Plain text files
@@ -208,62 +208,49 @@ Watchtower automatically detects and processes these text-based file types:
 - `.csv` - CSV data
 - `.xml` - XML data
 - `.yml`, `.yaml` - YAML configuration
+- `.sql` - SQL scripts
 
-**Source Code:**
-- `.py` - Python
-- `.js` - JavaScript
-- `.java` - Java
-- `.c`, `.cpp`, `.h`, `.hpp` - C/C++
-- `.go` - Go
-- `.rs` - Rust
-- `.sh`, `.bash` - Shell scripts
-- `.ps1` - PowerShell
-
-**Configuration Files:**
-- `.ini` - INI files
-- `.conf`, `.cfg` - Generic config
-- `.env` - Environment variables
-- `.toml` - TOML config
+**Security:** Both file extension AND MIME type are validated to prevent spoofed malicious files. Source code files, binary files, and config files that may contain secrets are **not** processed for security reasons.
 
 ### Configuration
 
-**Enabled:**
+**Enabled by default (no configuration needed):**
 ```json
 {
   "channels": [{
     "id": "@channel",
-    "keywords": ["malware", "exploit"],
-    "check_attachments": true
+    "keywords": ["malware", "exploit"]
   }]
 }
 ```
 
-**Disabled (default, backward compatible):**
+**Explicitly disable if needed:**
 ```json
 {
   "channels": [{
     "id": "@channel",
-    "keywords": ["malware"]
+    "keywords": ["malware"],
+    "check_attachments": false
   }]
 }
 ```
-
-Omitting `check_attachments` or setting it to `false` disables the feature for that channel.
 
 ### Behavior
 
+- **Enabled by default**: No configuration needed, works out of the box
 - **Complete file checking**: Entire file is read and checked for keywords (no partial reads)
 - **Large file support**: Supports 3GB+ text files from Telegram (entire file is checked)
-- **Smart filtering**: Binary files and unsupported types are automatically skipped
+- **Security validation**: Both extension AND MIME type are checked (prevents spoofing)
+- **Smart filtering**: Malicious file types (source code, binaries, configs with secrets) are automatically blocked
 - **Encoding resilient**: Invalid UTF-8 characters are gracefully handled
 - **Combined search**: Attachment text is added to message text + OCR for comprehensive keyword matching
+- **Shared with restricted_mode**: Uses the same safe file type list for consistency
 
 ### Example Use Cases
 
 **Monitor threat intelligence channels sharing IOC dumps:**
 ```json
 {
-  "check_attachments": true,
   "keywords": ["malicious", "C2", "backdoor"]
 }
 ```
@@ -271,22 +258,21 @@ Omitting `check_attachments` or setting it to `false` disables the feature for t
 **Check JSON API responses shared in dev channels:**
 ```json
 {
-  "check_attachments": true,
   "keywords": ["error", "failed", "exception"]
 }
 ```
 
-**Scan source code snippets for security issues:**
+**Scan log files for specific events:**
 ```json
 {
-  "check_attachments": true,
-  "keywords": ["password", "api_key", "secret"]
+  "keywords": ["authentication failed", "access denied", "suspicious"]
 }
 ```
 
 ## Security
 - Keep your `.env` and `watchtower_session.session` files private.
-- While both MIME types and file extensions are checked in restricted mode, these values could easily be spoofed to bypass the filter if desired.
+- Both extension and MIME type checks provide defense-in-depth against malicious files, but determined attackers may still be able to spoof these values.
+- Attachment checking and `restricted_mode` use the same safe file type list to ensure consistency.
 
 ## Telegram Channel Configuration
 
@@ -634,8 +620,7 @@ Both source types route to the same destination with independent keyword filteri
           "keywords": ["malware", "ransomware"],
           "restricted_mode": false,
           "parser": {"trim_front_lines": 1, "trim_back_lines": 2},
-          "ocr": true,
-          "check_attachments": true
+          "ocr": true
         }
       ],
       "rss": [

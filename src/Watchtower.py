@@ -585,8 +585,8 @@ class Watchtower:
                 return []
 
             # Check if file has a supported text extension
-            from MessageRouter import SUPPORTED_TEXT_EXTENSIONS
-            if path.suffix.lower() not in SUPPORTED_TEXT_EXTENSIONS:
+            from allowed_file_types import ALLOWED_EXTENSIONS
+            if path.suffix.lower() not in ALLOWED_EXTENSIONS:
                 return []
 
             # Read file with encoding fallback

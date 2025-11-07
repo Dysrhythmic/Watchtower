@@ -285,7 +285,7 @@ class ConfigManager:
             if not processed_channel['keywords']:
                 _logger.info(
                     f"[ConfigManager] {processed_channel['id']}: "
-                    f"No keywords configured - ALL messages will be forwarded"
+                    f"No keywords configured - ALL messages will be forwarded to {name}"
                 )
 
             # Validate parser configuration
@@ -299,7 +299,7 @@ class ConfigManager:
                     _logger.error(
                         f"[ConfigManager] {processed_channel['id']}: "
                         f"Parser cannot use 'keep_first_lines' with 'trim_front_lines'/'trim_back_lines'. "
-                        f"Ignoring trim options."
+                        f"Ignoring trim options for {name}"
                     )
                     # Remove trim options to enforce mutual exclusivity
                     parser.pop('trim_front_lines', None)
@@ -311,7 +311,7 @@ class ConfigManager:
                     if not isinstance(keep, int) or keep <= 0:
                         _logger.warning(
                             f"[ConfigManager] {processed_channel['id']}: "
-                            f"'keep_first_lines' must be a positive integer, got {keep}. Parser disabled."
+                            f"'keep_first_lines' must be a positive integer, got {keep}. Parser disabled for {name}"
                         )
                         processed_channel.pop('parser', None)  # Remove invalid parser
 
@@ -319,26 +319,26 @@ class ConfigManager:
 
             # Log settings specific to Telegram sources
             if processed_channel.get('restricted_mode', False):
-                _logger.info(f"[ConfigManager] Restricted mode enabled for channel {processed_channel['id']}")
+                _logger.info(f"[ConfigManager] Restricted mode enabled for channel {processed_channel['id']} for {name}")
             if processed_channel.get('ocr', False):
-                _logger.info(f"[ConfigManager] OCR enabled for channel {processed_channel['id']}")
+                _logger.info(f"[ConfigManager] OCR enabled for channel {processed_channel['id']} for {name}")
 
             # Log check_attachments status (enabled by default)
             check_attachments = processed_channel.get('check_attachments', True)
             if check_attachments is False:
-                _logger.info(f"[ConfigManager] Attachment checking disabled for channel {processed_channel['id']}")
+                _logger.info(f"[ConfigManager] Attachment checking disabled for channel {processed_channel['id']} for {name}")
 
             # Log parser configuration
             if processed_channel.get('parser'):
                 parser = processed_channel['parser']
                 if 'keep_first_lines' in parser:
-                    _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: keep first {parser['keep_first_lines']} lines")
+                    _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: keep first {parser['keep_first_lines']} lines for {name}")
                 elif 'trim_front_lines' in parser or 'trim_back_lines' in parser:
                     front = parser.get('trim_front_lines', 0)
                     back = parser.get('trim_back_lines', 0)
                     # Only log if there's actual trimming happening
                     if front > 0 or back > 0:
-                        _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: trim front={front}, back={back}")
+                        _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: trim front={front}, back={back} for {name}")
 
         return processed_telegram_channels
 
@@ -385,20 +385,20 @@ class ConfigManager:
             if not rss_channel['keywords']:
                 _logger.info(
                     f"[ConfigManager] RSS:{rss_name}: "
-                    f"No keywords configured - ALL items will be forwarded"
+                    f"No keywords configured - ALL items will be forwarded to {dest_name}"
                 )
 
             # Log parser configuration for RSS
             if rss_channel.get('parser'):
                 parser = rss_channel['parser']
                 if 'keep_first_lines' in parser:
-                    _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: keep first {parser['keep_first_lines']} lines")
+                    _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: keep first {parser['keep_first_lines']} lines for {dest_name}")
                 elif 'trim_front_lines' in parser or 'trim_back_lines' in parser:
                     front = parser.get('trim_front_lines', 0)
                     back = parser.get('trim_back_lines', 0)
                     # Only log if there's actual trimming happening
                     if front > 0 or back > 0:
-                        _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: trim front={front}, back={back}")
+                        _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: trim front={front}, back={back} for {dest_name}")
 
     def _load_keyword_file(self, filename: str) -> List[str]:
         """Load keywords from a JSON file in the config directory.

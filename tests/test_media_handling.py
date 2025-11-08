@@ -34,7 +34,8 @@ class TestMediaDownload(unittest.TestCase):
         self.mock_config.config_dir = self.mock_config.project_root / "config"
 
     @patch('TelegramHandler.TelegramClient')
-    def test_download_media_success(self, MockClient):
+    @patch('os.path.getsize')
+    def test_download_media_success(self, mock_getsize, MockClient):
         """
         Given: Message with media
         When: download_media() called
@@ -45,6 +46,9 @@ class TestMediaDownload(unittest.TestCase):
         # Given: Handler with mocked client
         handler = TelegramHandler(self.mock_config)
         handler.client = MockClient()
+
+        # Mock file size for successful download
+        mock_getsize.return_value = 1024 * 1024  # 1 MB
 
         # Create message data with media
         message_data = MessageData(
@@ -62,11 +66,14 @@ class TestMediaDownload(unittest.TestCase):
         message_data.original_message.download_media = AsyncMock(return_value="/tmp/attachments/12345.jpg")
 
         # When: download_media() called
-        result = asyncio.run(handler.download_media(message_data))
+        with self.assertLogs(level='INFO') as log_context:
+            result = asyncio.run(handler.download_media(message_data))
 
         # Then: Media downloaded successfully
         self.assertEqual(result, "/tmp/attachments/12345.jpg")
         message_data.original_message.download_media.assert_called_once()
+        # Check that success log was written
+        self.assertTrue(any("Media downloaded successfully" in msg for msg in log_context.output))
 
     @patch('TelegramHandler.TelegramClient')
     def test_download_media_failure_returns_none(self, MockClient):

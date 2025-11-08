@@ -641,7 +641,15 @@ class TelegramHandler(DestinationHandler):
         try:
             if message_data.original_message and message_data.original_message.media:
                 target_dir = str(self.config.attachments_dir) + os.sep
-                return await message_data.original_message.download_media(file=target_dir)
+                media_path = await message_data.original_message.download_media(file=target_dir)
+                if media_path:
+                    file_size = os.path.getsize(media_path)
+                    file_size_mb = file_size / (1024 * 1024)
+                    _logger.info(
+                        f"[TelegramHandler] Media downloaded successfully: "
+                        f"{os.path.basename(media_path)} ({file_size_mb:.2f} MB)"
+                    )
+                return media_path
         except Exception as e:
             _logger.error(f"[TelegramHandler] Media download failed: {e}")
         return None

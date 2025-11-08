@@ -159,15 +159,6 @@ def _print_diff_output(new_channels, removed_channel_ids, existing_channel_ids, 
     """Print diff mode output showing configuration changes.
 
     Displays formatted diff showing new and removed channels with summary statistics.
-
-    Args:
-        new_channels: List of new channel dicts
-        removed_channel_ids: Set of removed channel IDs
-        existing_channel_ids: Set of existing channel IDs from config
-        all_channels: List of all discovered channels
-
-    Returns:
-        bool: True if changes detected, False if no changes
     """
     has_changes = len(new_channels) > 0 or len(removed_channel_ids) > 0
 

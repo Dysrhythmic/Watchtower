@@ -114,26 +114,6 @@ class MessageRouter:
 
         Keyword matching is case-insensitive. If OCR is enabled for a destination
         and OCR text is available, both message text and OCR text are searched.
-
-        Args:
-            message_data: Message to route
-
-        Returns:
-            List[Dict]: Matched destination configs with the following keys:
-                - name: Destination name
-                - type: Platform type ('discord' or 'telegram')
-                - keywords: List of matched keywords
-                - restricted_mode: Whether restricted mode is enabled
-                - parser: Parser configuration dict (or None)
-                - ocr: Whether OCR is enabled
-                - discord_webhook_url: (Discord only) Webhook URL
-                - telegram_destination_channel: (Telegram only) Channel ID
-
-        Example:
-            >>> msg = MessageData(channel_id="@security", text="CVE-2024-1234 vulnerability")
-            >>> dests = router.get_destinations(msg)
-            >>> dests[0]['keywords']
-            ['CVE']
         """
         destinations: List[Dict] = []
 

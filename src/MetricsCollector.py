@@ -126,14 +126,6 @@ class MetricsCollector:
 
         Marks metrics as dirty and triggers periodic save if interval elapsed.
         Does NOT immediately save to disk - use force_save() for that.
-
-        Args:
-            metric_name: Name of the metric (e.g., "messages_received_telegram")
-            value: Amount to increment by (default: 1)
-
-        Example:
-            >>> collector.increment("messages_received_telegram")
-            >>> collector.increment("messages_routed", 5)
         """
         self.metrics[metric_name] += value
         self._dirty = True
@@ -144,35 +136,17 @@ class MetricsCollector:
 
         Marks metrics as dirty and triggers periodic save if interval elapsed.
         Does NOT immediately save to disk - use force_save() for that.
-
-        Args:
-            metric_name: Name of the metric
-            value: Value to set
-
-        Example:
-            >>> collector.set("time_ran", 3600)  # Set runtime to 1 hour
         """
         self.metrics[metric_name] = value
         self._dirty = True
         self._maybe_save_metrics()
 
     def get(self, metric_name: str) -> int:
-        """Get current value of a metric.
-
-        Args:
-            metric_name: Name of the metric
-
-        Returns:
-            int: Current metric value (0 if metric doesn't exist)
-        """
+        """Get current value of a metric (returns 0 if metric doesn't exist)."""
         return self.metrics.get(metric_name, 0)
 
     def get_all(self) -> Dict[str, int]:
-        """Get all metrics as a dictionary.
-
-        Returns:
-            Dict[str, int]: Copy of all current metrics
-        """
+        """Get all metrics as a dictionary."""
         return dict(self.metrics)
 
     def reset(self) -> None:

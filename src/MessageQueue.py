@@ -67,14 +67,7 @@ class MessageQueue:
                 formatted_content: str,
                 media_path: Optional[str],
                 reason: str = "rate limit"):
-        """Add failed message to retry queue.
-
-        Args:
-            destination: Destination configuration
-            formatted_content: Already formatted message text
-            media_path: Optional path to media file
-            reason: Reason for failure (for logging)
-        """
+        """Add failed message to retry queue."""
         retry_item = RetryItem(
             destination=destination,
             formatted_content=formatted_content,

@@ -49,18 +49,9 @@ class DestinationHandler(AbstractBaseClass):
     def _get_rate_limit_key(self, destination_identifier) -> str:
         """Get the unique key for rate limit tracking.
 
-        This abstract method must be implemented by subclasses.
-        The 'pass' statement is intentional, it's a template that subclasses override.
-
         Different platforms may have different rate limit bucketing strategies:
         - Discord: Rate limits per webhook URL
         - Telegram: Rate limits per chat_id
-
-        Args:
-            destination_identifier: webhook_url for Discord, chat_id for Telegram
-
-        Returns:
-            str: Unique key for this destination's rate limit bucket
         """
         pass
 
@@ -77,9 +68,6 @@ class DestinationHandler(AbstractBaseClass):
 
         When a rate limit error is detected, subclasses call _store_rate_limit() to
         record the wait time, which this method then enforces on subsequent sends.
-
-        Args:
-            destination_identifier: webhook_url for Discord, chat_id for Telegram
         """
         key = self._get_rate_limit_key(destination_identifier)
 
@@ -95,12 +83,7 @@ class DestinationHandler(AbstractBaseClass):
                 del self._rate_limits[key]
 
     def _store_rate_limit(self, destination_identifier, wait_seconds: float) -> None:
-        """Store rate limit information for a destination.
-
-        Args:
-            destination_identifier: webhook_url for Discord, chat_id for Telegram
-            wait_seconds: How many seconds to wait before next attempt
-        """
+        """Store rate limit information for a destination."""
         key = self._get_rate_limit_key(destination_identifier)
         rounded_wait = math.ceil(wait_seconds)
         expires_at = time.time() + rounded_wait
@@ -116,13 +99,6 @@ class DestinationHandler(AbstractBaseClass):
 
         Attempts to split at newlines when possible to preserve message structure.
         If no newline is found within max_length, performs hard split at max length.
-
-        Args:
-            text: Text to split into chunks
-            max_length: Maximum characters per chunk
-
-        Returns:
-            List[str]: Text chunks, each <= max_length characters
         """
         if len(text) <= max_length:
             return [text]
@@ -148,20 +124,9 @@ class DestinationHandler(AbstractBaseClass):
     def send_message(self, content: str, destination_identifier, media_path: Optional[str] = None) -> bool:
         """Send message to destination.
 
-        This abstract method must be implemented by subclasses.
-        The 'pass' statement is intentional, it's a template that subclasses override.
-
         Subclasses implement platform-specific sending logic:
         - Discord: POST to webhook URL with JSON payload
         - Telegram: Use Telethon API send methods
-
-        Args:
-            content: Message text to send
-            destination_identifier: webhook_url for Discord, chat_id for Telegram
-            media_path: Optional path to media file attachment
-
-        Returns:
-            bool: True if successful, False otherwise
         """
         pass
 

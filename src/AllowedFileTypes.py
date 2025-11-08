@@ -1,9 +1,8 @@
 """
-Shared constants for allowed file types in attachment checking and restricted mode.
+Shared constants for allowed file types.
 
-This module defines the unified lists of file extensions and MIME types that are:
-1. Safe (non-executable, non-malicious)
-2. Text-based and searchable for keyword matching
+This module defines the unified lists of file extensions and MIME types that are
+text-based and searchable for keyword matching.
 
 Both attachment keyword checking and restricted mode use these same lists to ensure
 consistent behavior. Files must match both extension and MIME type to be accepted.
@@ -26,7 +25,6 @@ ALLOWED_EXTENSIONS = {
     '.toml'   # TOML configuration files
 }
 
-# Corresponds to the file extensions above
 ALLOWED_MIME_TYPES = {
     'text/plain',              # .txt, .log, .sql, .ini, .conf, .cfg, .env
     'text/csv',                # .csv

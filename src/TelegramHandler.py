@@ -50,20 +50,12 @@ _logger = setup_logger(__name__)
 class TelegramHandler(DestinationHandler):
     """Telegram handler for message monitoring and delivery.
 
-    Dual-purpose handler that:
-    1. Monitors configured Telegram channels for new messages (source mode)
-    2. Delivers formatted messages to Telegram destinations (destination mode)
-
     Attributes:
         TELEGRAM_CAPTION_LIMIT: Max caption length (1024 chars)
         TELEGRAM_MESSAGE_LIMIT: Max message length (4096 chars)
         client: Telethon TelegramClient instance
         channels: Resolved channel entities (channel_id -> entity)
         msg_callback: Callback function for new messages
-
-    Note:
-        ALLOWED_EXTENSIONS and ALLOWED_MIME_TYPES are imported from allowed_file_types module
-        and shared with attachment checking functionality for consistency
     """
 
     # Telegram limits
@@ -746,32 +738,11 @@ class TelegramHandler(DestinationHandler):
             return None
 
     def _get_rate_limit_key(self, destination_identifier) -> str:
-        """Get rate limit key for Telegram (chat ID).
-
-        Implements DestinationHandler interface for rate limit tracking.
-
-        Args:
-            destination_identifier: Telegram chat ID (int)
-
-        Returns:
-            str: String representation of chat ID for rate limit tracking
-        """
+        """Get rate limit key for Telegram (chat ID)."""
         return str(destination_identifier)
 
     def send_message(self, content: str, destination_chat_id: int, media_path: Optional[str] = None) -> bool:
-        """Send message to Telegram destination (sync wrapper for async send_copy).
-
-        This implements the DestinationHandler interface. Since Telegram operations
-        are async, this is primarily for interface compatibility.
-
-        Args:
-            content: Message text to send
-            destination_chat_id: Target channel/chat ID
-            media_path: Optional path to media file
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
+        """Send message to Telegram destination (sync wrapper for async send_copy)."""
         import asyncio
         return asyncio.create_task(self.send_copy(destination_chat_id, content, media_path))
 

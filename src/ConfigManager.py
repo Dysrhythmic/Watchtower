@@ -92,19 +92,17 @@ class ConfigManager:
 
         # Create temporary working directories if they don't exist
         self.tmp_dir = self.project_root / "tmp"
-        self.attachments_dir = self.tmp_dir / "attachments"     # Downloaded media files
+        self.attachments_dir = self.tmp_dir / "attachments"
         self.attachments_dir.mkdir(parents=True, exist_ok=True)
-        self.rsslog_dir = self.tmp_dir / "rsslog"               # RSS feed timestamp logs for polling
+        self.rsslog_dir = self.tmp_dir / "rsslog"
         self.rsslog_dir.mkdir(parents=True, exist_ok=True)
-        self.telegramlog_dir = self.tmp_dir / "telegramlog"     # Telegram message ID logs for polling
+        self.telegramlog_dir = self.tmp_dir / "telegramlog"
         self.telegramlog_dir.mkdir(parents=True, exist_ok=True)
 
-        # Keyword file cache: filename -> List[keywords]
-        # Avoid re-parsing keyword files when multiple destinations use same one
+        # Keyword file cache to avoid re-parsing files used by multiple destinations
         self._keyword_cache: Dict[str, List[str]] = {}
 
-        # Load and parse configuration file
-        # Default to config.json if no CONFIG_FILE environment variable
+        # Load and parse configuration file (defaults to config.json)
         config_filename = os.getenv('CONFIG_FILE', 'config.json')
         config_path = self.config_dir / config_filename
         self.destinations, self.rss_feeds = self._load_config(config_path)

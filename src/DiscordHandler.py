@@ -61,14 +61,11 @@ class DiscordHandler(DestinationHandler):
             bool: True if all chunks sent successfully, False otherwise
         """
         try:
-            # Check and wait for rate limit before sending
             self._check_and_wait_for_rate_limit(webhook_url)
 
-            # Split content into 2000-char chunks
             chunks = self._chunk_text(content, self.MAX_LENGTH)
             chunks_sent = 0
 
-            # Send first chunk with media attachment (if media exists)
             if media_path and os.path.exists(media_path):
                 with open(media_path, 'rb') as f:
                     files = {'file': f}

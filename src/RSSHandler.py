@@ -165,12 +165,6 @@ class RSSHandler:
 
         Extracts entry fields and strips HTML tags for clean text. Truncates
         summaries longer than 1000 characters.
-
-        Args:
-            entry: Feedparser entry object
-
-        Returns:
-            str: Formatted message text with title, link, and summary (newline-separated)
         """
         title = getattr(entry, 'title', '') or ''
         link = getattr(entry, 'link', '') or ''

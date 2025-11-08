@@ -2,7 +2,7 @@
 
 <img src="./watchtower.png" alt="Watchtower Logo" width="200" height="200" />
 
-A Cyber Threat Intelligence app for monitoring feeds, running images through OCR, applying customizable filters and parsing to the messages and OCR output, and forwarding the result to other platforms. It currently supports the following sources and destinations:
+A Cyber Threat Intelligence app for monitoring feeds, extracting text from images using OCR, filtering messages by keywords, parsing message content, and forwarding matches to other platforms. It currently supports the following sources and destinations:
 
 Sources:
 - Telegram channels (OCR supported)
@@ -15,20 +15,24 @@ Destinations:
 ## Features
 - Logs metadata from the latest Telegram message for each channel on startup to prove connectivity
 - Forwards all new messages to the provided Discord webhook(s) or Telegram channel(s)
-- Automatically splits long messages into 2000-character chunks (Discord character limit)
+- Automatically splits long messages into chunks: 2000 characters for Discord, 4096 for Telegram messages, 1024 for Telegram media captions
 - Includes attached media and reply context in messages
-- Telegram channels can be set in `restricted_mode` to only forward safe text files (txt, log, csv, json, xml, yaml, md, sql) and block malicious/explicit media
+- Telegram channels can be set in `restricted_mode` to only forward safe text files and block all other media (images, videos, executables, etc.)
 - For each destination, all channels have their own keyword filtering and other configuration for the most flexible routing control
 - Enhanced message parser with two modes: trim lines from ends or keep only first N lines
 - OCR integration for Telegram messages to run keyword filters against extracted text
 - Attachment keyword checking for safe text-based files (enabled by default, validates both extension and MIME type)
 - Configuration validation with duplicate destination detection and helpful warnings about default values
 - RSS feed monitoring support
-- Comprehensive test suite with 282 tests covering unit and integration scenarios
+- Comprehensive test suite with 309 tests covering unit and integration scenarios
+- Telegram polling every 5 minutes to catch messages missed during downtime or event handler failures
+- Message retry queue with exponential backoff (5s, 10s, 20s) for failed deliveries
+- Rate limit handling for both Discord and Telegram with pre-emptive waiting
+- Graceful shutdown with cleanup of temporary files and metrics persistence
 - Lightweight for compatibility running on devices with limited storage capacity such as a Raspberry Pi
 
 ## Requirements
-- Python 3.8+
+- Python 3.9+
 - Telegram API credentials ([get them here](https://my.telegram.org/apps))
 - Discord webhook URL(s) (edit channel -> integrations -> webhooks)
 - (Optional) EasyOCR for OCR-based filtering
@@ -49,9 +53,9 @@ Destinations:
 
    The `monitor` subcommand examples:
    ```bash
-   python3 src/watchtower.py monitor --sources all
-   python3 src/watchtower.py monitor --sources telegram
-   python3 src/watchtower.py monitor --sources rss
+   python3 src/Watchtower.py monitor --sources all
+   python3 src/Watchtower.py monitor --sources telegram
+   python3 src/Watchtower.py monitor --sources rss
    ```
 
    The `discover` subcommand:
@@ -196,7 +200,7 @@ Text-based attachments can be checked for keywords in addition to message text a
 
 ### Supported File Types
 
-Watchtower automatically detects and processes these safe, non-malicious text-based file types:
+Watchtower automatically detects and processes these text-based file types:
 
 **Text & Documentation:**
 - `.txt` - Plain text files
@@ -216,7 +220,7 @@ Watchtower automatically detects and processes these safe, non-malicious text-ba
 - `.env` - Environment variables
 - `.toml` - TOML config
 
-**Security:** Both file extension AND MIME type are validated to prevent spoofed malicious files. Source code files and binary files are **not** processed for security reasons.
+**Security:** Both file extension AND MIME type are validated in an attempt to prevent spoofed malicious files.
 
 ### Configuration
 
@@ -251,6 +255,7 @@ Watchtower automatically detects and processes these safe, non-malicious text-ba
 - **Encoding resilient**: Invalid UTF-8 characters are gracefully handled
 - **Combined search**: Attachment text is added to message text + OCR for comprehensive keyword matching
 - **Shared with restricted_mode**: Uses the same safe file type list for consistency
+- **File size limits**: Discord destinations support up to 25MB attachments, Telegram destinations support up to 2GB attachments
 
 ### Example Use Cases
 
@@ -306,22 +311,6 @@ Private channels (those with invite links like `https://t.me/+ewIIWdHcmfM5ZjAx`)
 
 ## Understanding Log Output
 
-Watchtower uses colored logging to make errors and warnings more visible:
-- 🔴 **ERROR** messages appear in red
-- 🟡 **WARNING** messages appear in yellow
-- ⚪ **INFO** messages appear in white
-
-### Common Log Messages
-
-**Connection Proof (Startup)**
-```
-[Watchtower] CONNECTION ESTABLISHED
-  Channel: Security Feed
-  Latest message by: @username
-  Timestamp: 2025-11-05 14:30:00
-```
-Appears on startup for each Telegram channel to verify connectivity. Shows the most recent message metadata.
-
 **Telegram Message Processing**
 ```
 [TelegramHandler] Received message tg_id=12345 from Channel Name
@@ -335,7 +324,7 @@ Appears on startup for each Telegram channel to verify connectivity. Shows the m
 ```
 - `new=7`: Number of new RSS entries found since last poll
 - `routed=3`: Number of entries that matched keywords and were forwarded
-- Logged every 5 minutes (300 seconds) per RSS feed
+- Logged every 5 minutes per RSS feed
 
 **Missed Message Detection**
 ```
@@ -343,8 +332,8 @@ Appears on startup for each Telegram channel to verify connectivity. Shows the m
 [TelegramHandler] Processed 5 missed messages from Channel Name
 ```
 - Appears when polling finds messages that were missed during downtime
-- Polls every 5 minutes (300 seconds) for each Telegram channel
-- All missed messages are processed, not just the most recent
+- Polls every 5 minutes for each Telegram channel
+- All missed messages are processed
 
 **Telegram Logs**
 ```
@@ -357,15 +346,34 @@ Appears on startup for each Telegram channel to verify connectivity. Shows the m
 
 ### Metrics Summary (Shutdown)
 ```
-[Watchtower] Final metrics: {
-  "telegram_missed_messages": 12,
-  "messages_routed": 145,
-  "time_ran": 3600
+[Watchtower] Final metrics for this session:
+{
+  "messages_received_telegram": 35361,
+  "total_msgs_no_destination": 35326,
+  "telegram_missed_messages_caught": 6934,
+  "messages_received_rss": 9,
+  "messages_sent_telegram": 41,
+  "messages_sent_discord": 33,
+  "total_msgs_routed_success": 44,
+  "ocr_processed": 34,
+  "ocr_msgs_sent": 3,
+  "seconds_ran": 52002
 }
 ```
-- `telegram_missed_messages`: Total messages found via polling that were previously missed
-- `messages_routed`: Total messages successfully forwarded to at least one destination
-- `time_ran`: Application runtime in seconds
+
+**Metric Definitions:**
+- `messages_received_telegram`: Total messages received from all Telegram channels
+- `messages_received_rss`: Total entries received from all RSS feeds
+- `telegram_missed_messages_caught`: Messages recovered via polling that were missed by event handlers
+- `total_msgs_routed_success`: Messages successfully forwarded to at least one destination
+- `total_msgs_no_destination`: Messages that did not match any destination keywords
+- `messages_sent_discord`: Total messages successfully sent to Discord webhooks
+- `messages_sent_telegram`: Total messages successfully sent to Telegram channels
+- `ocr_processed`: Number of images processed through OCR
+- `ocr_msgs_sent`: Messages with OCR text that were successfully forwarded
+- `seconds_ran`: Total application runtime in seconds
+
+**Note:** Metrics are automatically saved to `tmp/metrics.json` every 60 seconds during operation and on shutdown. This periodic save reduces disk I/O while ensuring metrics are preserved regularly.
 
 ## Testing
 
@@ -388,7 +396,7 @@ python3 -m unittest tests.test_telegram_handler.TestTelegramLogFunctionality
 
 ### Test Coverage
 
-The test suite includes **282 tests** covering:
+The test suite includes **309 tests** covering:
 
 - **Configuration** (654 lines): Loading, validation, keyword resolution, parser validation
 - **Telegram Handler** (1215 lines): Message formatting, restricted mode, URL defanging, log files
@@ -423,50 +431,6 @@ Tests use mock objects and don't require:
 - External services
 
 All tests run offline using unittest.mock for external dependencies.
-
-## Telegram Log Files
-
-Watchtower creates per-channel log files to track message processing and detect missed messages.
-
-### File Structure
-
-```
-tmp/
-└── telegramlog/
-    ├── 123456789.txt      # Channel with ID -100123456789
-    ├── channelname.txt    # Channel with username @channelname
-    └── 987654321.txt      # Another channel
-```
-
-**Filename sanitization:**
-- Numeric IDs: `-100` prefix stripped (e.g., `-100123456789` → `123456789.txt`)
-- Username IDs: `@` prefix stripped (e.g., `@channel` → `channel.txt`)
-
-### File Format
-
-Each log file contains two lines:
-```
-Channel Display Name
-12345
-```
-- **Line 1**: Human-readable channel name (for manual inspection)
-- **Line 2**: Last processed message ID (integer)
-
-### Lifecycle
-
-1. **Created**: On startup during connection proofs with latest message ID
-2. **Updated**: After processing each message (both event handler and polling)
-3. **Used**: Every 5 minutes during polling to detect missed messages
-4. **Cleared**: On shutdown (logs are not persistent across restarts)
-
-### Why Not Persistent?
-
-Telegram logs are intentionally cleared on shutdown because:
-- We don't want to process messages sent during extended downtime
-- Prevents message floods after long outages
-- Simpler than implementing age-based filtering like RSS feeds
-
-If you restart Watchtower, it will create new logs from the current latest message and won't process any messages sent while it was offline.
 
 ## Discover Command
 
@@ -531,8 +495,6 @@ The configuration structure is destination-based. Each destination (Discord webh
 - **RSS feeds** - defined in the `rss` array
 
 Both source types route to the same destination with independent keyword filtering and parsing rules.
-
-**Note:** The top-level key can be either `"destinations"` (recommended) or `"webhooks"` (legacy). Both work identically.
 
 #### Example 1: Telegram -> Discord
 ```json
@@ -610,7 +572,8 @@ Both source types route to the same destination with independent keyword filteri
 - Subscribes to `https://example.com/feed.xml` and polls it every 300 seconds (5 minutes)
 - Forwards only feed items containing `vulnerability` or `CVE`
 - Sends to the Discord webhook URL stored in `.env` as `DISCORD_WEBHOOK_FEEDS`
-- **Note:** All RSS feeds are polled every 300 seconds (5 minutes) - this interval is not configurable
+- **Note:** All RSS feeds are polled every 300 seconds (5 minutes)
+- **Age Filter:** RSS entries older than 2 days are automatically ignored to prevent message floods after extended downtime
 
 #### Example 4: Mixed Sources -> Multiple Destinations
 ```json
@@ -709,6 +672,3 @@ Same RSS feed routed to multiple destinations with different keyword filters:
 - **Discord destination** receives only items containing `CVE`, `0-day`, or `exploit`
 - **Telegram destination** receives all items with the first line trimmed
 - This demonstrates RSS feed deduplication: same feed, different filters per destination
-
-## Example Output
-<img width="607" height="187" alt="2025-10-27_18-50" src="https://github.com/user-attachments/assets/f4c80b89-0b92-485b-975e-66687ba33b6e" />

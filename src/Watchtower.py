@@ -229,7 +229,7 @@ class Watchtower:
         if metrics_summary:
             _logger.info(
                 f"[Watchtower] Final metrics for this session:\n"
-                f"\n{json.dumps(metrics_summary, indent=2)}"
+                f"{json.dumps(metrics_summary, indent=2)}"
             )
 
         # Check retry queue status

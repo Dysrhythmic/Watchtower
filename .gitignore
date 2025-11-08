@@ -1,12 +1,5 @@
-.vscode
-.claude
 .env
 *.session
 *.session-journal
 tmp/
 __pycache__
-docs/
-config.json
-kw-*.json
-.coverage
-htmlcov/

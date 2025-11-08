@@ -4,14 +4,11 @@ Shared constants for allowed file types in attachment checking and restricted mo
 This module defines the unified lists of file extensions and MIME types that are:
 1. Safe (non-executable, non-malicious)
 2. Text-based and searchable for keyword matching
-3. Commonly used in CTI workflows
 
 Both attachment keyword checking and restricted mode use these same lists to ensure
-consistent behavior. Files must match BOTH extension AND MIME type to be accepted.
+consistent behavior. Files must match both extension and MIME type to be accepted.
 """
 
-# File extensions allowed for attachment checking and restricted mode downloads
-# Only non-malicious, searchable text files
 ALLOWED_EXTENSIONS = {
     '.txt',   # Plain text files
     '.log',   # Log files
@@ -26,10 +23,9 @@ ALLOWED_EXTENSIONS = {
     '.conf',  # Generic configuration files
     '.cfg',   # Configuration files
     '.env',   # Environment variable files
-    '.toml',  # TOML configuration files
+    '.toml'   # TOML configuration files
 }
 
-# MIME types allowed for attachment checking and restricted mode downloads
 # Corresponds to the file extensions above
 ALLOWED_MIME_TYPES = {
     'text/plain',              # .txt, .log, .sql, .ini, .conf, .cfg, .env
@@ -43,5 +39,5 @@ ALLOWED_MIME_TYPES = {
     'text/markdown',           # .md
     'text/x-markdown',         # .md (alternate MIME type)
     'application/toml',        # .toml
-    'text/toml',               # .toml (alternate MIME type)
+    'text/toml'                # .toml (alternate MIME type)
 }

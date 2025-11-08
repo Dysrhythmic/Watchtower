@@ -3,9 +3,3 @@
 *.session-journal
 tmp/
 __pycache__
-
-# Coverage reports
-.coverage
-.coverage.*
-htmlcov/
-*.cover

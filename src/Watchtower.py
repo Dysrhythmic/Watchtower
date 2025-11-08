@@ -564,48 +564,69 @@ class Watchtower:
             _logger.error(f"[TelegramHandler] Failed to send to {channel_specifier}: {e}")
             return "failed"
 
-    def _extract_matched_lines_from_attachment(self, media_path: str, keywords: List[str]) -> List[str]:
-        """Extract lines from attachment file that match any of the keywords.
+    def _extract_matched_lines_from_attachment(self, media_path: str, keywords: List[str]) -> dict:
+        """Extract lines from attachment file that match keywords, or first N lines if no keywords.
 
-        Reads the attachment file and returns all lines that contain at least one
-        of the specified keywords (case-insensitive matching).
+        Streams the file line-by-line to avoid loading large files into memory.
+        If keywords are provided, returns matching lines. If no keywords, returns first 100 lines.
 
         Args:
             media_path: Path to the attachment file
-            keywords: List of keywords to match against
+            keywords: List of keywords to match against (empty list = no keywords)
 
         Returns:
-            List[str]: Lines from the file that matched keywords (empty if none or error)
+            dict: {
+                'matched_lines': List of lines (matched or first N),
+                'total_lines': Total number of lines in file,
+                'is_sample': True if showing first N lines due to no keywords
+            }
         """
-        if not media_path or not keywords:
-            return []
+        result = {
+            'matched_lines': [],
+            'total_lines': 0,
+            'is_sample': False
+        }
+
+        if not media_path:
+            return result
 
         try:
             path = Path(media_path)
             if not path.exists():
-                return []
+                return result
 
             # Check if file has a supported text extension
             from AllowedFileTypes import ALLOWED_EXTENSIONS
             if path.suffix.lower() not in ALLOWED_EXTENSIONS:
-                return []
+                return result
 
-            # Read file with encoding fallback
-            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()
-
-            # Find lines that match any keyword (case-insensitive)
+            # Stream file line-by-line (never load entire file into memory)
             matched_lines = []
-            for line in lines:
-                line_stripped = line.rstrip('\n\r')
-                if any(keyword.lower() in line_stripped.lower() for keyword in keywords):
-                    matched_lines.append(line_stripped)
+            total_lines = 0
 
-            return matched_lines
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    total_lines += 1
+                    line_stripped = line.rstrip('\n\r')
+
+                    if keywords:
+                        # Keywords provided - check for matches
+                        if any(keyword.lower() in line_stripped.lower() for keyword in keywords):
+                            matched_lines.append(line_stripped)
+                    else:
+                        # No keywords - collect first 100 lines as sample
+                        if total_lines <= 100:
+                            matched_lines.append(line_stripped)
+
+            result['matched_lines'] = matched_lines
+            result['total_lines'] = total_lines
+            result['is_sample'] = (len(keywords) == 0)
+
+            return result
 
         except Exception as e:
-            _logger.warning(f"[Watchtower] Failed to extract matched lines from {media_path}: {e}")
-            return []
+            _logger.warning(f"[Watchtower] Failed to extract lines from {media_path}: {e}")
+            return result
 
     def _check_file_size_and_modify_content(
         self,
@@ -617,18 +638,18 @@ class Watchtower:
         """Check if attachment exceeds file size limit and modify content if needed.
 
         If the attachment file exceeds the destination's file size limit, extracts
-        the lines that matched keywords and appends them to the message content with
-        a "**From Attachment:**" header. The media should then be skipped.
+        the lines that matched keywords (or first 100 lines if no keywords) and appends
+        them to the message content with block quote formatting. The media should then be skipped.
 
         Args:
-            content: Formatted message content
+            content: Formatted message content (Discord markdown or Telegram HTML)
             media_path: Path to attachment file (or None)
             file_size_limit: Maximum file size in bytes for this destination
-            destination: Destination config with keywords
+            destination: Destination config with keywords and type
 
         Returns:
             tuple[str, bool]: (modified_content, should_include_media)
-                modified_content: Content with matched lines appended if file too large
+                modified_content: Content with matched/sampled lines appended if file too large
                 should_include_media: False if file too large, True otherwise
         """
         if not media_path:
@@ -640,34 +661,55 @@ class Watchtower:
             if file_size <= file_size_limit:
                 return content, True
 
-            # File is too large - extract matched lines
+            # File is too large - extract matched lines or sample
+            file_size_mb = file_size / (1024 * 1024)
             _logger.info(
-                f"[Watchtower] Attachment {Path(media_path).name} ({file_size / (1024*1024):.1f}MB) "
-                f"exceeds limit ({file_size_limit / (1024*1024):.1f}MB), extracting matched lines"
+                f"[Watchtower] Attachment {Path(media_path).name} ({file_size_mb:.1f}MB) "
+                f"exceeds limit ({file_size_limit / (1024*1024):.1f}MB), streaming file for keyword extraction"
             )
 
             keywords = destination.get('keywords', [])
-            matched_lines = self._extract_matched_lines_from_attachment(media_path, keywords)
+            result = self._extract_matched_lines_from_attachment(media_path, keywords)
+
+            matched_lines = result['matched_lines']
+            total_lines = result['total_lines']
+            is_sample = result['is_sample']
+            dest_type = destination.get('type', 'discord')
 
             if matched_lines:
-                # Append matched lines to content with header
-                attachment_section = "\n\n**From Attachment:**\n" + "\n".join(matched_lines)
-                # Limit to first 20 lines to avoid overwhelming the message
-                if len(matched_lines) > 20:
-                    _logger.info(
-                        f"[Watchtower] Limiting attachment excerpt to first 20 lines "
-                        f"(matched {len(matched_lines)} total)"
-                    )
-                    attachment_section = (
-                        "\n\n**From Attachment:**\n" +
-                        "\n".join(matched_lines[:20]) +
-                        f"\n**[...{len(matched_lines) - 20} more matched line(s) omitted]**"
-                    )
+                # Format header based on whether it's a sample or keyword matches
+                if is_sample:
+                    # No keywords configured - showing first N lines as sample
+                    header = f"Attachment too large to forward ({file_size_mb:.0f} MB). No keywords configured, showing first {len(matched_lines)} lines:"
+                else:
+                    # Keywords matched - showing matched lines
+                    header = f"Attachment too large to forward ({file_size_mb:.0f} MB). Matched {len(matched_lines)} line(s):"
+
+                # Format lines with block quotes based on destination type
+                if dest_type == 'telegram':
+                    # Telegram uses HTML blockquote tags
+                    from html import escape
+                    lines_escaped = [escape(line) for line in matched_lines]
+                    lines_formatted = f"<blockquote>{'<br>'.join(lines_escaped)}</blockquote>"
+                    attachment_section = f"\n\n<b>{escape(header)}</b>\n{lines_formatted}"
+                else:
+                    # Discord uses markdown quote prefix ("> ")
+                    lines_quoted = [f"> {line}" for line in matched_lines]
+                    attachment_section = f"\n\n**{header}**\n" + "\n".join(lines_quoted)
+
+                # Add file statistics
+                if dest_type == 'telegram':
+                    attachment_section += f"\n\n<i>[Full file has {total_lines:,} lines]</i>"
+                else:
+                    attachment_section += f"\n\n*[Full file has {total_lines:,} lines]*"
 
                 content += attachment_section
             else:
-                # No matched lines found (shouldn't happen if keywords matched)
-                content += "\n\n**[Attachment too large to forward, no matching text extracted]**"
+                # Empty file or no lines extracted
+                if dest_type == 'telegram':
+                    content += f"\n\n<b>[Attachment too large to forward ({file_size_mb:.0f} MB), file appears empty]</b>"
+                else:
+                    content += f"\n\n**[Attachment too large to forward ({file_size_mb:.0f} MB), file appears empty]**"
 
             return content, False
 

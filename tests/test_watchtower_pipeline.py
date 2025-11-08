@@ -1429,12 +1429,15 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         try:
             # When: Extract matched lines
             keywords = ['malware', 'exploit']
-            matched_lines = watchtower._extract_matched_lines_from_attachment(temp_path, keywords)
+            result = watchtower._extract_matched_lines_from_attachment(temp_path, keywords)
 
             # Then: Only lines with keywords are returned
+            matched_lines = result['matched_lines']
             self.assertEqual(len(matched_lines), 2)
             self.assertIn('malware', matched_lines[0])
             self.assertIn('exploit', matched_lines[1])
+            self.assertEqual(result['total_lines'], 5)  # File has 5 total lines
+            self.assertFalse(result['is_sample'])  # Keywords provided, not a sample
         finally:
             os.unlink(temp_path)
 
@@ -1477,10 +1480,13 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
 
         try:
             keywords = ['malware']
-            matched_lines = watchtower._extract_matched_lines_from_attachment(temp_path, keywords)
+            result = watchtower._extract_matched_lines_from_attachment(temp_path, keywords)
 
             # Then: All 3 lines matched despite case differences
+            matched_lines = result['matched_lines']
             self.assertEqual(len(matched_lines), 3)
+            self.assertEqual(result['total_lines'], 3)
+            self.assertFalse(result['is_sample'])
         finally:
             os.unlink(temp_path)
 
@@ -1496,9 +1502,9 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         """
         Given: File with unsupported extension (not in SUPPORTED_TEXT_EXTENSIONS)
         When: _extract_matched_lines_from_attachment() is called
-        Then: Returns empty list (skips unsupported files)
+        Then: Returns empty dict result (skips unsupported files)
 
-        Tests: src/Watchtower.py:556-557 (file type filtering)
+        Tests: src/Watchtower.py:600-601 (file type filtering)
         """
         from Watchtower import Watchtower
         import tempfile
@@ -1522,10 +1528,12 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
 
         try:
             keywords = ['malware']
-            matched_lines = watchtower._extract_matched_lines_from_attachment(temp_path, keywords)
+            result = watchtower._extract_matched_lines_from_attachment(temp_path, keywords)
 
-            # Then: Empty list (unsupported file type)
-            self.assertEqual(matched_lines, [])
+            # Then: Empty dict result (unsupported file type)
+            self.assertEqual(result['matched_lines'], [])
+            self.assertEqual(result['total_lines'], 0)
+            self.assertFalse(result['is_sample'])
         finally:
             os.unlink(temp_path)
 
@@ -1626,16 +1634,17 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         try:
             content = "**Test Message**"
             file_size_limit = 1 * 1024 * 1024  # 1MB limit (file is larger)
-            destination = {'keywords': ['malware']}
+            destination = {'keywords': ['malware'], 'type': 'discord'}
 
             # When: Check file size
             modified_content, should_include = watchtower._check_file_size_and_modify_content(
                 content, temp_path, file_size_limit, destination
             )
 
-            # Then: Content includes matched lines, media should NOT be included
-            self.assertIn("**From Attachment:**", modified_content)
+            # Then: Content includes matched lines in block quotes, media should NOT be included
+            self.assertIn("Matched", modified_content)  # New format: "Matched X line(s):"
             self.assertIn("malware", modified_content)
+            self.assertIn("lines]", modified_content)  # File statistics
             self.assertFalse(should_include)
         finally:
             os.unlink(temp_path)
@@ -1683,16 +1692,17 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         try:
             content = "**Original Message**"
             file_size_limit = 1 * 1024 * 1024  # 1MB limit
-            destination = {'keywords': ['malware']}
+            destination = {'keywords': ['malware'], 'type': 'discord'}
 
             # When: Check file size
             modified_content, should_include = watchtower._check_file_size_and_modify_content(
                 content, temp_path, file_size_limit, destination
             )
 
-            # Then: Only first 20 lines + truncation notice
-            self.assertIn("**From Attachment:**", modified_content)
-            self.assertIn("[...10 more matched line(s) omitted]", modified_content)
+            # Then: All 30 matched lines included (no truncation in new implementation)
+            self.assertIn("Matched", modified_content)  # New format: "Matched X line(s):"
+            self.assertIn("malware", modified_content)
+            # Note: Truncation logic was removed - all matched lines now included
             self.assertFalse(should_include)
         finally:
             os.unlink(temp_path)
@@ -1753,7 +1763,8 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
 
             destination = {
                 'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
-                'keywords': ['malware']
+                'keywords': ['malware'],
+                'type': 'discord'
             }
 
             content = "**Original Message**"
@@ -1768,7 +1779,8 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
             sent_content = args[0]
             sent_media = args[2]
 
-            self.assertIn("**From Attachment:**", sent_content)
+            self.assertIn("Matched", sent_content)  # New format: "Matched X line(s):"
+            self.assertIn("malware", sent_content)
             self.assertIsNone(sent_media)  # No media sent
             self.assertEqual(status, "sent")
         finally:
@@ -1847,7 +1859,10 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
             sent_content = args[1]
             sent_media = args[2]
 
-            self.assertIn("**From Attachment:**", sent_content)
+            # Check for Telegram HTML format
+            self.assertIn("Matched", sent_content)  # New format: "Matched X line(s):"
+            self.assertIn("exploit", sent_content)
+            self.assertIn("<blockquote>", sent_content)  # Telegram uses HTML blockquote
             self.assertIsNone(sent_media)  # No media sent
             self.assertEqual(status, "sent")
         finally:

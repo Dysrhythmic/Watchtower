@@ -52,20 +52,20 @@ class TelegramHandler(DestinationHandler):
     """Telegram handler for message monitoring and delivery.
 
     Attributes:
-        TELEGRAM_CAPTION_LIMIT: Max caption length (1024 chars)
-        TELEGRAM_MESSAGE_LIMIT: Max message length (4096 chars)
+        MAX_CAPTION_LENGTH: Max caption length (1024 chars)
+        MAX_MSG_LENGTH: Max message length (4096 chars)
         client: Telethon TelegramClient instance
         channels: Resolved channel entities (channel_id -> entity)
         msg_callback: Callback function for new messages
     """
 
     # Telegram limits
-    TELEGRAM_CAPTION_LIMIT = 1024  # Maximum caption length for media
-    TELEGRAM_MESSAGE_LIMIT = 4096  # Maximum message length
-    FILE_SIZE_LIMIT = 2 * 1024 * 1024 * 1024  # 2GB for Telegram (user client via Telethon)
+    MAX_CAPTION_LENGTH = 1024  # Maximum caption length for media
+    MAX_MSG_LENGTH = 4096  # Maximum message length
+    _FILE_SIZE_LIMIT = 2 * 1024 * 1024 * 1024  # 2GB for Telegram (user client via Telethon)
 
     # Polling configuration
-    DEFAULT_POLL_INTERVAL = 300  # seconds (5 minutes) - check for missed messages
+    _DEFAULT_POLL_INTERVAL = 300  # seconds (5 minutes) - check for missed messages
 
     # Restricted mode file types: imported from allowed_file_types module
     # Both ALLOWED_EXTENSIONS and ALLOWED_MIME_TYPES are now shared constants
@@ -89,6 +89,11 @@ class TelegramHandler(DestinationHandler):
 
         # Destination resolution cache: spec (@name or -100id) -> int chat_id
         self._dest_cache: Dict[str, int] = {}
+
+    @property
+    def file_size_limit(self) -> int:
+        """Maximum file size in bytes for Telegram (2GB via user client)."""
+        return self._FILE_SIZE_LIMIT
 
     async def start(self) -> None:
         """Start Telegram client and resolve all configured channels.
@@ -338,7 +343,7 @@ class TelegramHandler(DestinationHandler):
 
         while True:
             try:
-                await asyncio.sleep(self.DEFAULT_POLL_INTERVAL)
+                await asyncio.sleep(self._DEFAULT_POLL_INTERVAL)
 
                 for channel_id, telegram_entity in self.channels.items():
                     channel_name = self._get_channel_name(channel_id)
@@ -742,6 +747,19 @@ class TelegramHandler(DestinationHandler):
         """Get rate limit key for Telegram (chat ID)."""
         return str(destination_identifier)
 
+    def _extract_retry_after(self, error: Exception) -> Optional[float]:
+        """Extract retry_after value from Telegram FloodWaitError.
+
+        Args:
+            error: FloodWaitError exception from Telegram API
+
+        Returns:
+            Optional[float]: Retry after seconds if error is FloodWaitError, None otherwise
+        """
+        if isinstance(error, FloodWaitError):
+            return float(error.seconds)
+        return None
+
     def send_message(self, content: str, destination_chat_id: int, media_path: Optional[str] = None) -> bool:
         """Send message to Telegram destination (sync wrapper for async send_copy)."""
         import asyncio
@@ -771,34 +789,36 @@ class TelegramHandler(DestinationHandler):
 
             # Media with content
             if media_path and os.path.exists(media_path):
-                if len(content) <= self.TELEGRAM_CAPTION_LIMIT:
+                if len(content) <= self.MAX_CAPTION_LENGTH:
                     # Content fits as caption - send media with caption
                     await self.client.send_file(destination_chat_id, media_path,
                                               caption=content or None, parse_mode='html')
                 else:
                     # Content too long for caption - send media captionless, then chunk content at 4096
-                    _logger.info(f"[TelegramHandler] Content exceeds {self.TELEGRAM_CAPTION_LIMIT} chars, sending media captionless and text separately")
+                    _logger.info(f"[TelegramHandler] Content exceeds {self.MAX_CAPTION_LENGTH} chars, sending media captionless and text separately")
                     await self.client.send_file(destination_chat_id, media_path, caption=None)
 
                     # Chunk the FULL content at Telegram's message limit (4096 chars)
                     # This guarantees NO content is lost
-                    chunks = self._chunk_text(content, self.TELEGRAM_MESSAGE_LIMIT)
+                    chunks = self._chunk_text(content, self.MAX_MSG_LENGTH)
                     for chunk in chunks:
                         await self.client.send_message(destination_chat_id, chunk, parse_mode='html')
                 return True
 
             # Text only - chunk at 4096 if needed
-            if len(content) <= self.TELEGRAM_MESSAGE_LIMIT:
+            if len(content) <= self.MAX_MSG_LENGTH:
                 await self.client.send_message(destination_chat_id, content, parse_mode='html')
             else:
-                chunks = self._chunk_text(content, self.TELEGRAM_MESSAGE_LIMIT)
+                chunks = self._chunk_text(content, self.MAX_MSG_LENGTH)
                 for chunk in chunks:
                     await self.client.send_message(destination_chat_id, chunk, parse_mode='html')
             return True
 
         except FloodWaitError as e:
             # Telegram rate limit - extract wait time and store
-            self._store_rate_limit(destination_chat_id, e.seconds)
+            retry_after = self._extract_retry_after(e)
+            if retry_after is not None:
+                self._store_rate_limit(destination_chat_id, retry_after)
             return False
 
         except Exception as e:

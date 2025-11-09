@@ -1738,7 +1738,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
 
         mock_discord = MockDiscord.return_value
         mock_discord.send_message = Mock(return_value=True)
-        mock_discord.FILE_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB limit
+        mock_discord.file_size_limit = 1 * 1024 * 1024  # 1MB limit
 
         watchtower = Watchtower(sources=['telegram'])
 
@@ -1818,7 +1818,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         mock_telegram = MockTelegram.return_value
         mock_telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
         mock_telegram.send_copy = AsyncMock(return_value=True)
-        mock_telegram.FILE_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB limit for testing
+        mock_telegram.file_size_limit = 1 * 1024 * 1024  # 1MB limit for testing
 
         watchtower = Watchtower(sources=['telegram'])
 

@@ -491,7 +491,7 @@ class Watchtower:
         # Check file size limit before sending
         if media_path:
             content, should_send_media = self._check_file_size_and_modify_content(
-                content, media_path, self.discord.FILE_SIZE_LIMIT, destination
+                content, media_path, self.discord.file_size_limit, destination
             )
             media_path = media_path if should_send_media else None
 
@@ -533,7 +533,7 @@ class Watchtower:
         # Check file size limit before sending
         if media_path:
             content, should_send_media = self._check_file_size_and_modify_content(
-                content, media_path, self.telegram.FILE_SIZE_LIMIT, destination
+                content, media_path, self.telegram.file_size_limit, destination
             )
             media_path = media_path if should_send_media else None
 

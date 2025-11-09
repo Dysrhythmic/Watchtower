@@ -664,8 +664,8 @@ class TestTelegramCaptionHandling(unittest.TestCase):
         app = Watchtower(sources=["telegram"])
 
         # Verify the limit constants are set
-        self.assertEqual(app.telegram.TELEGRAM_CAPTION_LIMIT, 1024)
-        self.assertEqual(app.telegram.TELEGRAM_MESSAGE_LIMIT, 4096)
+        self.assertEqual(app.telegram.MAX_CAPTION_LENGTH, 1024)
+        self.assertEqual(app.telegram.MAX_MSG_LENGTH, 4096)
 
     @patch('TelegramHandler.TelegramClient')
     @patch('ConfigManager.ConfigManager')
@@ -689,7 +689,7 @@ class TestTelegramCaptionHandling(unittest.TestCase):
         test_content = "A" * 6700
 
         # Verify chunking uses proper Telegram limits (4096 not 2000)
-        chunks = app.telegram._chunk_text(test_content, TelegramHandler.TELEGRAM_MESSAGE_LIMIT)
+        chunks = app.telegram._chunk_text(test_content, TelegramHandler.MAX_MSG_LENGTH)
 
         # Should create 2 chunks at 4096 limit: [4096 chars, 2604 chars]
         self.assertEqual(len(chunks), 2, "6700 chars should create 2 chunks at 4096 limit")
@@ -721,7 +721,7 @@ class TestTelegramCaptionHandling(unittest.TestCase):
 
         long_message = chunk1 + chunk2 + chunk3
 
-        chunks = app.telegram._chunk_text(long_message, TelegramHandler.TELEGRAM_MESSAGE_LIMIT)
+        chunks = app.telegram._chunk_text(long_message, TelegramHandler.MAX_MSG_LENGTH)
 
         # Verify all chunks created
         self.assertEqual(len(chunks), 3)

@@ -24,8 +24,15 @@ Test Pattern - Text Chunking:
 
 Concrete Handler Template (for testing abstract base):
     class ConcreteHandler(DestinationHandler):
+        @property
+        def file_size_limit(self):
+            return 25 * 1024 * 1024  # 25MB test limit
+
         def _get_rate_limit_key(self, destination_identifier):
             return str(destination_identifier)
+
+        def _extract_retry_after(self, error_or_response):
+            return 1.0  # Default 1 second for tests
 
         def send_message(self, content, destination_identifier, media_path=None):
             return True
@@ -67,8 +74,13 @@ class TestDestinationHandler(unittest.TestCase):
     def setUp(self):
         """Create a concrete implementation for testing."""
         class ConcreteHandler(DestinationHandler):
+            @property
+            def file_size_limit(self):
+                return 25 * 1024 * 1024  # 25MB test limit
             def _get_rate_limit_key(self, destination_identifier):
                 return str(destination_identifier)
+            def _extract_retry_after(self, error_or_response):
+                return 1.0  # Default 1 second for tests
             def send_message(self, content, destination_identifier, media_path=None):
                 return True
             def format_message(self, message_data, destination):

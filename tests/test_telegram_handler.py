@@ -199,20 +199,20 @@ class TestTelegramHandler(unittest.TestCase):
         self.assertIsNotNone(self.handler.client)
 
     def test_caption_limit_constant(self):
-        """Test TELEGRAM_CAPTION_LIMIT constant is set correctly."""
-        self.assertEqual(self.handler.TELEGRAM_CAPTION_LIMIT, 1024)
+        """Test MAX_CAPTION_LENGTH constant is set correctly."""
+        self.assertEqual(self.handler.MAX_CAPTION_LENGTH, 1024)
 
     def test_caption_length_validation_logic(self):
         """Test caption length validation logic."""
         # Test that limit is correctly defined
-        self.assertEqual(TelegramHandler.TELEGRAM_CAPTION_LIMIT, 1024)
+        self.assertEqual(TelegramHandler.MAX_CAPTION_LENGTH, 1024)
 
         # Test boundary conditions
         caption_ok = "x" * 1024
         caption_too_long = "y" * 1025
 
-        self.assertLessEqual(len(caption_ok), TelegramHandler.TELEGRAM_CAPTION_LIMIT)
-        self.assertGreater(len(caption_too_long), TelegramHandler.TELEGRAM_CAPTION_LIMIT)
+        self.assertLessEqual(len(caption_ok), TelegramHandler.MAX_CAPTION_LENGTH)
+        self.assertGreater(len(caption_too_long), TelegramHandler.MAX_CAPTION_LENGTH)
 
 
 class TestTelegramSendOperations(unittest.TestCase):

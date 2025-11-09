@@ -27,13 +27,18 @@ class DiscordHandler(DestinationHandler):
     long messages and handles rate limiting.
     """
 
+    _USERNAME = 'Watchtower'
+    _AVATAR_URL = "https://raw.githubusercontent.com/Dysrhythmic/Watchtower/master/watchtower.png"
+    _FILE_SIZE_LIMIT = 25 * 1024 * 1024  # 25MB for Discord free tier
     MAX_MSG_LENGTH = 2000
-    FILE_SIZE_LIMIT = 25 * 1024 * 1024  # 25MB for Discord free tier
-    USERNAME = 'Watchtower'
-    AVATAR_URL = "https://raw.githubusercontent.com/Dysrhythmic/Watchtower/master/watchtower.png"
 
     def __init__(self):
         super().__init__()
+
+    @property
+    def file_size_limit(self) -> int:
+        """Maximum file size in bytes for Discord."""
+        return self._FILE_SIZE_LIMIT
 
     def send_message(self, content: str, webhook_url: str, media_path: Optional[str] = None) -> bool:
         """Send message to Discord webhook.
@@ -60,8 +65,8 @@ class DiscordHandler(DestinationHandler):
                 with open(media_path, 'rb') as f:
                     files = {'file': f}
                     data = {
-                        'username': self.USERNAME,
-                        'avatar_url': self.AVATAR_URL,
+                        'username': self._USERNAME,
+                        'avatar_url': self._AVATAR_URL,
                         'content': chunks[0]
                     }
                     response = requests.post(webhook_url, files=files, data=data, timeout=15)
@@ -81,8 +86,8 @@ class DiscordHandler(DestinationHandler):
             # Send remaining chunks as text-only messages
             for chunk_index, chunk in enumerate(chunks[chunks_sent:], start=chunks_sent + 1):
                 payload = {
-                    "username": self.USERNAME,
-                    "avatar_url": self.AVATAR_URL,
+                    "username": self._USERNAME,
+                    "avatar_url": self._AVATAR_URL,
                     "content": chunk
                 }
                 response = requests.post(webhook_url, json=payload, timeout=5)
@@ -104,23 +109,36 @@ class DiscordHandler(DestinationHandler):
             _logger.error(f"[DiscordHandler] Discord send failed: {e}")
             return False
 
-    def _handle_rate_limit(self, webhook_url: str, response: requests.Response) -> None:
-        """Parse 429 rate limit response and store retry information.
+    def _extract_retry_after(self, response: requests.Response) -> Optional[float]:
+        """Extract retry_after value from Discord 429 rate limit response.
 
         Discord returns rate limit info in JSON body with 'retry_after' field
-        specifying seconds to wait. Falls back to 1 second if parsing fails.
+        specifying seconds to wait.
+
+        Args:
+            response: 429 HTTP response from Discord API
+
+        Returns:
+            Optional[float]: Retry after seconds if successfully extracted, None if parsing fails
+        """
+        try:
+            body = response.json()
+            return body.get('retry_after', 1.0)
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            _logger.warning(f"[DiscordHandler] Rate limited (429) but couldn't parse retry_after: {e}")
+            return None
+
+    def _handle_rate_limit(self, webhook_url: str, response: requests.Response) -> None:
+        """Parse 429 rate limit response and store retry information.
 
         Args:
             webhook_url: Webhook URL being rate limited
             response: 429 HTTP response from Discord API
         """
-        try:
-            body = response.json()
-            retry_after = body.get('retry_after', 1.0)
-            self._store_rate_limit(webhook_url, retry_after)
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            _logger.warning(f"[DiscordHandler] Rate limited (429) but couldn't parse retry_after: {e}")
-            self._store_rate_limit(webhook_url, 1.0)
+        retry_after = self._extract_retry_after(response)
+        if retry_after is None:
+            retry_after = 1.0  # Fallback if extraction fails
+        self._store_rate_limit(webhook_url, retry_after)
 
     def format_message(self, message_data: MessageData, destination: Dict) -> str:
         """Format message for Discord with metadata and markdown formatting.

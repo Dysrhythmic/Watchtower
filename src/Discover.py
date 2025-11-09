@@ -25,7 +25,6 @@ Subcommand Usage:
     python3 src/Watchtower.py discover --diff --generate
         Show diff and generate config file
 """
-import os
 import json
 from pathlib import Path
 from LoggerSetup import setup_logger
@@ -252,28 +251,13 @@ async def discover_channels(diff_mode=False, generate_config=False):
     from telethon.tl.types import Channel, Chat, User
     from ConfigManager import ConfigManager
 
-    # Use ConfigManager for paths and env vars (may fail if config.json invalid/missing, but we only need env vars)
-    config = None
-    config_filename = 'config.json'
-    try:
-        config = ConfigManager()
-        config_dir = config.config_dir
-        api_id = config.api_id
-        api_hash = config.api_hash
-        # Get config filename from env var (already loaded by ConfigManager)
-        config_filename = os.getenv('CONFIG_FILE', 'config.json')
-    except Exception as e:
-        _logger.warning(f"[Discover] Could not load full config (this is OK for discovery): {e}")
-        _logger.info("[Discover] Loading minimal config for discovery...")
-        # Minimal bootstrap if full config unavailable
-        from dotenv import load_dotenv
-        project_root = Path(__file__).resolve().parents[1]
-        config_dir = project_root / "config"
-        env_path = config_dir / ".env"
-        load_dotenv(dotenv_path=env_path)
-        api_id = os.getenv('TELEGRAM_API_ID')
-        api_hash = os.getenv('TELEGRAM_API_HASH')
-        config_filename = os.getenv('CONFIG_FILE', 'config.json')
+    # Use ConfigManager in minimal mode to access env vars and paths
+    # This allows discover to work even if the JSON config isn't generated yet
+    config = ConfigManager(load_full_config=False)
+    config_dir = config.config_dir
+    api_id = config.api_id
+    api_hash = config.api_hash
+    config_filename = config.config_file
 
     if not api_id or not api_hash:
         _logger.error("[Discover] Missing TELEGRAM_API_ID or TELEGRAM_API_HASH in .env file")

@@ -58,11 +58,15 @@ class ConfigManager:
     - Assumes default values for boolean options (e.g., ocr, check_attachments, and restricted_mode)
     """
 
-    def __init__(self):
-        """Initialize by loading all configuration sources and creating temporary working directories.
+    def __init__(self, load_full_config=True):
+        """Initialize by loading environment variables and optionally the full configuration.
+
+        Args:
+            load_full_config: If True (default), loads and validates config.json.
+                            If False, only loads env vars and paths (minimal mode for discover).
 
         Raises:
-            ValueError: If required environment variables are missing or config is invalid
+            ValueError: If required environment variables are missing or config is invalid (when load_full_config=True)
         """
         # Project directory structure (Watchtower/)
         self.project_root = Path(__file__).resolve().parents[1]
@@ -90,17 +94,25 @@ class ConfigManager:
         # Keyword file cache to avoid re-parsing files used by multiple destinations
         self._keyword_cache: Dict[str, List[str]] = {}
 
-        # Load and parse configuration file (defaults to config.json)
-        config_filename = os.getenv('CONFIG_FILE', 'config.json')
-        config_path = self.config_dir / config_filename
-        self.destinations, self.rss_feeds = self._load_config(config_path)
+        # Expose CONFIG_FILE env var
+        self.config_file = os.getenv('CONFIG_FILE', 'config.json')
 
-        self._validate_env_config()
+        # Load and validate full configuration if requested
+        if load_full_config:
+            config_path = self.config_dir / self.config_file
+            self.destinations, self.rss_feeds = self._load_config(config_path)
+            self._validate_env_config()
 
-        # Channel ID -> Channel Name mapping
-        self.channel_names: Dict[str, str] = {}
+            # Channel ID -> Channel Name mapping
+            self.channel_names: Dict[str, str] = {}
 
-        _logger.info(f"[ConfigManager] Loaded {len(self.destinations)} destinations and {len(self.rss_feeds)} RSS feeds")
+            _logger.info(f"[ConfigManager] Loaded {len(self.destinations)} destinations and {len(self.rss_feeds)} RSS feeds")
+        else:
+            # Minimal mode:
+            self.destinations = []
+            self.rss_feeds = []
+            self.channel_names = {}
+            _logger.info("[ConfigManager] Initialized in minimal mode (env vars and paths only)")
 
     def _validate_env_config(self):
         """Validate required environment configuration (credentials, webhooks).

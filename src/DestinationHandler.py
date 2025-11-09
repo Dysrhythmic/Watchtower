@@ -34,6 +34,33 @@ class DestinationHandler(AbstractBaseClass):
         # Track rate limits per destination: destination_id -> expiry timestamp
         self._rate_limits: Dict[str, float] = {}
 
+    @property
+    @abstractmethod
+    def file_size_limit(self) -> int:
+        """Maximum file size in bytes for this destination platform.
+
+        Returns:
+            int: Maximum file size in bytes
+        """
+        pass
+
+    @abstractmethod
+    def _extract_retry_after(self, error_or_response) -> Optional[float]:
+        """Extract retry_after value from platform response.
+
+        This method must be implemented by subclasses to parse platform specific
+        rate limit responses and extract the number of seconds to wait before retrying.
+
+        Args:
+            error_or_response: Platform error or response object containing rate limit info. E.g.:
+                              For Discord: requests.Response object with 429 status
+                              For Telegram: FloodWaitError exception
+
+        Returns:
+            Optional[float]: Number of seconds to wait before retrying, or None if extraction fails
+        """
+        pass
+
     def _check_and_wait_for_rate_limit(self, destination_id) -> None:
         """Check if destination is rate limited and wait if necessary.
 

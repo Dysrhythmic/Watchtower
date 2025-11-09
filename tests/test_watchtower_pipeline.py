@@ -530,7 +530,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         destination = {
             'type': 'telegram',
             'name': 'Telegram Feed',
-            'telegram_destination_channel': '@target_channel',
+            'telegram_dst_channel': '@target_channel',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
         }
 
@@ -1106,7 +1106,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'telegram_destination_channel': '@target_channel',
+            'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 
@@ -1176,7 +1176,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'telegram_destination_channel': '@target_channel',
+            'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 
@@ -1242,7 +1242,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'telegram_destination_channel': '@target_channel',
+            'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 
@@ -1305,7 +1305,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'telegram_destination_channel': '@target_channel',
+            'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 
@@ -1369,7 +1369,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         destination = {
             'type': 'telegram',
-            'telegram_destination_channel': '@target_channel',
+            'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
 
@@ -1843,7 +1843,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
 
             destination = {
                 'type': 'telegram',
-                'telegram_destination_channel': '@target_channel',
+                'telegram_dst_channel': '@target_channel',
                 'keywords': ['exploit']
             }
 

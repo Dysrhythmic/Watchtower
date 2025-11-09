@@ -130,7 +130,7 @@ class TestRSSIntegration(unittest.TestCase):
             'destinations': [{
                 'name': 'Threat Intelligence',
                 'type': 'telegram',
-                'telegram_destination_channel': '@threat_alerts',
+                'telegram_dst_channel': '@threat_alerts',
                 'channels': [{
                     'id': 'https://threatfeeds.io/rss',
                     'keywords': ['ransomware', 'malware'],
@@ -379,7 +379,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
             'destinations': [{
                 'name': 'Mirror Channel',
                 'type': 'telegram',
-                'telegram_destination_channel': '@destination_channel',
+                'telegram_dst_channel': '@destination_channel',
                 'channels': [{
                     'id': '@source_channel',
                     'keywords': [],  # Forward all
@@ -442,7 +442,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
                 {
                     'name': 'Public Feed',
                     'type': 'telegram',
-                    'telegram_destination_channel': '@public_feed',
+                    'telegram_dst_channel': '@public_feed',
                     'channels': [{
                         'id': '@news_source',
                         'keywords': [],
@@ -454,7 +454,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
                 {
                     'name': 'Private Archive',
                     'type': 'telegram',
-                    'telegram_destination_channel': '@private_archive',
+                    'telegram_dst_channel': '@private_archive',
                     'channels': [{
                         'id': '@news_source',
                         'keywords': [],
@@ -483,8 +483,8 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
         destinations = app.router.get_destinations(msg)
         self.assertEqual(len(destinations), 2)
         self.assertTrue(all(d['type'] == 'telegram' for d in destinations))
-        self.assertEqual(destinations[0]['telegram_destination_channel'], '@public_feed')
-        self.assertEqual(destinations[1]['telegram_destination_channel'], '@private_archive')
+        self.assertEqual(destinations[0]['telegram_dst_channel'], '@public_feed')
+        self.assertEqual(destinations[1]['telegram_dst_channel'], '@private_archive')
 
 
 class TestMediaCleanup(unittest.TestCase):

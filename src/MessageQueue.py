@@ -22,6 +22,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import List, Optional, Dict, TYPE_CHECKING
 from LoggerSetup import setup_logger
+from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD
 
 if TYPE_CHECKING:
     from Watchtower import Watchtower
@@ -137,15 +138,15 @@ class MessageQueue:
         dest = retry_item.destination
 
         try:
-            if dest['type'] == 'discord':
+            if dest['type'] == APP_TYPE_DISCORD:
                 return watchtower.discord.send_message(
                     retry_item.formatted_content,
                     dest['discord_webhook_url'],
                     retry_item.media_path
                 )
-            elif dest['type'] == 'telegram':
+            elif dest['type'] == APP_TYPE_TELEGRAM:
                 # Telegram sending requires async
-                channel_spec = dest['telegram_destination_channel']
+                channel_spec = dest['telegram_dst_channel']
                 chat_id = await watchtower.telegram.resolve_destination(channel_spec)
                 if chat_id:
                     result = await watchtower.telegram.send_copy(

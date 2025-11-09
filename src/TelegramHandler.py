@@ -44,6 +44,7 @@ from MessageData import MessageData
 from DestinationHandler import DestinationHandler
 from LoggerSetup import setup_logger
 from AllowedFileTypes import ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES
+from AppTypes import APP_TYPE_TELEGRAM
 
 _logger = setup_logger(__name__)
 
@@ -475,7 +476,7 @@ class TelegramHandler(DestinationHandler):
             reply_context = await self._get_reply_context(message)
 
         return MessageData(
-            source_type="telegram",
+            source_type=APP_TYPE_TELEGRAM,
             channel_id=channel_id,
             channel_name=self._get_channel_name(channel_id),
             username=username,

@@ -35,6 +35,7 @@ from pathlib import Path
 from LoggerSetup import setup_logger
 from MessageData import MessageData
 from ConfigManager import ConfigManager
+from AppTypes import APP_TYPE_RSS
 
 _logger = setup_logger(__name__)
 
@@ -217,7 +218,7 @@ class RSSHandler:
         text = self._format_entry_text(entry)
 
         message_data = MessageData(
-            source_type="rss",
+            source_type=APP_TYPE_RSS,
             channel_id=rss_url,
             channel_name=rss_name,
             username="RSS",

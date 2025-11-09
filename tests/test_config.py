@@ -272,26 +272,129 @@ class TestConfigManager(unittest.TestCase):
                         self.assertEqual(len(config.destinations), 1)
                         self.assertEqual(config.destinations[0]['type'], 'discord')
 
-    def test_env_variable_validation(self):
-        """Test handling when required env vars are missing."""
+    def test_discord_only_without_telegram_credentials(self):
+        """Test that Discord-only config with only RSS sources works without Telegram credentials."""
         config_data = {
             "destinations": [{
-                "name": "Test",
+                "name": "Discord Only",
                 "type": "discord",
-                "env_key": "MISSING_ENV_VAR",
-                "channels": [{"id": "@test", "keywords": {"inline": []}}]
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": [],  # No Telegram channel sources
+                "rss": [{"url": "https://example.com/feed.xml", "name": "Security Feed"}]
             }]
         }
 
-        # ConfigManager requires TELEGRAM_API_ID and TELEGRAM_API_HASH at initialization
+        def mock_getenv(key, default=None):
+            if key == "DISCORD_WEBHOOK":
+                return "https://discord.com/webhook"
+            elif key == "CONFIG_FILE":
+                return default  # Use default value
+            # TELEGRAM_API_ID and TELEGRAM_API_HASH return None (not set)
+            return None
+
         with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
-            with patch('os.getenv', return_value=None):  # All env vars not set
+            with patch('os.getenv', side_effect=mock_getenv):
                 with patch.object(Path, 'exists', return_value=True):
                     with patch.object(Path, 'mkdir'):
-                        # Should raise ValueError for missing Telegram credentials
+                        # Should succeed without Telegram credentials
+                        config = ConfigManager()
+                        self.assertEqual(len(config.destinations), 1)
+                        self.assertEqual(config.destinations[0]['type'], 'discord')
+                        # Telegram credentials should be None
+                        self.assertIsNone(config.api_id)
+                        self.assertIsNone(config.api_hash)
+
+    def test_telegram_destination_requires_credentials(self):
+        """Test that Telegram destination requires Telegram credentials."""
+        config_data = {
+            "destinations": [{
+                "name": "Telegram Dest",
+                "type": "telegram",
+                "env_key": "TELEGRAM_CHANNEL",
+                "channels": [],
+                "rss": [{"url": "https://example.com/feed.xml", "name": "Feed"}]
+            }]
+        }
+
+        def mock_getenv(key, default=None):
+            if key == "TELEGRAM_CHANNEL":
+                return "@my_channel"
+            elif key == "CONFIG_FILE":
+                return default
+            # TELEGRAM_API_ID and TELEGRAM_API_HASH are None
+            return None
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', side_effect=mock_getenv):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        # Should fail due to missing Telegram credentials
                         with self.assertRaises(ValueError) as context:
                             config = ConfigManager()
+                        self.assertIn("Telegram", str(context.exception))
                         self.assertIn("TELEGRAM_API_ID", str(context.exception))
+
+    def test_telegram_source_requires_credentials(self):
+        """Test that Telegram source channels require Telegram credentials even with Discord destination."""
+        config_data = {
+            "destinations": [{
+                "name": "Discord with Telegram Source",
+                "type": "discord",
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": [{"id": "@telegram_channel", "keywords": {"inline": []}}]
+            }]
+        }
+
+        def mock_getenv(key, default=None):
+            if key == "DISCORD_WEBHOOK":
+                return "https://discord.com/webhook"
+            elif key == "CONFIG_FILE":
+                return default
+            # TELEGRAM_API_ID and TELEGRAM_API_HASH are None
+            return None
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', side_effect=mock_getenv):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        # Should fail because Telegram channels require Telegram credentials
+                        with self.assertRaises(ValueError) as context:
+                            config = ConfigManager()
+                        self.assertIn("Telegram", str(context.exception))
+                        self.assertIn("TELEGRAM_API_ID", str(context.exception))
+
+    def test_rss_only_to_discord_without_telegram(self):
+        """Test that RSS-only sources to Discord work without Telegram credentials."""
+        config_data = {
+            "destinations": [{
+                "name": "RSS to Discord",
+                "type": "discord",
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": [],
+                "rss": [
+                    {"url": "https://example.com/feed.xml", "name": "Security Feed"}
+                ]
+            }]
+        }
+
+        def mock_getenv(key, default=None):
+            if key == "DISCORD_WEBHOOK":
+                return "https://discord.com/webhook"
+            elif key == "CONFIG_FILE":
+                return default
+            # TELEGRAM_API_ID and TELEGRAM_API_HASH are None
+            return None
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', side_effect=mock_getenv):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        # Should succeed - no Telegram needed
+                        config = ConfigManager()
+                        self.assertEqual(len(config.destinations), 1)
+                        self.assertEqual(len(config.rss_feeds), 1)
+                        self.assertIsNone(config.api_id)
+                        self.assertIsNone(config.api_hash)
 
     def test_keyword_file_parsing_errors(self):
         """Test handling malformed keyword files."""
@@ -753,6 +856,127 @@ class TestConfigManager(unittest.TestCase):
                         with self.assertRaises(ValueError) as context:
                             ConfigManager()
                         self.assertIn("No valid destinations", str(context.exception))
+
+    def test_invalid_trim_front_lines_negative(self):
+        """Test that negative trim_front_lines disables parser."""
+        config_data = {
+            "destinations": [{
+                "name": "Test",
+                "type": "discord",
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": [{
+                    "id": "@test",
+                    "keywords": {"inline": []},
+                    "parser": {"trim_front_lines": -1, "trim_back_lines": 0}
+                }]
+            }]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://discord.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        config = ConfigManager()
+                        # Parser should be removed due to invalid value
+                        self.assertIsNone(config.destinations[0]['channels'][0].get('parser'))
+
+    def test_invalid_trim_back_lines_negative(self):
+        """Test that negative trim_back_lines disables parser."""
+        config_data = {
+            "destinations": [{
+                "name": "Test",
+                "type": "discord",
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": [{
+                    "id": "@test",
+                    "keywords": {"inline": []},
+                    "parser": {"trim_front_lines": 0, "trim_back_lines": -5}
+                }]
+            }]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://discord.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        config = ConfigManager()
+                        # Parser should be removed due to invalid value
+                        self.assertIsNone(config.destinations[0]['channels'][0].get('parser'))
+
+    def test_invalid_trim_lines_non_integer(self):
+        """Test that non-integer trim values disable parser."""
+        config_data = {
+            "destinations": [{
+                "name": "Test",
+                "type": "discord",
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": [{
+                    "id": "@test",
+                    "keywords": {"inline": []},
+                    "parser": {"trim_front_lines": "2", "trim_back_lines": 0}
+                }]
+            }]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://discord.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        config = ConfigManager()
+                        # Parser should be removed due to invalid type
+                        self.assertIsNone(config.destinations[0]['channels'][0].get('parser'))
+
+    def test_valid_trim_lines_zero(self):
+        """Test that zero trim values are valid."""
+        config_data = {
+            "destinations": [{
+                "name": "Test",
+                "type": "discord",
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": [{
+                    "id": "@test",
+                    "keywords": {"inline": []},
+                    "parser": {"trim_front_lines": 0, "trim_back_lines": 0}
+                }]
+            }]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://discord.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        config = ConfigManager()
+                        # Parser should remain valid
+                        self.assertIsNotNone(config.destinations[0]['channels'][0].get('parser'))
+                        parser = config.destinations[0]['channels'][0]['parser']
+                        self.assertEqual(parser['trim_front_lines'], 0)
+                        self.assertEqual(parser['trim_back_lines'], 0)
+
+    def test_invalid_rss_parser_trim_values(self):
+        """Test that invalid trim values in RSS parser disable parser."""
+        config_data = {
+            "destinations": [{
+                "name": "Test",
+                "type": "discord",
+                "env_key": "DISCORD_WEBHOOK",
+                "channels": [],
+                "rss": [{
+                    "url": "https://example.com/feed.xml",
+                    "name": "Test Feed",
+                    "keywords": {"inline": []},
+                    "parser": {"trim_front_lines": -1, "trim_back_lines": 0}
+                }]
+            }]
+        }
+
+        with patch('builtins.open', mock_open(read_data=json.dumps(config_data))):
+            with patch('os.getenv', return_value="https://discord.com/webhook"):
+                with patch.object(Path, 'exists', return_value=True):
+                    with patch.object(Path, 'mkdir'):
+                        config = ConfigManager()
+                        # RSS pseudo-channel parser should be removed due to invalid value
+                        rss_channel = config.destinations[0]['channels'][0]
+                        self.assertIsNone(rss_channel.get('parser'))
 
     def test_rss_feed_url_deduplication(self):
         """Test that RSS feeds with duplicate URLs are deduplicated."""

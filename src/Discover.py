@@ -1,11 +1,11 @@
 """
-Discover - Channel discovery subcommand for Watchtower
+Discover - For the "discover" subcommand
 
-This module provides functionality to discover and list all accessible Telegram channels,
-with options to diff against existing config and generate config files.
+This module provides functionality for assisting in configuring Telegram
+channels since many live and die so quickly.
 
 Features:
-- List all accessible Telegram channels, groups, and users
+- List all accessible Telegram channels, groups, etc.
 - Compare discovered channels with existing config (--diff mode)
 - Auto-generate config file from discovered channels (--generate flag)
 
@@ -13,8 +13,11 @@ Subcommand Usage:
     python3 src/Watchtower.py discover
         List all accessible channels
 
+    python3 src/Watchtower.py discover -h
+        Display help menu
+
     python3 src/Watchtower.py discover --diff
-        Show only new channels not in existing config
+        Show channels not in existing config and vice versa
 
     python3 src/Watchtower.py discover --generate
         Generate config_discovered.json file
@@ -26,6 +29,7 @@ import os
 import json
 from pathlib import Path
 from LoggerSetup import setup_logger
+from AppTypes import APP_TYPE_DISCORD
 
 _logger = setup_logger(__name__)
 
@@ -222,7 +226,7 @@ def _save_discovered_config(channels, config_dir: Path):
         "destinations": [
             {
                 "name": "Auto-Generated Feed",
-                "type": "discord",
+                "type": APP_TYPE_DISCORD,
                 "env_key": "DISCORD_WEBHOOK_URL",
                 "channels": [ch["info"] for ch in channels]
             }

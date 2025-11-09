@@ -28,6 +28,7 @@ from pathlib import Path
 import mimetypes
 from LoggerSetup import setup_logger
 from ConfigManager import ConfigManager
+from AppTypes import APP_TYPE_DISCORD
 from MessageData import MessageData
 from AllowedFileTypes import ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES
 
@@ -357,10 +358,10 @@ class MessageRouter:
             'parser': channel_config.get('parser'),
             'ocr': channel_config.get('ocr', False),
         }
-        if base['type'] == 'discord':
+        if base['type'] == APP_TYPE_DISCORD:
             base['discord_webhook_url'] = destination['discord_webhook_url']
         else:
-            base['telegram_destination_channel'] = destination['telegram_destination_channel']
+            base['telegram_dst_channel'] = destination['telegram_dst_channel']
         return base
 
     def _channel_matches(self, channel_id: str, channel_name: str, config_id: str) -> bool:

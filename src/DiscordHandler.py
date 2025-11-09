@@ -4,15 +4,9 @@ DiscordHandler - Discord webhook message delivery
 This module handles sending messages to Discord channels via webhooks. Implements
 chunking for long messages, media attachment support, and rate limit handling.
 
-Features:
-- Automatic message chunking (2000 char Discord limit)
-- Media file attachment support
-- Rate limit detection and retry coordination
-- Formatted message output with metadata headers
-
 Discord API Details:
     - Max message length: 2000 characters
-    - Rate limit response: 429 with retry_after in seconds
+    - Rate limit response: 429 status code with retry_after in seconds
     - Success status codes: 200, 204
 """
 import os
@@ -33,20 +27,16 @@ class DiscordHandler(DestinationHandler):
     long messages and handles rate limiting.
     """
 
-    MAX_LENGTH = 2000  # Discord's message character limit
-    FILE_SIZE_LIMIT = 25 * 1024 * 1024  # 25MB for Discord free tier (configurable by user)
+    MAX_MSG_LENGTH = 2000
+    FILE_SIZE_LIMIT = 25 * 1024 * 1024  # 25MB for Discord free tier
+    USERNAME = 'Watchtower'
     AVATAR_URL = "https://raw.githubusercontent.com/Dysrhythmic/Watchtower/master/watchtower.png"
 
     def __init__(self):
-        """Initialize Discord handler."""
         super().__init__()
 
-    def _get_rate_limit_key(self, destination_identifier) -> str:
-        """Get rate limit key for Discord (webhook URL)."""
-        return str(destination_identifier)
-
     def send_message(self, content: str, webhook_url: str, media_path: Optional[str] = None) -> bool:
-        """Send message to Discord webhook with automatic chunking.
+        """Send message to Discord webhook.
 
         Sends media attachment with first chunk if media_path provided. Remaining
         chunks are sent as text-only messages. Returns False on any error (rate limit,
@@ -63,14 +53,14 @@ class DiscordHandler(DestinationHandler):
         try:
             self._check_and_wait_for_rate_limit(webhook_url)
 
-            chunks = self._chunk_text(content, self.MAX_LENGTH)
+            chunks = self._chunk_text(content, self.MAX_MSG_LENGTH)
             chunks_sent = 0
 
             if media_path and os.path.exists(media_path):
                 with open(media_path, 'rb') as f:
                     files = {'file': f}
                     data = {
-                        'username': 'Watchtower',
+                        'username': self.USERNAME,
                         'avatar_url': self.AVATAR_URL,
                         'content': chunks[0]
                     }
@@ -82,7 +72,7 @@ class DiscordHandler(DestinationHandler):
                     elif response.status_code not in [200, 204]:
                         body = (response.text or "")[:200]
                         _logger.error(
-                            f"[DiscordHandler] Unsuccessful status code from Discord webhook (media): "
+                            f"[DiscordHandler] Unsuccessful status code from Discord webhook (sent media): "
                             f"status={response.status_code}, body={body}"
                         )
                         return False
@@ -91,7 +81,7 @@ class DiscordHandler(DestinationHandler):
             # Send remaining chunks as text-only messages
             for chunk_index, chunk in enumerate(chunks[chunks_sent:], start=chunks_sent + 1):
                 payload = {
-                    "username": "Watchtower",
+                    "username": self.USERNAME,
                     "avatar_url": self.AVATAR_URL,
                     "content": chunk
                 }
@@ -129,15 +119,14 @@ class DiscordHandler(DestinationHandler):
             retry_after = body.get('retry_after', 1.0)
             self._store_rate_limit(webhook_url, retry_after)
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            # Fallback if response parsing fails
             _logger.warning(f"[DiscordHandler] Rate limited (429) but couldn't parse retry_after: {e}")
             self._store_rate_limit(webhook_url, 1.0)
 
     def format_message(self, message_data: MessageData, destination: Dict) -> str:
-        """Format message for Discord with metadata headers and markdown formatting.
+        """Format message for Discord with metadata and markdown formatting.
 
-        Creates a formatted message with headers (source, sender, time), matched
-        keywords, message text, and OCR text (quoted for visual distinction).
+        Creates a formatted message with metadata (source, sender, time),
+        matched keywords, message text, and OCR text.
 
         Args:
             message_data: Message to format
@@ -152,12 +141,11 @@ class DiscordHandler(DestinationHandler):
             **Time:** YYYY-MM-DD HH:MM:SS UTC
             **Source:** (defanged URL if available)
             **Content:** (media type if present)
-            **Matched:** keyword1, keyword2
+            **Matched:** keyword1, keyword2 (if any)
             **Message:**
             Message text content
             **OCR:**
             > Quoted OCR text
-            > for visual distinction
         """
         lines = [
             f"**New message from:** {message_data.channel_name}",
@@ -165,14 +153,12 @@ class DiscordHandler(DestinationHandler):
             f"**Time:** {message_data.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}"
         ]
 
-        # Add defanged source URL if available (for CTI workflows)
         if 'src_url_defanged' in message_data.metadata:
             lines.append(f"**Source:** {message_data.metadata['src_url_defanged']}")
 
         if message_data.has_media:
             lines.append(f"**Content:** {message_data.media_type}")
 
-        # Show which keywords triggered this message's delivery
         if destination.get('keywords'):
             lines.append(f"**Matched:** {', '.join(f'`{keyword}`' for keyword in destination['keywords'])}")
 
@@ -182,7 +168,6 @@ class DiscordHandler(DestinationHandler):
         if message_data.text:
             lines.append(f"**Message:**\n{message_data.text}")
 
-        # OCR text formatted as quote for visual distinction
         if message_data.ocr_raw:
             ocr_quoted = '\n'.join(f"> {line}" for line in message_data.ocr_raw.split('\n'))
             lines.append(f"**OCR:**\n{ocr_quoted}")
@@ -190,7 +175,7 @@ class DiscordHandler(DestinationHandler):
         return '\n'.join(lines)
 
     def _format_reply_context(self, reply_context: Dict) -> str:
-        """Format Telegram reply-to information for Discord display.
+        """Format source reply-to information for Discord display.
 
         Shows author, timestamp, and content of the message being replied to.
         Truncates long text to 200 characters.
@@ -210,7 +195,6 @@ class DiscordHandler(DestinationHandler):
 
         original_text = reply_context.get('text', '')
         if original_text:
-            # Truncate long replies for readability
             if len(original_text) > 200:
                 original_text = original_text[:200] + " ..."
             parts.append(f"**  Original message:** {original_text}")

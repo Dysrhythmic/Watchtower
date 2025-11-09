@@ -289,7 +289,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         Tests: src/MessageQueue.py:117-128 (Telegram retry)
         """
         queue = MessageQueue()
-        dest = {'type': 'telegram', 'name': 'Test', 'telegram_destination_channel': '@testchannel'}
+        dest = {'type': 'telegram', 'name': 'Test', 'telegram_dst_channel': '@testchannel'}
 
         retry_item = RetryItem(
             destination=dest,
@@ -320,7 +320,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         Tests: src/MessageQueue.py:120-128 (Telegram resolve failure)
         """
         queue = MessageQueue()
-        dest = {'type': 'telegram', 'name': 'Test', 'telegram_destination_channel': '@invalid'}
+        dest = {'type': 'telegram', 'name': 'Test', 'telegram_dst_channel': '@invalid'}
 
         retry_item = RetryItem(
             destination=dest,

@@ -14,6 +14,7 @@ Key Features:
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Literal, Any
 from datetime import datetime
+from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_RSS
 
 @dataclass
 class MessageData:
@@ -37,7 +38,7 @@ class MessageData:
     """
 
     # Source identity
-    source_type: Literal["telegram", "rss"] = "telegram"
+    source_type: Literal["telegram", "rss"] = APP_TYPE_TELEGRAM
 
     # Origin / display
     channel_id: str = ""

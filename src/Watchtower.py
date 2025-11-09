@@ -70,6 +70,7 @@ from typing import List, Dict, Optional, TYPE_CHECKING
 from pathlib import Path
 from LoggerSetup import setup_logger
 from Discover import discover_channels
+from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD, APP_TYPE_RSS
 
 if TYPE_CHECKING:
     from MessageData import MessageData
@@ -354,7 +355,7 @@ class Watchtower:
         accidental navigation to potentially malicious content in CTI workflows.
         """
         ocr_needed = False
-        if message_data.source_type == "telegram" and message_data.has_media:
+        if message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_media:
             ocr_needed = self.router.is_ocr_enabled_for_channel(message_data.channel_id, message_data.channel_name)
         if ocr_needed and self.ocr.is_available():
             if not message_data.media_path:
@@ -370,7 +371,7 @@ class Watchtower:
                 else:
                     _logger.debug(f"[Watchtower] Skipping OCR for non-image file: {message_data.media_path}")
 
-        if message_data.source_type == "telegram" and message_data.original_message:
+        if message_data.source_type == APP_TYPE_TELEGRAM and message_data.original_message:
             telegram_msg_id = getattr(message_data.original_message, "id", None)
             defanged_url = self.telegram.build_defanged_tg_url(
                 message_data.channel_id,
@@ -410,14 +411,14 @@ class Watchtower:
         any_destination_has_restricted_mode = any(destination.get('restricted_mode', False) for destination in destinations)
 
         media_passes_restrictions = True
-        if any_destination_has_restricted_mode and message_data.source_type == "telegram" and message_data.has_media and message_data.original_message:
+        if any_destination_has_restricted_mode and message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_media and message_data.original_message:
             # _is_media_restricted returns True if media IS restricted, so invert for "passes" check
             media_passes_restrictions = not self.telegram._is_media_restricted(message_data.original_message)
 
-        if message_data.source_type == "telegram" and message_data.has_media and not message_data.media_path:
+        if message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_media and not message_data.media_path:
             should_download_media = False
             for destination in destinations:
-                if destination['type'] in ('discord', 'telegram'):
+                if destination['type'] in (APP_TYPE_DISCORD, APP_TYPE_TELEGRAM):
                     if not destination.get('restricted_mode', False):
                         should_download_media = True
                         break
@@ -451,10 +452,10 @@ class Watchtower:
                 include_media = True
 
         # Use appropriate formatter based on destination type
-        if destination['type'] == 'discord':
+        if destination['type'] == APP_TYPE_DISCORD:
             content = self.discord.format_message(parsed_message, destination)
             status = await self._send_to_discord(parsed_message, destination, content, include_media)
-        elif destination['type'] == 'telegram':
+        elif destination['type'] == APP_TYPE_TELEGRAM:
             content = self.telegram.format_message(parsed_message, destination)
             status = await self._send_to_telegram(parsed_message, destination, content, include_media)
         else:
@@ -536,7 +537,7 @@ class Watchtower:
             )
             media_path = media_path if should_send_media else None
 
-        channel_specifier = destination['telegram_destination_channel']
+        channel_specifier = destination['telegram_dst_channel']
 
         destination_chat_id = await self.telegram.resolve_destination(channel_specifier)
         if destination_chat_id is None:
@@ -686,7 +687,7 @@ class Watchtower:
                     header = f"Attachment too large to forward ({file_size_mb:.0f} MB). Matched {len(matched_lines)} line(s):"
 
                 # Format lines with block quotes based on destination type
-                if dest_type == 'telegram':
+                if dest_type == APP_TYPE_TELEGRAM:
                     # Telegram uses HTML blockquote tags
                     from html import escape
                     lines_escaped = [escape(line) for line in matched_lines]
@@ -698,7 +699,7 @@ class Watchtower:
                     attachment_section = f"\n\n**{header}**\n" + "\n".join(lines_quoted)
 
                 # Add file statistics
-                if dest_type == 'telegram':
+                if dest_type == APP_TYPE_TELEGRAM:
                     attachment_section += f"\n\n<i>[Full file has {total_lines:,} lines]</i>"
                 else:
                     attachment_section += f"\n\n*[Full file has {total_lines:,} lines]*"
@@ -706,7 +707,7 @@ class Watchtower:
                 content += attachment_section
             else:
                 # Empty file or no lines extracted
-                if dest_type == 'telegram':
+                if dest_type == APP_TYPE_TELEGRAM:
                     content += f"\n\n<b>[Attachment too large to forward ({file_size_mb:.0f} MB), file appears empty]</b>"
                 else:
                     content += f"\n\n**[Attachment too large to forward ({file_size_mb:.0f} MB), file appears empty]**"

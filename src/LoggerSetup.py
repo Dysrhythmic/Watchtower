@@ -4,17 +4,6 @@ logger_setup - Centralized logging configuration for Watchtower
 This module provides consistent logging configuration across all Watchtower components.
 All source files should use setup_logger() instead of configuring logging.basicConfig()
 directly to ensure consistent formatting and log levels.
-
-Features:
-- Colored output for better visibility (ERROR=red, WARNING=yellow)
-- Consistent timestamp and message formatting
-- Automatic color detection (disabled when output is redirected to file)
-
-Example:
-    from LoggerSetup import setup_logger
-    logger = setup_logger(__name__)
-    logger.info("Message logged with consistent formatting")
-    logger.error("Error messages appear in red!")
 """
 import logging
 import sys
@@ -23,7 +12,6 @@ import sys
 class ColoredFormatter(logging.Formatter):
     """Custom formatter that adds ANSI color codes to log levels."""
 
-    # ANSI color codes
     COLORS = {
         'DEBUG': '\033[0;36m',      # Cyan
         'INFO': '\033[0;37m',       # White
@@ -33,7 +21,7 @@ class ColoredFormatter(logging.Formatter):
     }
     RESET = '\033[0m'  # Reset to default color
 
-    def __init__(self, fmt=None, datefmt=None, use_color=True):
+    def __init__(self, fmt=None, datefmt=None, use_color=None):
         """Initialize colored formatter.
 
         Args:
@@ -57,16 +45,15 @@ class ColoredFormatter(logging.Formatter):
         return super().format(record)
 
 
-def setup_logger(name: str, use_color=True) -> logging.Logger:
-    """Get logger with consistent Watchtower formatting and colored output.
+def setup_logger(name: str, use_color=None) -> logging.Logger:
+    """Get logger with consistent formatting and colored output.
 
     Configures logging with a standard format including timestamp, level, and message.
-    ERROR and WARNING messages are colored for better visibility.
-    Safe to call multiple times - only configures on first call.
+    Safe to call multiple times; it only configures on the first call.
 
     Args:
-        name: Logger name (typically __name__ from calling module)
-        use_color: Whether to use colored output (auto-detected if True, disabled if False)
+        name: Logger name (__name__ from calling module for easier debugging)
+        use_color: Whether to use colored output (auto-detected if None)
 
     Returns:
         logging.Logger: Configured logger instance with colored formatting

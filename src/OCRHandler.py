@@ -1,23 +1,12 @@
 """
 OCRHandler - Optical Character Recognition for text extraction from images
 
-This module provides OCR capabilities using EasyOCR to extract text from images.
-Primary use case is extracting text from screenshots for keyword matching and routing.
-
-Features:
-- Lazy initialization of OCR reader (only loads when needed)
-- Graceful degradation when EasyOCR is not installed
-- Optimized parameters for screenshot text extraction
-- English language support
-
-Dependencies:
-    - easyocr (optional): pip install easyocr
-    If not installed, OCR features will be disabled but app continues to function.
+This module uses EasyOCR to extract text from images for keyword matching and routing.
+If the EasyOCR import fails, it is logged and OCR functionality is disabled without crashing.
 """
 from typing import Optional
 from LoggerSetup import setup_logger
 
-# Optional EasyOCR import (if missing, log and skip OCR)
 try:
     import easyocr
     _EASYOCR_AVAILABLE = True
@@ -28,14 +17,12 @@ _logger = setup_logger(__name__)
 
 
 class OCRHandler:
-    """Handles OCR operations for image text extraction.
-
-    Uses EasyOCR library for text recognition. Reader is lazily initialized
-    on first use to avoid startup delays when OCR is not needed.
+    """Handles OCR operations using EasyOCR.
     """
 
     def __init__(self):
-        """Initialize OCRHandler with lazy reader loading."""
+        """Initialize OCRHandler with lazy reader loading to avoid startup delays
+        when OCR is not needed."""
         self._ocr_reader = None
 
     def is_available(self) -> bool:
@@ -55,7 +42,7 @@ class OCRHandler:
         """
         if self._ocr_reader is None and _EASYOCR_AVAILABLE:
             try:
-                # English only, CPU mode for simplicity
+                # English only, CPU mode
                 self._ocr_reader = easyocr.Reader(['en'], gpu=False)
                 _logger.info("[OCRHandler] EasyOCR reader initialized (en, CPU)")
             except Exception as e:
@@ -70,12 +57,6 @@ class OCRHandler:
 
         Returns:
             Optional[str]: Extracted text if successful, None if OCR unavailable or failed
-
-        Note:
-            EasyOCR parameters are tuned for screenshot text extraction:
-            - contrast_ths=0.15: Lower threshold to detect faint text
-            - min_size=10: Ignore tiny noise artifacts
-            - paragraph=True: Group text into logical blocks
         """
         if not _EASYOCR_AVAILABLE:
             _logger.debug("[OCRHandler] OCR skipped (EasyOCR not available)")
@@ -86,7 +67,7 @@ class OCRHandler:
             return None
 
         try:
-            # EasyOCR parameters tuned for screenshot text extraction:
+            # EasyOCR parameters tuning:
             # - contrast_ths=0.15: Lower threshold to detect faint text
             # - min_size=10: Ignore tiny noise artifacts
             # - detail=0: Return only text (not coordinates)

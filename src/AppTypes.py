@@ -5,6 +5,6 @@ These constants define the supported platform types used throughout the applicat
 for both source types (where messages originate) and destination types (where messages are sent).
 """
 
-APP_TYPE_TELEGRAM = 'telegram'
-APP_TYPE_DISCORD = 'discord'
-APP_TYPE_RSS = 'rss'
+APP_TYPE_TELEGRAM = 'Telegram'
+APP_TYPE_DISCORD = 'Discord'
+APP_TYPE_RSS = 'RSS'

@@ -1,15 +1,8 @@
 """
-MessageQueue - In-memory retry queue for rate-limited message delivery
+MessageQueue - In-memory retry queue for rate limited message delivery
 
 This module provides a retry mechanism for messages that fail due to rate limiting
-or temporary delivery errors. Uses exponential backoff strategy to avoid overwhelming
-destination endpoints.
-
-Features:
-- Automatic retry with exponential backoff (5s, 10s, 20s)
-- Maximum 3 retry attempts per message
-- Async background processing
-- Per-message attempt tracking
+or temporary delivery errors.
 
 Retry Strategy:
     Attempt 1: Wait 5 seconds
@@ -36,24 +29,23 @@ class RetryItem:
 
     Attributes:
         destination: Destination configuration dict
-        formatted_content: Pre-formatted message text ready to send
+        formatted_content: Message text ready to send
         media_path: Optional path to media file attachment
-        attempt_count: Number of retry attempts made (0-indexed)
+        attempt_count: Number of retry attempts made (zero indexed)
         next_retry_time: Unix timestamp when next retry should occur
     """
-    destination: Dict              # Destination config
-    formatted_content: str         # Already formatted message content
-    media_path: Optional[str]      # Path to media file
-    attempt_count: int = 0         # Number of retry attempts
-    next_retry_time: float = 0.0   # Timestamp when next retry should occur
+    destination: Dict
+    formatted_content: str
+    media_path: Optional[str]
+    attempt_count: int = 0
+    next_retry_time: float = 0.0
 
 
 class MessageQueue:
-    """In-memory retry queue for rate-limited messages.
+    """In-memory retry queue for rate limited messages.
 
     Provides automatic retry with exponential backoff for failed message deliveries.
-    Queue is processed by a background async task that attempts redelivery at
-    appropriate intervals.
+    Queue is processed by a background async task that attempts redelivery.
     """
 
     MAX_RETRIES = 3
@@ -83,8 +75,7 @@ class MessageQueue:
         """Background task that continuously processes retry queue.
 
         Runs indefinitely as async background task. Checks queue every second and
-        attempts to resend messages whose retry time has elapsed. Applies exponential
-        backoff on failures (5s, 10s, 20s) and drops messages after MAX_RETRIES.
+        attempts to resend messages whose retry time has elapsed.
 
         Args:
             watchtower: Watchtower instance providing access to destination handlers
@@ -106,15 +97,15 @@ class MessageQueue:
                             f"[MessageQueue] Retry succeeded after {retry_item.attempt_count + 1} "
                             f"attempt(s) for {retry_item.destination['name']}"
                         )
+                    # Max retries reached (0, 1, 2 = 3 attempts)
                     elif retry_item.attempt_count >= self.MAX_RETRIES - 1:
-                        # Max retries reached (0, 1, 2 = 3 attempts)
                         self._queue.remove(retry_item)
                         _logger.error(
                             f"[MessageQueue] Message dropped after {self.MAX_RETRIES} "
                             f"failed attempts to {retry_item.destination['name']}"
                         )
+                    # Exponential backoff: 5s, 10s, 20s
                     else:
-                        # Exponential backoff: 5s, 10s, 20s
                         retry_item.attempt_count += 1
                         backoff = self.INITIAL_BACKOFF * (2 ** retry_item.attempt_count)
                         retry_item.next_retry_time = now + backoff
@@ -129,7 +120,7 @@ class MessageQueue:
         """Attempt to resend a message.
 
         Args:
-            retry_item: Item to retry
+            retry_item: Message to retry
             watchtower: Watchtower instance
 
         Returns:
@@ -164,7 +155,7 @@ class MessageQueue:
         return False
 
     def get_queue_size(self) -> int:
-        """Get current queue size (for metrics/monitoring).
+        """Get current queue size.
 
         Returns:
             int: Number of items in queue
@@ -172,10 +163,9 @@ class MessageQueue:
         return len(self._queue)
 
     def clear_queue(self) -> None:
-        """Clear all items from queue (for graceful shutdown).
+        """Clear all items from queue.
 
-        Removes all pending retry items. Typically called during application
-        shutdown to prevent orphaned retry attempts.
+        Removes all pending retry items. Used for graceful shutdown.
         """
         size = len(self._queue)
         self._queue.clear()

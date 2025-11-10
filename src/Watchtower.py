@@ -24,6 +24,7 @@ from pathlib import Path
 from LoggerSetup import setup_logger
 from Discover import discover_channels
 from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD, APP_TYPE_RSS
+from AllowedFileTypes import ALLOWED_EXTENSIONS
 from SendStatus import SendStatus
 
 if TYPE_CHECKING:
@@ -447,14 +448,11 @@ class Watchtower:
             return SendStatus.QUEUED
 
     async def _send_to_telegram(self, parsed_message: MessageData, destination: Dict, content: str, include_media: bool) -> SendStatus:
-        """Send message to Telegram channel using copy mode.
-
-        Always uses copy mode (formatted message with optional media) for consistency
-        with Discord and to allow parser modifications, keyword display, etc.
+        """Send message to Telegram channel
 
         Args:
             parsed_message: The parsed message with applied parser rules
-            destination: Telegram destination config with single channel specifier
+            destination: Telegram destination config
             content: Formatted message text
             include_media: Whether to include media attachment
 
@@ -470,11 +468,11 @@ class Watchtower:
             )
             media_path = media_path if should_send_media else None
 
-        channel_specifier = destination['telegram_dst_channel']
+        dst_channel_specifier = destination['telegram_dst_channel'] # as specified in config
 
-        destination_chat_id = await self.telegram.resolve_destination(channel_specifier)
+        destination_chat_id = await self.telegram.resolve_destination(dst_channel_specifier)
         if destination_chat_id is None:
-            _logger.warning(f"Skipping unresolved destination: {channel_specifier}")
+            _logger.warning(f"Skipping unresolved destination: {dst_channel_specifier}")
             return SendStatus.FAILED
 
         try:
@@ -485,7 +483,6 @@ class Watchtower:
                     self.metrics.increment("ocr_msgs_sent")
                 return SendStatus.SENT
             else:
-                # Send failed, enqueue for retry
                 self.message_queue.enqueue(
                     destination=destination,
                     formatted_content=content,
@@ -495,7 +492,7 @@ class Watchtower:
                 self.metrics.increment("messages_queued_retry")
                 return SendStatus.QUEUED
         except Exception as e:
-            _logger.error(f"Failed to send to {channel_specifier}: {e}")
+            _logger.error(f"Failed to send to {dst_channel_specifier}: {e}")
             return SendStatus.FAILED
 
     def _extract_matched_lines_from_attachment(self, media_path: str, keywords: List[str]) -> dict:
@@ -529,12 +526,10 @@ class Watchtower:
             if not path.exists():
                 return result
 
-            # Check if file has a supported text extension
-            from AllowedFileTypes import ALLOWED_EXTENSIONS
             if path.suffix.lower() not in ALLOWED_EXTENSIONS:
                 return result
 
-            # Stream file line-by-line (never load entire file into memory)
+            # Stream file line-by-line
             matched_lines = []
             total_lines = 0
 
@@ -544,11 +539,11 @@ class Watchtower:
                     line_stripped = line.rstrip('\n\r')
 
                     if keywords:
-                        # Keywords provided - check for matches
+                        # Check for matches
                         if any(keyword.lower() in line_stripped.lower() for keyword in keywords):
                             matched_lines.append(line_stripped)
                     else:
-                        # No keywords - collect first 100 lines as sample
+                        # Collect first 100 lines as sample
                         if total_lines <= 100:
                             matched_lines.append(line_stripped)
 
@@ -595,7 +590,7 @@ class Watchtower:
             if file_size <= file_size_limit:
                 return content, True
 
-            # File is too large - extract matched lines or sample
+            # File is too large, extract matched lines or sample
             file_size_mb = file_size / (1024 * 1024)
             _logger.info(
                 f"Attachment {Path(media_path).name} ({file_size_mb:.1f}MB) "
@@ -611,12 +606,11 @@ class Watchtower:
             dest_type = destination.get('type', 'discord')
 
             if matched_lines:
-                # Format header based on whether it's a sample or keyword matches
                 if is_sample:
-                    # No keywords configured - showing first N lines as sample
+                    # No keywords configured, showing first N lines as sample
                     header = f"Attachment too large to forward ({file_size_mb:.0f} MB). No keywords configured, showing first {len(matched_lines)} lines:"
                 else:
-                    # Keywords matched - showing matched lines
+                    # Keywords matched, showing matched lines
                     header = f"Attachment too large to forward ({file_size_mb:.0f} MB). Matched {len(matched_lines)} line(s):"
 
                 # Format lines with block quotes based on destination type
@@ -626,30 +620,29 @@ class Watchtower:
                     lines_escaped = [escape(line) for line in matched_lines]
                     lines_formatted = f"<blockquote>{'<br>'.join(lines_escaped)}</blockquote>"
                     attachment_section = f"\n\n<b>{escape(header)}</b>\n{lines_formatted}"
-                else:
+                elif dest_type == APP_TYPE_DISCORD:
                     # Discord uses markdown quote prefix ("> ")
                     lines_quoted = [f"> {line}" for line in matched_lines]
                     attachment_section = f"\n\n**{header}**\n" + "\n".join(lines_quoted)
 
-                # Add file statistics
                 if dest_type == APP_TYPE_TELEGRAM:
-                    attachment_section += f"\n\n<i>[Full file has {total_lines:,} lines]</i>"
-                else:
-                    attachment_section += f"\n\n*[Full file has {total_lines:,} lines]*"
+                    attachment_section += f"\n\n<b>[Full file has {total_lines:,} lines]</b>"
+                elif dest_type == APP_TYPE_DISCORD:
+                    attachment_section += f"\n\n**[Full file has {total_lines:,} lines]**"
 
                 content += attachment_section
             else:
                 # Empty file or no lines extracted
                 if dest_type == APP_TYPE_TELEGRAM:
                     content += f"\n\n<b>[Attachment too large to forward ({file_size_mb:.0f} MB), file appears empty]</b>"
-                else:
+                elif dest_type == APP_TYPE_DISCORD:
                     content += f"\n\n**[Attachment too large to forward ({file_size_mb:.0f} MB), file appears empty]**"
 
             return content, False
 
         except Exception as e:
             _logger.error(f"Error checking file size for {media_path}: {e}")
-            return content, True  # On error, try to send normally
+            return content, True  # On error, try to send without attachment
 
     def _get_media_for_send(self, parsed_message: MessageData, destination: Dict, include_media: bool) -> Optional[str]:
         """Determine which media file to send based on restricted mode and OCR settings.
@@ -677,7 +670,8 @@ def main():
 
     Parses command-line arguments and dispatches to appropriate subcommand:
     - monitor: Run live message monitoring and routing
-    - discover: Auto-generate config from accessible Telegram channels
+    - discover: Compare config against accessible Telegram channels and/or
+                generate a new config from accessible Telegram channels
     """
     parser = argparse.ArgumentParser(description="Watchtower - CTI Message Routing")
     subparsers = parser.add_subparsers(dest="cmd")
@@ -694,7 +688,7 @@ def main():
     args = parser.parse_args()
 
     if args.cmd == "monitor":
-        # Parse sources - map CLI strings to AppTypes constants
+        # Parse sources
         wanted = set(s.strip().lower() for s in args.sources.split(','))
         if "all" in wanted:
             sources = [APP_TYPE_TELEGRAM, APP_TYPE_RSS]
@@ -715,7 +709,7 @@ def main():
             if app:
                 asyncio.run(app.shutdown())
         except Exception as e:
-            _logger.error(f"Fatal error: {e}")
+            _logger.error(f"Error: {e}")
             if app:
                 asyncio.run(app.shutdown())
             raise
@@ -724,7 +718,7 @@ def main():
         try:
             asyncio.run(discover_channels(diff_mode=args.diff, generate_config=args.generate))
         except KeyboardInterrupt:
-            _logger.info("Cancelled by user")
+            _logger.info("Interrupted by user (Ctrl+C)")
         except Exception as e:
             _logger.error(f"Error: {e}", exc_info=True)
             raise

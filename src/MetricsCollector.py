@@ -1,35 +1,20 @@
 """
-MetricsCollector - Simple JSON-based metrics tracking
+MetricsCollector - JSON-based metrics tracking
 
 This module provides lightweight metrics collection and persistence using JSON file
-storage. Tracks application statistics like message counts, routing success/failure
-rates, and queue sizes.
+storage.
 
-Features:
-- Periodic persistence to JSON file (every 60 seconds by default)
-- Counter-based metrics (increment, set, get)
-- Thread-safe for single-process use
-- Force save on shutdown for clean exit
-
-Performance:
-    Uses periodic saves instead of immediate persistence to reduce disk I/O:
-    - Default: Save every 60 seconds (configurable)
-    - Max data loss: 60 seconds worth of metrics on crash
-    - Significant performance gain for high-volume message processing
-    - SSD-friendly for Raspberry Pi and similar devices
-
-Metrics Persistence:
-    - Saved to metrics.json at shutdown for logging/archival purposes
-    - On startup each session starts fresh at zero
-
-Common Metrics:
-    - messages_received_telegram: Messages from Telegram
-    - messages_received_rss: Messages from RSS feeds
-    - total_msgs_routed_success: Successfully delivered messages
-    - total_msgs_routed_failed: Failed delivery attempts
-    - total_msgs_no_destination: Messages with no matching destinations
-    - telegram_missed_messages: Messages found via polling
-    - time_ran: Session duration in seconds
+Metrics include:
+  messages_received_telegram
+  total_msgs_no_destination
+  telegram_missed_messages_caught
+  messages_received_rss
+  messages_sent_telegram
+  messages_sent_discord
+  total_msgs_routed_success
+  ocr_processed
+  ocr_msgs_sent
+  seconds_ran
 """
 import json
 import time
@@ -42,11 +27,10 @@ _logger = setup_logger(__name__)
 
 
 class MetricsCollector:
-    """Lightweight metrics collector using JSON file storage with periodic saves.
+    """Metrics collector using JSON file storage with periodic saves.
 
     Persists metrics to JSON file every SAVE_INTERVAL seconds to balance data
-    integrity with performance. Suitable for single-process applications running
-    on devices like Raspberry Pi where minimizing disk writes is important.
+    integrity with performance.
 
     Attributes:
         SAVE_INTERVAL: Seconds between automatic saves (default: 60)
@@ -54,12 +38,12 @@ class MetricsCollector:
         metrics: Dictionary of metric names to values
     """
 
-    SAVE_INTERVAL = 60  # seconds - save metrics every minute
+    SAVE_INTERVAL = 60  # seconds
 
     def __init__(self, metrics_file: Path):
         """Initialize metrics collector.
 
-        Metrics are per-session (reset on each startup). The metrics file is used
+        Metrics reset on each startup. The metrics file is used
         for saving at shutdown but is not loaded on startup.
 
         Args:
@@ -79,7 +63,7 @@ class MetricsCollector:
 
         Note:
             Called by _maybe_save_metrics() for periodic saves and force_save()
-            for shutdown. Not called directly by increment/set anymore.
+            for shutdown.
         """
         try:
             # Ensure parent directory exists
@@ -125,17 +109,17 @@ class MetricsCollector:
         """Increment a metric counter.
 
         Marks metrics as dirty and triggers periodic save if interval elapsed.
-        Does NOT immediately save to disk - use force_save() for that.
+        Does not immediately save to disk, use force_save() for that.
         """
         self.metrics[metric_name] += value
         self._dirty = True
         self._maybe_save_metrics()
 
     def set(self, metric_name: str, value: int) -> None:
-        """Set a metric to a specific value (replaces existing value).
+        """Set a metric to a specific value.
 
         Marks metrics as dirty and triggers periodic save if interval elapsed.
-        Does NOT immediately save to disk - use force_save() for that.
+        Does not immediately save to disk, use force_save() for that.
         """
         self.metrics[metric_name] = value
         self._dirty = True
@@ -151,8 +135,6 @@ class MetricsCollector:
 
     def reset(self) -> None:
         """Reset all metrics to zero and force immediate save.
-
-        This is a significant operation that warrants immediate persistence.
         """
         self.metrics.clear()
         self._dirty = True
@@ -164,8 +146,6 @@ class MetricsCollector:
 
         Args:
             metric_name: Name of the metric to reset
-
-        This is a significant operation that warrants immediate persistence.
         """
         if metric_name in self.metrics:
             del self.metrics[metric_name]

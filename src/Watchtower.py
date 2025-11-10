@@ -24,6 +24,7 @@ from pathlib import Path
 from LoggerSetup import setup_logger
 from Discover import discover_channels
 from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD, APP_TYPE_RSS
+from SendStatus import SendStatus
 
 if TYPE_CHECKING:
     from MessageData import MessageData
@@ -85,8 +86,8 @@ class Watchtower:
         self.router = router or MessageRouter(self.config)
         self.discord = discord or DiscordHandler()
         self.ocr = ocr or OCRHandler()
-        self.message_queue = message_queue or MessageQueue()
         self.metrics = metrics or MetricsCollector(self.config.tmp_dir / "metrics.json")
+        self.message_queue = message_queue or MessageQueue(self.metrics)
 
         self.sources = sources
         self.rss = None  # created only if RSS is enabled
@@ -99,7 +100,7 @@ class Watchtower:
         _logger.info("Initialized")
 
     def _cleanup_attachments_dir(self):
-        """Remove any leftover media files from previous runs.
+        """Remove any leftover attachments from previous runs.
 
         Cleans the tmp/attachments directory of any files remaining from
         previous application runs (e.g., if app crashed before cleanup).
@@ -113,7 +114,7 @@ class Watchtower:
                     try:
                         if file_path.is_file():
                             os.remove(file_path)
-                            _logger.debug(f"Cleaned up leftover file: {file_path}")
+                            _logger.info(f"Cleaned up leftover file: {file_path}")
                     except Exception as e:
                         _logger.warning(f"Failed to clean up {file_path}: {e}")
                 _logger.info(f"Cleaned up {len(files)} leftover media files from attachments directory")
@@ -121,8 +122,9 @@ class Watchtower:
     async def start(self) -> None:
         """Start the Watchtower service.
 
-        Initializes all configured sources (Telegram, RSS) and their handlers,
-        starts the message queue processor for retries, and keeps the service running.
+        Initializes all configured sources and their handlers,
+        starts the message queue processor for retries,
+        and keeps the service running.
 
         Returns:
             None
@@ -133,17 +135,15 @@ class Watchtower:
         # Start message queue processor (background retry task)
         tasks.append(asyncio.create_task(self.message_queue.process_queue(self)))
 
-        # Telegram source
         if APP_TYPE_TELEGRAM in self.sources:
             await self.telegram.start()
             self.telegram.setup_handlers(self._handle_message)
-            # connection proofs
+            # Connection proofs
             await self.telegram.fetch_latest_messages()
             tasks.append(asyncio.create_task(self.telegram.run()))
             # Start polling for missed messages
             tasks.append(asyncio.create_task(self.telegram.poll_missed_messages(self.metrics)))
 
-        # RSS source
         if APP_TYPE_RSS in self.sources and self.config.rss_feeds:
             from RSSHandler import RSSHandler
             self.rss = RSSHandler(self.config, self._handle_message)
@@ -161,7 +161,7 @@ class Watchtower:
     async def shutdown(self):
         """Gracefully shutdown the application.
 
-        Stops all sources (Telegram, RSS), disconnects clients, saves metrics.
+        Stops all sources, disconnects clients, saves metrics.
 
         Returns:
             None
@@ -169,16 +169,12 @@ class Watchtower:
         _logger.info("Initiating graceful shutdown...")
         self._shutdown_requested = True
 
-        # Calculate and save seconds_ran metric
         if self._start_time is not None:
             runtime_seconds = int(time.time() - self._start_time)
             self.metrics.set("seconds_ran", runtime_seconds)
 
-        # Force save metrics before shutdown (in case periodic save hasn't triggered)
         self.metrics.force_save()
 
-        # Log metrics before shutdown with explanatory note
-        # NOTE: All metrics are PER-SESSION (reset on each startup)
         metrics_summary = self.metrics.get_all()
         if metrics_summary:
             _logger.info(
@@ -186,16 +182,13 @@ class Watchtower:
                 f"{json.dumps(metrics_summary, indent=2)}"
             )
 
-        # Check retry queue status
         queue_size = self.message_queue.get_queue_size()
         if queue_size > 0:
             _logger.warning(f"Shutting down with {queue_size} messages in retry queue (will be lost)")
 
-        # Clear telegram logs (don't process messages sent during downtime)
         if self.telegram:
             self._clear_telegram_logs()
 
-        # Disconnect Telegram client
         if self.telegram and self.telegram.client.is_connected():
             await self.telegram.client.disconnect()
             _logger.info("Telegram client disconnected")
@@ -203,19 +196,13 @@ class Watchtower:
         _logger.info("Shutdown complete")
 
     def _clear_telegram_logs(self):
-        """Clear all telegram log files on shutdown.
+        """Clear all Telegram log files on shutdown.
 
-        Removes all .txt files in the telegramlog directory. Telegram logs are
-        not persistent across restarts since we don't want to process messages
-        sent during downtime.
+        Removes all .txt files in the tmp/telegramlog/ directory. Telegram logs are
+        not persistent across restarts to avoid processing messages sent during downtime.
 
         Called during shutdown to prevent stale log files from affecting next startup.
-
-        Returns:
-            None
-
-        Note:
-            Errors during cleanup are logged but non-fatal (shutdown continues)
+        Errors during cleanup are logged but shutdown continues
         """
         try:
             telegramlog_dir = self.config.telegramlog_dir
@@ -229,16 +216,16 @@ class Watchtower:
             _logger.error(f"Error clearing telegram logs: {e}")
 
     async def _handle_message(self, message_data: 'MessageData', is_latest: bool) -> bool:
-        """Process incoming message from any source (Telegram, RSS).
+        """Process incoming message
 
         Central message processing pipeline that:
-        1. Handles connection proof logging (is_latest=True messages)
+        1. Handles initial connection proof logging
         2. Pre-processes message (OCR, URL defanging)
         3. Routes to matching destinations via MessageRouter
         4. Checks media restrictions for each destination
         5. Dispatches message to each destination
         6. Tracks metrics and handles errors
-        7. Cleans up media files in finally block
+        7. Cleans up stored attachment files
 
         Args:
             message_data: Incoming message from Telegram or RSS source
@@ -249,7 +236,7 @@ class Watchtower:
                   False if no destinations matched or all deliveries failed
         """
         try:
-            # Connection proof logging only
+            # Connection proof logging
             if is_latest:
                 _logger.info(
                     f"\nCONNECTION ESTABLISHED\n"
@@ -290,22 +277,19 @@ class Watchtower:
             return False
 
         finally:
-            # Clean up media file after all destinations have been processed
+            # Clean up stored attachments after all destinations have been processed
             if message_data.media_path and os.path.exists(message_data.media_path):
                 try:
                     os.remove(message_data.media_path)
-                    _logger.debug(f"Cleaned up media file: {message_data.media_path}")
+                    _logger.info(f"Cleaned up stored attachment file: {message_data.media_path}")
                 except Exception as e:
-                    _logger.error(f"Error removing media at {message_data.media_path}: {e}")
+                    _logger.error(f"Error removing stored attachment file at {message_data.media_path}: {e}")
 
     async def _preprocess_message(self, message_data: MessageData):
-        """Pre-process message with OCR and defanged URLs.
-
-        OCR allows text extraction from images (e.g., screenshots of checks, invoices)
-        for keyword matching and routing.
+        """Pre-process message with OCR and defanged URLs
 
         Defanged URLs make t.me links non-clickable (hxxps://t[.]me format) to prevent
-        accidental navigation to potentially malicious content in CTI workflows.
+        accidental navigation to potentially malicious content
         """
         ocr_needed = False
         if message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_media:
@@ -322,7 +306,7 @@ class Watchtower:
                         message_data.ocr_raw = ocr_text
                         self.metrics.increment("ocr_processed")
                 else:
-                    _logger.debug(f"Skipping OCR for non-image file: {message_data.media_path}")
+                    _logger.info(f"Skipping OCR for non-image file: {message_data.media_path}")
 
         if message_data.source_type == APP_TYPE_TELEGRAM and message_data.original_message:
             telegram_msg_id = getattr(message_data.original_message, "id", None)
@@ -343,7 +327,7 @@ class Watchtower:
         Returns:
             bool: True if the file has an image extension, False otherwise
         """
-        image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif'}
+        image_extensions = {'.jpg', '.jpeg', 'jfif', '.png', '.gif', '.bmp', '.webp', '.tiff', '.tif'}
         file_ext = os.path.splitext(file_path)[1].lower()
         return file_ext in image_extensions
 
@@ -384,10 +368,10 @@ class Watchtower:
         return media_passes_restrictions
 
     async def _dispatch_to_destination(self, message_data: MessageData, destination: Dict, media_passes_restrictions: bool) -> bool:
-        """Dispatch message to a single destination (Discord or Telegram).
+        """Dispatch message to a single destination
 
-        Applies destination-specific parsing, formats the message, determines media inclusion,
-        and routes to the appropriate sending method based on destination type.
+        Applies destination specific parsing, formats the message, determines media inclusion,
+        and routes to the appropriate sending method based on destination type
 
         Args:
             message_data: The message to send
@@ -404,7 +388,6 @@ class Watchtower:
             if not destination.get('restricted_mode', False) or media_passes_restrictions:
                 include_media = True
 
-        # Use appropriate formatter based on destination type
         if destination['type'] == APP_TYPE_DISCORD:
             content = self.discord.format_message(parsed_message, destination)
             status = await self._send_to_discord(parsed_message, destination, content, include_media)
@@ -412,14 +395,13 @@ class Watchtower:
             content = self.telegram.format_message(parsed_message, destination)
             status = await self._send_to_telegram(parsed_message, destination, content, include_media)
         else:
-            status = "failed"
+            status = SendStatus.FAILED
 
-        _logger.info(f"Message from {parsed_message.channel_name} by {parsed_message.username} {status} to {destination['name']}")
+        _logger.info(f"Message from {parsed_message.channel_name} by {parsed_message.username} {status.value} to {destination['name']}")
 
-        # Return True if status indicates success (not "failed")
-        return status != "failed"
+        return status == SendStatus.SENT
 
-    async def _send_to_discord(self, parsed_message: MessageData, destination: Dict, content: str, include_media: bool) -> str:
+    async def _send_to_discord(self, parsed_message: MessageData, destination: Dict, content: str, include_media: bool) -> SendStatus:
         """Send message to Discord webhook.
 
         Appends a note if media was blocked by restricted mode, then sends via HTTP POST.
@@ -431,7 +413,7 @@ class Watchtower:
             include_media: Whether to include media attachment
 
         Returns:
-            str: "sent" if successful, "queued" if enqueued for retry, "failed" otherwise
+            SendStatus: SENT if successful, QUEUED if enqueued for retry, FAILED otherwise
         """
         if parsed_message.has_media and not include_media:
             if destination.get('restricted_mode', False):
@@ -441,7 +423,6 @@ class Watchtower:
 
         media_path = parsed_message.media_path if include_media else None
 
-        # Check file size limit before sending
         if media_path:
             content, should_send_media = self._check_file_size_and_modify_content(
                 content, media_path, self.discord.file_size_limit, destination
@@ -454,9 +435,8 @@ class Watchtower:
             self.metrics.increment("messages_sent_discord")
             if parsed_message.ocr_raw:
                 self.metrics.increment("ocr_msgs_sent")
-            return "sent"
+            return SendStatus.SENT
         else:
-            # Enqueue for retry
             self.message_queue.enqueue(
                 destination=destination,
                 formatted_content=content,
@@ -464,9 +444,9 @@ class Watchtower:
                 reason="Discord send failed (likely rate limit)"
             )
             self.metrics.increment("messages_queued_retry")
-            return "queued for retry"
+            return SendStatus.QUEUED
 
-    async def _send_to_telegram(self, parsed_message: MessageData, destination: Dict, content: str, include_media: bool) -> str:
+    async def _send_to_telegram(self, parsed_message: MessageData, destination: Dict, content: str, include_media: bool) -> SendStatus:
         """Send message to Telegram channel using copy mode.
 
         Always uses copy mode (formatted message with optional media) for consistency
@@ -479,7 +459,7 @@ class Watchtower:
             include_media: Whether to include media attachment
 
         Returns:
-            str: Status "sent", "queued for retry", or "failed"
+            SendStatus: SENT if successful, QUEUED if enqueued for retry, FAILED otherwise
         """
         media_path = self._get_media_for_send(parsed_message, destination, include_media)
 
@@ -495,7 +475,7 @@ class Watchtower:
         destination_chat_id = await self.telegram.resolve_destination(channel_specifier)
         if destination_chat_id is None:
             _logger.warning(f"Skipping unresolved destination: {channel_specifier}")
-            return "failed"
+            return SendStatus.FAILED
 
         try:
             ok = await self.telegram.send_copy(destination_chat_id, content, media_path)
@@ -503,7 +483,7 @@ class Watchtower:
                 self.metrics.increment("messages_sent_telegram")
                 if parsed_message.ocr_raw:
                     self.metrics.increment("ocr_msgs_sent")
-                return "sent"
+                return SendStatus.SENT
             else:
                 # Send failed, enqueue for retry
                 self.message_queue.enqueue(
@@ -513,10 +493,10 @@ class Watchtower:
                     reason="Telegram send failed (likely rate limit)"
                 )
                 self.metrics.increment("messages_queued_retry")
-                return "queued for retry"
+                return SendStatus.QUEUED
         except Exception as e:
             _logger.error(f"Failed to send to {channel_specifier}: {e}")
-            return "failed"
+            return SendStatus.FAILED
 
     def _extract_matched_lines_from_attachment(self, media_path: str, keywords: List[str]) -> dict:
         """Extract lines from attachment file that match keywords, or first N lines if no keywords.

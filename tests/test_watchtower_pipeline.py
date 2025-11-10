@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from MessageData import MessageData
 from Watchtower import Watchtower
 from AppTypes import APP_TYPE_TELEGRAM
+from SendStatus import SendStatus
 
 class TestWatchtowerMessagePreprocessing(unittest.TestCase):
     """Tests for message preprocessing (_preprocess_message)."""
@@ -803,7 +804,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_discord.send_message.assert_called_once_with(
             "**Formatted Message**", 'https://discord.com/api/webhooks/123/token', None
         )
-        self.assertEqual(status, "sent")
+        self.assertEqual(status, SendStatus.SENT)
         mock_metrics.increment.assert_any_call("messages_sent_discord")
 
     @patch('MetricsCollector.MetricsCollector')
@@ -873,7 +874,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
             'https://discord.com/api/webhooks/123/token',
             "/tmp/attachments/photo.jpg"
         )
-        self.assertEqual(status, "sent")
+        self.assertEqual(status, SendStatus.SENT)
 
     @patch('MetricsCollector.MetricsCollector')
     @patch('MessageQueue.MessageQueue')
@@ -993,7 +994,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
 
         # Then: Message enqueued for retry
         mock_queue.enqueue.assert_called_once()
-        self.assertEqual(status, "queued for retry")
+        self.assertEqual(status, SendStatus.QUEUED)
         mock_metrics.increment.assert_any_call("messages_queued_retry")
 
     @patch('MetricsCollector.MetricsCollector')
@@ -1123,7 +1124,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_telegram.send_copy.assert_called_once_with(
             -1001234567890, "**Formatted Telegram Message**", None
         )
-        self.assertEqual(status, "sent")
+        self.assertEqual(status, SendStatus.SENT)
         mock_metrics.increment.assert_any_call("messages_sent_telegram")
 
     @patch('MetricsCollector.MetricsCollector')
@@ -1192,7 +1193,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_telegram.send_copy.assert_called_once_with(
             -1001234567890, "**Message with attachment**", "/tmp/attachments/photo.jpg"
         )
-        self.assertEqual(status, "sent")
+        self.assertEqual(status, SendStatus.SENT)
 
     @patch('MetricsCollector.MetricsCollector')
     @patch('MessageQueue.MessageQueue')
@@ -1254,7 +1255,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         # Then: Send called (handler manages overflow internally)
         mock_telegram.send_copy.assert_called_once()
-        self.assertEqual(status, "sent")
+        self.assertEqual(status, SendStatus.SENT)
 
     @patch('MetricsCollector.MetricsCollector')
     @patch('MessageQueue.MessageQueue')
@@ -1381,7 +1382,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
 
         # Then: Message enqueued for retry
         mock_queue.enqueue.assert_called_once()
-        self.assertEqual(status, "queued for retry")
+        self.assertEqual(status, SendStatus.QUEUED)
         mock_metrics.increment.assert_any_call("messages_queued_retry")
 
 class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
@@ -1783,7 +1784,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
             self.assertIn("Matched", sent_content)  # New format: "Matched X line(s):"
             self.assertIn("malware", sent_content)
             self.assertIsNone(sent_media)  # No media sent
-            self.assertEqual(status, "sent")
+            self.assertEqual(status, SendStatus.SENT)
         finally:
             os.unlink(temp_path)
 
@@ -1865,7 +1866,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
             self.assertIn("exploit", sent_content)
             self.assertIn("<blockquote>", sent_content)  # Telegram uses HTML blockquote
             self.assertIsNone(sent_media)  # No media sent
-            self.assertEqual(status, "sent")
+            self.assertEqual(status, SendStatus.SENT)
         finally:
             os.unlink(temp_path)
 

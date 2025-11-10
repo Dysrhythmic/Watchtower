@@ -51,9 +51,14 @@ class MessageQueue:
     MAX_RETRIES = 3
     INITIAL_BACKOFF = 5  # seconds
 
-    def __init__(self):
-        """Initialize empty retry queue."""
+    def __init__(self, metrics=None):
+        """Initialize empty retry queue.
+
+        Args:
+            metrics: Optional MetricsCollector instance for tracking retry outcomes
+        """
         self._queue: List[RetryItem] = []
+        self._metrics = metrics
 
     def enqueue(self,
                 destination: Dict,
@@ -93,6 +98,8 @@ class MessageQueue:
 
                     if success:
                         self._queue.remove(retry_item)
+                        if self._metrics:
+                            self._metrics.increment("messages_retry_succeeded")
                         _logger.info(
                             f"Retry succeeded after {retry_item.attempt_count + 1} "
                             f"attempt(s) for {retry_item.destination['name']}"
@@ -100,6 +107,8 @@ class MessageQueue:
                     # Max retries reached (0, 1, 2 = 3 attempts)
                     elif retry_item.attempt_count >= self.MAX_RETRIES - 1:
                         self._queue.remove(retry_item)
+                        if self._metrics:
+                            self._metrics.increment("messages_retry_failed")
                         _logger.error(
                             f"Message dropped after {self.MAX_RETRIES} "
                             f"failed attempts to {retry_item.destination['name']}"

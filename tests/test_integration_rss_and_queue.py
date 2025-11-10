@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from MessageData import MessageData
 from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_RSS
+from SendStatus import SendStatus
 
 
 def create_mock_config(extra_attrs=None):
@@ -420,7 +421,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
             msg, destinations[0], formatted, include_media=False
         ))
 
-        self.assertEqual(result, "sent")
+        self.assertEqual(result, SendStatus.SENT)
         app.telegram.resolve_destination.assert_called_once_with('@destination_channel')
         app.telegram.send_copy.assert_called_once()
 

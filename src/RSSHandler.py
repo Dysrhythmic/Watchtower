@@ -4,25 +4,6 @@ RSSHandler - RSS/Atom feed monitoring and message generation
 This module polls RSS and Atom feeds at regular intervals and converts new entries
 into MessageData objects for routing. Handles feed parsing, timestamp tracking to
 avoid duplicate processing, and age filtering to prevent message floods.
-
-Features:
-- Automatic polling at 5-minute intervals
-- Timestamp persistence to track processed entries
-- Age-based filtering (2-day cutoff) to prevent floods after downtime
-- HTML tag stripping and entity decoding for clean text
-- Per-feed state tracking via filesystem logs
-
-Age Filtering Logic:
-    When the application restarts after extended downtime (e.g., 1 week offline),
-    RSS feeds may contain hundreds of old entries. Without age filtering, all these
-    would be routed as "new" messages, flooding destinations with content users have
-    already seen elsewhere. MAX_ENTRY_AGE_DAYS (2 days) prevents this by ignoring
-    entries older than the cutoff.
-
-Polling Strategy:
-    All feeds are polled every 5 minutes (DEFAULT_POLL_INTERVAL = 300 seconds).
-    This is a fixed interval for consistency and simplicity. Per-feed custom
-    intervals are not currently supported.
 """
 import time
 import asyncio
@@ -47,7 +28,7 @@ class RSSHandler:
     filtering to prevent message floods after extended application downtime.
     """
     MAX_ENTRY_AGE_DAYS = 2  # Ignore entries older than 2 days
-    DEFAULT_POLL_INTERVAL = 300  # Poll every 5 minutes (seconds)
+    DEFAULT_POLL_INTERVAL = 300  # seconds
 
     def __init__(self, config: ConfigManager, on_message: Callable[[MessageData, bool], Any]):
         """Initialize RSS handler with configuration and message callback.
@@ -62,7 +43,7 @@ class RSSHandler:
         self._running = False
 
     def _log_path(self, rss_name: str) -> Path:
-        """Get the path to the RSS feed's timestamp log file.
+        """Get the path to the RSS feed's log file.
 
         Each feed has a log file storing the timestamp of the last processed entry.
         Format: {rss_name}.txt containing ISO 8601 timestamp.
@@ -75,7 +56,7 @@ class RSSHandler:
         """
         return self.config.rsslog_dir / f"{rss_name}.txt"
 
-    def _read_last_ts(self, rss_name: str) -> Optional[float]:
+    def _read_last_timestamp(self, rss_name: str) -> Optional[float]:
         """Read the last processed timestamp for an RSS feed.
 
         On first run (log file doesn't exist), initializes the log with current time
@@ -92,7 +73,7 @@ class RSSHandler:
         """
         log_file_path = self._log_path(rss_name)
         if not log_file_path.exists():
-            # Initialize log with current time - process only entries newer than now
+            # Initialize log with current time to process only entries newer than now
             now = datetime.now(timezone.utc).isoformat()
             log_file_path.write_text(now, encoding='utf-8')
             _logger.info(f"[RSSHandler] {rss_name} initialized")
@@ -106,10 +87,10 @@ class RSSHandler:
         except Exception:
             return None
 
-    def _write_last_ts(self, rss_name: str, timestamp: float) -> None:
+    def _write_last_timestamp(self, rss_name: str, timestamp: float) -> None:
         """Write the last processed timestamp for an RSS feed.
 
-        Stores timestamp in ISO 8601 format for human readability.
+        Stores timestamp in ISO 8601 format for readability.
 
         Args:
             rss_name: Name of the RSS feed
@@ -171,15 +152,13 @@ class RSSHandler:
         link = getattr(entry, 'link', '') or ''
         summary = getattr(entry, 'summary', '') or ''
 
-        # Strip HTML tags from title and summary
         title = self._strip_html_tags(title)
         summary = self._strip_html_tags(summary)
 
-        # Truncate long summaries for readability
         if len(summary) > 1000:
             summary = summary[:1000] + " ..."
 
-        # Join non-empty fields with newlines
+        # Join unempty fields with newlines
         return "\n".join(s for s in [title, link, summary] if s)
 
     async def _process_entry(self, entry, rss_url: str, rss_name: str, last_timestamp: Optional[float], cutoff_timestamp: float) -> tuple[Optional[MessageData], Optional[float]]:
@@ -193,7 +172,7 @@ class RSSHandler:
         Args:
             entry: Feedparser entry object
             rss_url: RSS feed URL (used as channel_id)
-            rss_name: Human-readable feed name
+            rss_name: Readable feed name
             last_timestamp: Last processed timestamp for this feed (None on first run)
             cutoff_timestamp: Entries older than this are ignored (age filter)
 
@@ -206,22 +185,22 @@ class RSSHandler:
         if timestamp is None:
             return None, None
 
-        # Filter 1: Too old (beyond MAX_ENTRY_AGE_DAYS)
+        # Too old
         if timestamp < cutoff_timestamp:
             return None, None
 
-        # Filter 2: Already processed (timestamp <= last seen)
+        # Already processed
         if last_timestamp is not None and timestamp <= last_timestamp:
             return None, None
 
-        # Entry passed all filters - create MessageData
+        # Entry passed all filters, create MessageData
         text = self._format_entry_text(entry)
 
         message_data = MessageData(
             source_type=APP_TYPE_RSS,
             channel_id=rss_url,
             channel_name=rss_name,
-            username="RSS",
+            username=APP_TYPE_RSS,
             timestamp=datetime.fromtimestamp(timestamp, tz=timezone.utc),
             text=text,
             has_media=False
@@ -232,10 +211,10 @@ class RSSHandler:
     async def run_feed(self, feed: Dict[str, Any]) -> None:
         """Run a single feed loop forever.
 
-        Continuously polls the feed at DEFAULT_POLL_INTERVAL (5 minutes). On each poll:
+        Continuously polls the feed at DEFAULT_POLL_INTERVAL. On each poll:
         1. Parse feed XML/JSON
         2. Process each entry (filter by age and duplication)
-        3. Route new entries via on_message callback
+        3. Route new entries via on_message() callback
         4. Update last_timestamp log
 
         Args:
@@ -244,7 +223,7 @@ class RSSHandler:
         rss_url = feed['rss_url']
         rss_name = feed['rss_name']
 
-        last_timestamp = self._read_last_ts(rss_name)
+        last_timestamp = self._read_last_timestamp(rss_name)
         newest_seen = last_timestamp or 0.0
 
         while True:
@@ -276,10 +255,10 @@ class RSSHandler:
                     newest_seen = max(newest_seen, timestamp)
 
                 if newest_seen and (last_timestamp is None or newest_seen > last_timestamp):
-                    self._write_last_ts(rss_name, newest_seen)
+                    self._write_last_timestamp(rss_name, newest_seen)
                     last_timestamp = newest_seen
 
-                log_msg = f"[RSSHandler] {rss_name} polled; new={count_new}; routed={count_routed}"
+                log_msg = f"[RSSHandler] {rss_name} polled; new_entries={count_new}; routed={count_routed}"
                 if count_too_old > 0:
                     log_msg += f"; too_old={count_too_old}"
                 _logger.info(log_msg)

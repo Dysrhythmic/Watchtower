@@ -106,13 +106,13 @@ class ConfigManager:
             # Channel ID -> Channel Name mapping
             self.channel_names: Dict[str, str] = {}
 
-            _logger.info(f"[ConfigManager] Loaded {len(self.destinations)} destinations and {len(self.rss_feeds)} RSS feeds")
+            _logger.info(f"Loaded {len(self.destinations)} destinations and {len(self.rss_feeds)} RSS feeds")
         else:
             # Minimal mode:
             self.destinations = []
             self.rss_feeds = []
             self.channel_names = {}
-            _logger.info("[ConfigManager] Initialized in minimal mode (env vars and paths only)")
+            _logger.info("Initialized in minimal mode (env vars and paths only)")
 
     def _validate_env_config(self):
         """Validate required environment configuration (credentials, webhooks).
@@ -152,7 +152,7 @@ class ConfigManager:
                     "Telegram is configured but missing required credentials: TELEGRAM_API_ID, TELEGRAM_API_HASH. "
                     "Add these to your .env file or remove Telegram destinations/sources from your config."
                 )
-            _logger.info("[ConfigManager] Telegram API credentials validated")
+            _logger.info("Telegram API credentials validated")
 
         # Check for Discord webhooks if Discord is used as a destination
         if discord_used:
@@ -161,7 +161,7 @@ class ConfigManager:
                     "Discord destinations are configured but no webhook URLs were found. "
                     "Check that the environment variables for Discord webhooks are set correctly in your .env file."
                 )
-            _logger.info("[ConfigManager] Discord webhook URLs validated")
+            _logger.info("Discord webhook URLs validated")
 
         if not destination_types_found:
             raise ValueError(
@@ -203,7 +203,7 @@ class ConfigManager:
                 destinations.append(result)
 
         if not destinations:
-            raise ValueError("[ConfigManager] No valid destinations configured")
+            raise ValueError("No valid destinations configured")
 
         # Check for duplicate destination names
         destination_names = [d['name'] for d in destinations]
@@ -211,7 +211,7 @@ class ConfigManager:
         if duplicates:
             unique_duplicates = set(duplicates)
             _logger.warning(
-                f"[ConfigManager] Duplicate destination names: {', '.join(unique_duplicates)}. "
+                f"Duplicate destination names: {', '.join(unique_duplicates)}. "
                 f"This may cause confusion in logs."
             )
 
@@ -227,7 +227,7 @@ class ConfigManager:
 
         # Destination must be an expected type
         if dest_type not in [APP_TYPE_DISCORD, APP_TYPE_TELEGRAM]:
-            _logger.error(f"[ConfigManager] Invalid or missing destination type for '{name}': {dest_type}.")
+            _logger.error(f"Invalid or missing destination type for '{name}': {dest_type}.")
             return None
 
         endpoint = self._resolve_destination_endpoint(destination_config, name, dest_type)
@@ -242,7 +242,7 @@ class ConfigManager:
 
         # Destination must have at least one source
         if not telegram_channels: # RSS feeds will be in this list as well as "pseudo Telegram channels"
-            _logger.error(f"[ConfigManager] Destination {name} has no sources")
+            _logger.error(f"Destination {name} has no sources")
             return None
 
         # Build destination entry (applicable to all destination types)
@@ -277,12 +277,12 @@ class ConfigManager:
             Optional[str]: The endpoint URL/channel ID, or None if configuration is invalid
         """
         if 'env_key' not in destination_config:
-            _logger.warning(f"[ConfigManager] No env_key specified for {dest_type} destination {name}")
+            _logger.warning(f"No env_key specified for {dest_type} destination {name}")
             return None
 
         endpoint = os.getenv(destination_config['env_key'])
         if not endpoint:
-            _logger.warning(f"[ConfigManager] Missing environment variable {destination_config['env_key']} for {dest_type} destination {name}")
+            _logger.warning(f"Missing environment variable {destination_config['env_key']} for {dest_type} destination {name}")
             return None
 
         return endpoint
@@ -305,7 +305,7 @@ class ConfigManager:
         # Check mutual exclusivity
         if has_keep and has_trim:
             _logger.error(
-                f"[ConfigManager] {source_id}: "
+                f"{source_id}: "
                 f"Parser cannot use 'keep_first_lines' with 'trim_front_lines'/'trim_back_lines'. "
                 f"Ignoring trim options for {dest_name}"
             )
@@ -318,7 +318,7 @@ class ConfigManager:
             keep = parser.get('keep_first_lines', 0)
             if not isinstance(keep, int) or keep <= 0:
                 _logger.warning(
-                    f"[ConfigManager] {source_id}: "
+                    f"{source_id}: "
                     f"'keep_first_lines' must be a positive integer, got {keep}. Parser disabled for {dest_name}"
                 )
                 config_dict.pop('parser', None)
@@ -331,13 +331,13 @@ class ConfigManager:
 
             if not isinstance(trim_front, int) or trim_front < 0:
                 _logger.warning(
-                    f"[ConfigManager] {source_id}: "
+                    f"{source_id}: "
                     f"'trim_front_lines' must be a non-negative integer, got {trim_front}. Parser disabled for {dest_name}"
                 )
                 config_dict.pop('parser', None)
             elif not isinstance(trim_back, int) or trim_back < 0:
                 _logger.warning(
-                    f"[ConfigManager] {source_id}: "
+                    f"{source_id}: "
                     f"'trim_back_lines' must be a non-negative integer, got {trim_back}. Parser disabled for {dest_name}"
                 )
                 config_dict.pop('parser', None)
@@ -360,7 +360,7 @@ class ConfigManager:
             return []
 
         if not all('id' in channel for channel in telegram_channels):
-            _logger.warning(f"[ConfigManager] Invalid telegram channels for {name}")
+            _logger.warning(f"Invalid telegram channels for {name}")
             return None
 
         processed_telegram_channels = []
@@ -372,7 +372,7 @@ class ConfigManager:
 
             if not processed_channel['keywords']:
                 _logger.info(
-                    f"[ConfigManager] {processed_channel['id']}: "
+                    f"{processed_channel['id']}: "
                     f"No keywords configured, all messages will be forwarded to {name}"
                 )
 
@@ -387,24 +387,24 @@ class ConfigManager:
 
             # Log settings
             if processed_channel.get('restricted_mode', False):
-                _logger.info(f"[ConfigManager] Restricted mode enabled for channel {processed_channel['id']} for {name}")
+                _logger.info(f"Restricted mode enabled for channel {processed_channel['id']} for {name}")
 
             if processed_channel.get('ocr', False):
-                _logger.info(f"[ConfigManager] OCR enabled for channel {processed_channel['id']} for {name}")
+                _logger.info(f"OCR enabled for channel {processed_channel['id']} for {name}")
 
             if not processed_channel.get('check_attachments', True): # defaults to True rather than False
-                _logger.info(f"[ConfigManager] Attachment checking disabled for channel {processed_channel['id']} for {name}")
+                _logger.info(f"Attachment checking disabled for channel {processed_channel['id']} for {name}")
 
             if processed_channel.get('parser'):
                 parser = processed_channel['parser']
                 if 'keep_first_lines' in parser:
-                    _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: keep first {parser['keep_first_lines']} lines for {name}")
+                    _logger.info(f"Parser for {processed_channel['id']}: keep first {parser['keep_first_lines']} lines for {name}")
                 elif 'trim_front_lines' in parser or 'trim_back_lines' in parser:
                     front = parser.get('trim_front_lines', 0)
                     back = parser.get('trim_back_lines', 0)
                     # Only log if there's actual trimming happening
                     if front > 0 or back > 0:
-                        _logger.info(f"[ConfigManager] Parser for {processed_channel['id']}: trim front={front}, back={back} for {name}")
+                        _logger.info(f"Parser for {processed_channel['id']}: trim front={front}, back={back} for {name}")
 
         return processed_telegram_channels
 
@@ -428,7 +428,7 @@ class ConfigManager:
         for rss_entry in rss_sources:
             rss_url = rss_entry.get('url')
             if not rss_url:
-                _logger.warning(f"[ConfigManager] RSS entry missing URL in {dest_name}")
+                _logger.warning(f"RSS entry missing URL in {dest_name}")
                 continue
 
             # Add to RSS feed deduplication index if not already present
@@ -457,20 +457,20 @@ class ConfigManager:
             rss_name = rss_entry.get('name', rss_url)
             if not rss_channel['keywords']:
                 _logger.info(
-                    f"[ConfigManager] RSS:{rss_name}: "
+                    f"RSS:{rss_name}: "
                     f"No keywords configured, all items will be forwarded to {dest_name}"
                 )
 
             if rss_channel.get('parser'):
                 parser = rss_channel['parser']
                 if 'keep_first_lines' in parser:
-                    _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: keep first {parser['keep_first_lines']} lines for {dest_name}")
+                    _logger.info(f"Parser for RSS:{rss_name}: keep first {parser['keep_first_lines']} lines for {dest_name}")
                 elif 'trim_front_lines' in parser or 'trim_back_lines' in parser:
                     front = parser.get('trim_front_lines', 0)
                     back = parser.get('trim_back_lines', 0)
                     # Only log if there's actual trimming happening
                     if front > 0 or back > 0:
-                        _logger.info(f"[ConfigManager] Parser for RSS:{rss_name}: trim front={front}, back={back} for {dest_name}")
+                        _logger.info(f"Parser for RSS:{rss_name}: trim front={front}, back={back} for {dest_name}")
 
     def _load_keyword_file(self, filename: str) -> List[str]:
         """Load keywords from a JSON file in the config directory.
@@ -522,7 +522,7 @@ class ConfigManager:
 
         # Cache and return
         self._keyword_cache[filename] = keywords
-        _logger.debug(f"[ConfigManager] Loaded {len(keywords)} keywords from {filename}")
+        _logger.debug(f"Loaded {len(keywords)} keywords from {filename}")
         return keywords
 
     def _resolve_keywords(self, keyword_config) -> List[str]:

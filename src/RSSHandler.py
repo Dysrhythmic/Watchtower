@@ -76,7 +76,7 @@ class RSSHandler:
             # Initialize log with current time to process only entries newer than now
             now = datetime.now(timezone.utc).isoformat()
             log_file_path.write_text(now, encoding='utf-8')
-            _logger.info(f"[RSSHandler] {rss_name} initialized")
+            _logger.info(f"{rss_name} initialized")
             return None
         try:
             content = log_file_path.read_text(encoding='utf-8').strip()
@@ -230,7 +230,7 @@ class RSSHandler:
             try:
                 parsed_feed = feedparser.parse(rss_url)
                 if parsed_feed.bozo:
-                    _logger.warning(f"[RSSHandler] Parse error for {rss_name}: {getattr(parsed_feed, 'bozo_exception', '')}")
+                    _logger.warning(f"Parse error for {rss_name}: {getattr(parsed_feed, 'bozo_exception', '')}")
 
                 count_new = 0
                 count_routed = 0
@@ -258,13 +258,13 @@ class RSSHandler:
                     self._write_last_timestamp(rss_name, newest_seen)
                     last_timestamp = newest_seen
 
-                log_msg = f"[RSSHandler] {rss_name} polled; new_entries={count_new}; routed={count_routed}"
+                log_msg = f"{rss_name} polled; new_entries={count_new}; routed={count_routed}"
                 if count_too_old > 0:
                     log_msg += f"; too_old={count_too_old}"
                 _logger.info(log_msg)
 
             except Exception as e:
-                _logger.error(f"[RSSHandler] Poll error for {rss_name}: {e}")
+                _logger.error(f"Poll error for {rss_name}: {e}")
 
             await self._sleep(self.DEFAULT_POLL_INTERVAL)
 

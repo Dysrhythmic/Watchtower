@@ -44,9 +44,9 @@ class OCRHandler:
             try:
                 # English only, CPU mode
                 self._ocr_reader = easyocr.Reader(['en'], gpu=False)
-                _logger.info("[OCRHandler] EasyOCR reader initialized (en, CPU)")
+                _logger.info("EasyOCR reader initialized (en, CPU)")
             except Exception as e:
-                _logger.error(f"[OCRHandler] Failed to initialize EasyOCR: {e}")
+                _logger.error(f"Failed to initialize EasyOCR: {e}")
                 self._ocr_reader = None
 
     def extract_text(self, image_path: str) -> Optional[str]:
@@ -59,7 +59,7 @@ class OCRHandler:
             Optional[str]: Extracted text if successful, None if OCR unavailable or failed
         """
         if not _EASYOCR_AVAILABLE:
-            _logger.debug("[OCRHandler] OCR skipped (EasyOCR not available)")
+            _logger.debug("OCR skipped (EasyOCR not available)")
             return None
 
         self._ensure_reader()
@@ -82,5 +82,5 @@ class OCRHandler:
             text = "\n".join([s for s in results if s])
             return text.strip() or None
         except Exception as e:
-            _logger.error(f"[OCRHandler] OCR failed on {image_path}: {e}")
+            _logger.error(f"OCR failed on {image_path}: {e}")
             return None

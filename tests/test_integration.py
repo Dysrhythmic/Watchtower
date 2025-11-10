@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from MessageData import MessageData
+from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_RSS
 
 
 def create_mock_config(extra_attrs=None):
@@ -65,7 +66,7 @@ class TestTelegramToDiscordFlow(unittest.TestCase):
         mock_post.return_value.status_code = 200
 
         # Create Watchtower
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create test message
         msg = MessageData(
@@ -102,7 +103,7 @@ class TestRetryQueueIntegration(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Mock 429 response
         mock_response_429 = Mock()
@@ -147,7 +148,7 @@ class TestMetricsIntegration(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Increment some metrics
         app.metrics.increment("messages_received_telegram")
@@ -196,7 +197,7 @@ class TestMessageRouting(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Message WITHOUT keyword
         msg_no_match = MessageData(
@@ -261,7 +262,7 @@ class TestMessageRouting(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         msg = MessageData(
             source_type="Telegram",
@@ -307,7 +308,7 @@ class TestParserIntegration(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         msg = MessageData(
             source_type="Telegram",
@@ -344,7 +345,7 @@ class TestErrorHandling(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Mock network error
         mock_post.side_effect = Exception("Connection failed")
@@ -375,7 +376,7 @@ class TestErrorHandling(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         msg = MessageData(
             source_type="Telegram",
@@ -401,7 +402,7 @@ class TestErrorHandling(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         msg = MessageData(
             source_type="Telegram",
@@ -444,7 +445,7 @@ class TestMediaHandling(unittest.TestCase):
         mock_config_class.return_value = mock_config
         mock_post.return_value.status_code = 200
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         msg = MessageData(
             source_type="Telegram",
@@ -473,7 +474,7 @@ class TestQueueProcessing(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Enqueue an item
         app.message_queue.enqueue(
@@ -507,7 +508,7 @@ class TestQueueProcessing(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         app.message_queue.enqueue(
             destination={'name': 'Test'},
@@ -559,7 +560,7 @@ class TestConfigurationVariations(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Message from first channel
         msg1 = MessageData(
@@ -619,7 +620,7 @@ class TestConfigurationVariations(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram", "rss"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM, APP_TYPE_RSS])
 
         # Telegram message
         msg_telegram = MessageData(
@@ -661,7 +662,7 @@ class TestTelegramCaptionHandling(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Verify the limit constants are set
         self.assertEqual(app.telegram.MAX_CAPTION_LENGTH, 1024)
@@ -683,7 +684,7 @@ class TestTelegramCaptionHandling(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create a 6700-character message (matches user's actual message length)
         test_content = "A" * 6700
@@ -711,7 +712,7 @@ class TestTelegramCaptionHandling(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create a message that will chunk into 3 parts at 4096 limit
         # Note: Use space separators instead of newlines to avoid lstrip behavior

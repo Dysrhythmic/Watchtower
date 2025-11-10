@@ -2,68 +2,21 @@
 Watchtower - Main orchestrator for message monitoring and routing
 
 This module contains the core Watchtower application that coordinates all components
-to monitor message sources (Telegram, RSS) and route matching messages to configured
-destinations (Discord, Telegram) based on keywords and filters.
-
-Architecture:
-    Watchtower serves as the central coordinator that:
-    1. Initializes all handlers (Telegram, Discord, RSS, OCR)
-    2. Starts message monitoring on configured sources
-    3. Routes messages through MessageRouter based on keywords
-    4. Applies per-destination transformations (parsing, formatting)
-    5. Handles media downloads and restrictions
-    6. Manages retry queue for failed deliveries
-    7. Collects metrics and handles graceful shutdown
-
-Message Flow:
-    1. Source (Telegram/RSS) receives message → converts to MessageData
-    2. Watchtower._handle_message() receives MessageData
-    3. Pre-process: OCR extraction, URL defanging
-    4. MessageRouter finds matching destinations based on keywords
-    5. For each destination:
-        a. Apply parser (trim lines if configured)
-        b. Format message (Discord markdown or Telegram HTML)
-        c. Check media restrictions
-        d. Send via DiscordHandler or TelegramHandler
-        e. On failure: enqueue for retry via MessageQueue
-    6. Clean up: Remove downloaded media files
-
-Key Components:
-    - ConfigManager: Loads config.json and environment variables
-    - TelegramHandler: Source + destination for Telegram
-    - RSSHandler: Source for RSS feeds
-    - DiscordHandler: Destination for Discord webhooks
-    - MessageRouter: Keyword matching and routing logic
-    - OCRHandler: Text extraction from images
-    - MessageQueue: Retry queue with exponential backoff
-    - MetricsCollector: Usage statistics tracking
-
-Error Handling Pattern:
-    Use exc_info=True in __logger.error() calls for unexpected exceptions that indicate bugs
-    or system failures (includes full tracebacks for debugging).
-
-    Do NOT use exc_info=True for:
-    - Expected errors (network timeouts, missing files, config validation)
-    - User errors (invalid input, missing credentials)
-    - Business logic failures (message routing failures, API rate limits)
-
-    Examples:
-        __logger.error("Failed to connect", exc_info=True)  # YES - unexpected system error
-        __logger.error("Invalid config file")                # NO - expected validation error
+to monitor message sources and route matching messages to configured destinations
+based on keywords and filters.
 
 Subcommands:
     monitor: Run live message monitoring and routing
         --sources: Comma-separated sources (telegram, rss, or all)
 
     discover: Auto-generate config from accessible Telegram channels
-        --diff: Show only new channels not in existing config
-        --generate: Write config_discovered.json file
+        --diff: Compare discovered channels with existing configuration
+        --generate: Create config_discovered.json file based on discovered channels
 """
 from __future__ import annotations
 import os
 import argparse
 import asyncio
-import glob
 import json
 import time
 from typing import List, Dict, Optional, TYPE_CHECKING
@@ -78,21 +31,21 @@ if TYPE_CHECKING:
 _logger = setup_logger(__name__)
 
 class Watchtower:
-    """Main application orchestrator for CTI message routing.
+    """Main application orchestrator for message monitoring.
 
-    Coordinates all components to monitor message sources (Telegram, RSS feeds)
-    and intelligently route matching messages to configured destinations (Discord,
-    Telegram) based on keyword filtering and per-destination configuration.
+    Coordinates all components to monitor message sources and route
+    matching messages to configured destinations based on keyword filtering
+    and per-destination configuration.
 
     Attributes:
-        config: ConfigManager instance with application configuration
-        telegram: TelegramHandler for Telegram operations (source + destination)
-        discord: DiscordHandler for Discord webhook delivery
+        config: ConfigManager for loading and validating application configuration
+        telegram: TelegramHandler for Telegram operations
+        discord: DiscordHandler for Discord operations
         router: MessageRouter for keyword matching and routing
         ocr: OCRHandler for text extraction from images
         message_queue: MessageQueue for retry handling
         metrics: MetricsCollector for usage statistics
-        sources: List of enabled sources ("telegram", "rss")
+        sources: List of enabled sources
         rss: RSSHandler instance (created if RSS is enabled)
     """
 
@@ -126,7 +79,7 @@ class Watchtower:
         from MessageQueue import MessageQueue
         from MetricsCollector import MetricsCollector
 
-        # Use provided instances or create defaults (dependency injection)
+        # Use provided instances for dependency injection or create defaults
         self.config = config or ConfigManager()
         self.telegram = telegram or TelegramHandler(self.config)
         self.router = router or MessageRouter(self.config)
@@ -140,10 +93,10 @@ class Watchtower:
         self._shutdown_requested = False
         self._start_time = None  # Track application runtime
 
-        # Clean up any leftover media files from previous runs
+        # Clean up any potential attachment files from previous runs
         self._cleanup_attachments_dir()
 
-        _logger.info("[Watchtower] Initialized")
+        _logger.info("Initialized")
 
     def _cleanup_attachments_dir(self):
         """Remove any leftover media files from previous runs.
@@ -160,10 +113,10 @@ class Watchtower:
                     try:
                         if file_path.is_file():
                             os.remove(file_path)
-                            _logger.debug(f"[Watchtower] Cleaned up leftover file: {file_path}")
+                            _logger.debug(f"Cleaned up leftover file: {file_path}")
                     except Exception as e:
-                        _logger.warning(f"[Watchtower] Failed to clean up {file_path}: {e}")
-                _logger.info(f"[Watchtower] Cleaned up {len(files)} leftover media files from attachments directory")
+                        _logger.warning(f"Failed to clean up {file_path}: {e}")
+                _logger.info(f"Cleaned up {len(files)} leftover media files from attachments directory")
 
     async def start(self) -> None:
         """Start the Watchtower service.
@@ -181,7 +134,7 @@ class Watchtower:
         tasks.append(asyncio.create_task(self.message_queue.process_queue(self)))
 
         # Telegram source
-        if 'telegram' in self.sources:
+        if APP_TYPE_TELEGRAM in self.sources:
             await self.telegram.start()
             self.telegram.setup_handlers(self._handle_message)
             # connection proofs
@@ -191,19 +144,19 @@ class Watchtower:
             tasks.append(asyncio.create_task(self.telegram.poll_missed_messages(self.metrics)))
 
         # RSS source
-        if 'rss' in self.sources and self.config.rss_feeds:
+        if APP_TYPE_RSS in self.sources and self.config.rss_feeds:
             from RSSHandler import RSSHandler
             self.rss = RSSHandler(self.config, self._handle_message)
             for feed in self.config.rss_feeds:
                 tasks.append(asyncio.create_task(self.rss.run_feed(feed)))
 
-        _logger.info(f"[Watchtower] Now monitoring for new messages... (sources={','.join(self.sources)})")
+        _logger.info(f"Now monitoring for new messages... (sources={','.join(self.sources)})")
 
         if tasks:
             try:
                 await asyncio.gather(*tasks)
             except asyncio.CancelledError:
-                _logger.info("[Watchtower] Tasks cancelled, returning to main...")
+                _logger.info("Tasks cancelled, returning to main...")
 
     async def shutdown(self):
         """Gracefully shutdown the application.
@@ -213,7 +166,7 @@ class Watchtower:
         Returns:
             None
         """
-        _logger.info("[Watchtower] Initiating graceful shutdown...")
+        _logger.info("Initiating graceful shutdown...")
         self._shutdown_requested = True
 
         # Calculate and save seconds_ran metric
@@ -229,14 +182,14 @@ class Watchtower:
         metrics_summary = self.metrics.get_all()
         if metrics_summary:
             _logger.info(
-                f"[Watchtower] Final metrics for this session:\n"
+                f"Final metrics for this session:\n"
                 f"{json.dumps(metrics_summary, indent=2)}"
             )
 
         # Check retry queue status
         queue_size = self.message_queue.get_queue_size()
         if queue_size > 0:
-            _logger.warning(f"[Watchtower] Shutting down with {queue_size} messages in retry queue (will be lost)")
+            _logger.warning(f"Shutting down with {queue_size} messages in retry queue (will be lost)")
 
         # Clear telegram logs (don't process messages sent during downtime)
         if self.telegram:
@@ -245,9 +198,9 @@ class Watchtower:
         # Disconnect Telegram client
         if self.telegram and self.telegram.client.is_connected():
             await self.telegram.client.disconnect()
-            _logger.info("[Watchtower] Telegram client disconnected")
+            _logger.info("Telegram client disconnected")
 
-        _logger.info("[Watchtower] Shutdown complete")
+        _logger.info("Shutdown complete")
 
     def _clear_telegram_logs(self):
         """Clear all telegram log files on shutdown.
@@ -271,9 +224,9 @@ class Watchtower:
                 for log_file in telegramlog_dir.glob("*.txt"):
                     log_file.unlink()
                     count += 1
-                _logger.info(f"[Watchtower] Cleared {count} telegram log file(s)")
+                _logger.info(f"Cleared {count} telegram log file(s)")
         except Exception as e:
-            _logger.error(f"[Watchtower] Error clearing telegram logs: {e}")
+            _logger.error(f"Error clearing telegram logs: {e}")
 
     async def _handle_message(self, message_data: 'MessageData', is_latest: bool) -> bool:
         """Process incoming message from any source (Telegram, RSS).
@@ -299,7 +252,7 @@ class Watchtower:
             # Connection proof logging only
             if is_latest:
                 _logger.info(
-                    f"\n[Watchtower] CONNECTION ESTABLISHED\n"
+                    f"\nCONNECTION ESTABLISHED\n"
                     f"  Channel: {message_data.channel_name}\n"
                     f"  Latest message by: {message_data.username}\n"
                     f"  Time: {message_data.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
@@ -313,7 +266,7 @@ class Watchtower:
 
             destinations = self.router.get_destinations(message_data)
             if not destinations:
-                _logger.info(f"[Watchtower] Message from {message_data.channel_name} by {message_data.username} has no destinations")
+                _logger.info(f"Message from {message_data.channel_name} by {message_data.username} has no destinations")
                 self.metrics.increment("total_msgs_no_destination")
                 return False
 
@@ -333,7 +286,7 @@ class Watchtower:
             return success_count > 0
 
         except Exception as e:
-            _logger.error(f"[Watchtower] Error processing message from {message_data.channel_name} by {message_data.username}: {e}", exc_info=True)
+            _logger.error(f"Error processing message from {message_data.channel_name} by {message_data.username}: {e}", exc_info=True)
             return False
 
         finally:
@@ -341,9 +294,9 @@ class Watchtower:
             if message_data.media_path and os.path.exists(message_data.media_path):
                 try:
                     os.remove(message_data.media_path)
-                    _logger.debug(f"[Watchtower] Cleaned up media file: {message_data.media_path}")
+                    _logger.debug(f"Cleaned up media file: {message_data.media_path}")
                 except Exception as e:
-                    _logger.error(f"[Watchtower] Error removing media at {message_data.media_path}: {e}")
+                    _logger.error(f"Error removing media at {message_data.media_path}: {e}")
 
     async def _preprocess_message(self, message_data: MessageData):
         """Pre-process message with OCR and defanged URLs.
@@ -369,7 +322,7 @@ class Watchtower:
                         message_data.ocr_raw = ocr_text
                         self.metrics.increment("ocr_processed")
                 else:
-                    _logger.debug(f"[Watchtower] Skipping OCR for non-image file: {message_data.media_path}")
+                    _logger.debug(f"Skipping OCR for non-image file: {message_data.media_path}")
 
         if message_data.source_type == APP_TYPE_TELEGRAM and message_data.original_message:
             telegram_msg_id = getattr(message_data.original_message, "id", None)
@@ -461,7 +414,7 @@ class Watchtower:
         else:
             status = "failed"
 
-        _logger.info(f"[Watchtower] Message from {parsed_message.channel_name} by {parsed_message.username} {status} to {destination['name']}")
+        _logger.info(f"Message from {parsed_message.channel_name} by {parsed_message.username} {status} to {destination['name']}")
 
         # Return True if status indicates success (not "failed")
         return status != "failed"
@@ -541,7 +494,7 @@ class Watchtower:
 
         destination_chat_id = await self.telegram.resolve_destination(channel_specifier)
         if destination_chat_id is None:
-            _logger.warning(f"[TelegramHandler] Skipping unresolved destination: {channel_specifier}")
+            _logger.warning(f"Skipping unresolved destination: {channel_specifier}")
             return "failed"
 
         try:
@@ -562,7 +515,7 @@ class Watchtower:
                 self.metrics.increment("messages_queued_retry")
                 return "queued for retry"
         except Exception as e:
-            _logger.error(f"[TelegramHandler] Failed to send to {channel_specifier}: {e}")
+            _logger.error(f"Failed to send to {channel_specifier}: {e}")
             return "failed"
 
     def _extract_matched_lines_from_attachment(self, media_path: str, keywords: List[str]) -> dict:
@@ -626,7 +579,7 @@ class Watchtower:
             return result
 
         except Exception as e:
-            _logger.warning(f"[Watchtower] Failed to extract lines from {media_path}: {e}")
+            _logger.warning(f"Failed to extract lines from {media_path}: {e}")
             return result
 
     def _check_file_size_and_modify_content(
@@ -665,7 +618,7 @@ class Watchtower:
             # File is too large - extract matched lines or sample
             file_size_mb = file_size / (1024 * 1024)
             _logger.info(
-                f"[Watchtower] Attachment {Path(media_path).name} ({file_size_mb:.1f}MB) "
+                f"Attachment {Path(media_path).name} ({file_size_mb:.1f}MB) "
                 f"exceeds limit ({file_size_limit / (1024*1024):.1f}MB), streaming file for keyword extraction"
             )
 
@@ -715,7 +668,7 @@ class Watchtower:
             return content, False
 
         except Exception as e:
-            _logger.error(f"[Watchtower] Error checking file size for {media_path}: {e}")
+            _logger.error(f"Error checking file size for {media_path}: {e}")
             return content, True  # On error, try to send normally
 
     def _get_media_for_send(self, parsed_message: MessageData, destination: Dict, include_media: bool) -> Optional[str]:
@@ -761,23 +714,28 @@ def main():
     args = parser.parse_args()
 
     if args.cmd == "monitor":
-        # Parse sources
+        # Parse sources - map CLI strings to AppTypes constants
         wanted = set(s.strip().lower() for s in args.sources.split(','))
         if "all" in wanted:
-            sources = ["telegram", "rss"]
+            sources = [APP_TYPE_TELEGRAM, APP_TYPE_RSS]
         else:
-            sources = [s for s in ("telegram", "rss") if s in wanted]
+            # Map lowercase CLI input to AppTypes constants
+            source_map = {
+                "telegram": APP_TYPE_TELEGRAM,
+                "rss": APP_TYPE_RSS
+            }
+            sources = [source_map[s] for s in ("telegram", "rss") if s in wanted]
 
         app = None
         try:
             app = Watchtower(sources)
             asyncio.run(app.start())
         except KeyboardInterrupt:
-            _logger.info("[Watchtower] Interrupted by user (Ctrl+C)")
+            _logger.info("Interrupted by user (Ctrl+C)")
             if app:
                 asyncio.run(app.shutdown())
         except Exception as e:
-            _logger.error(f"[Watchtower] Fatal error: {e}")
+            _logger.error(f"Fatal error: {e}")
             if app:
                 asyncio.run(app.shutdown())
             raise
@@ -786,9 +744,9 @@ def main():
         try:
             asyncio.run(discover_channels(diff_mode=args.diff, generate_config=args.generate))
         except KeyboardInterrupt:
-            _logger.info("[Discover] Cancelled by user")
+            _logger.info("Cancelled by user")
         except Exception as e:
-            _logger.error(f"[Discover] Error: {e}", exc_info=True)
+            _logger.error(f"Error: {e}", exc_info=True)
             raise
 
     else:

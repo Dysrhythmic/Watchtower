@@ -103,7 +103,7 @@ class TelegramHandler(DestinationHandler):
         in self.channels for message monitoring. Logs success/failure for each channel.
         """
         await self.client.start()
-        _logger.info("[TelegramHandler] Telegram client started")
+        _logger.info("Telegram client started")
 
         # Resolve all channels
         for channel_id in self.config.get_all_channel_ids():
@@ -113,11 +113,11 @@ class TelegramHandler(DestinationHandler):
                 self.channels[entity_id] = telegram_entity
                 name = f"@{telegram_entity.username}" if getattr(telegram_entity, 'username', None) else telegram_entity.title
                 self.config.channel_names[entity_id] = name
-                _logger.info(f"[TelegramHandler] Resolved {channel_id} -> ID: {entity_id}, Name: {name}")
+                _logger.info(f"Resolved {channel_id} -> ID: {entity_id}, Name: {name}")
             else:
-                _logger.error(f"[TelegramHandler] Failed to resolve channel: {channel_id}")
+                _logger.error(f"Failed to resolve channel: {channel_id}")
 
-        _logger.info(f"[TelegramHandler] Resolved {len(self.channels)} channels")
+        _logger.info(f"Resolved {len(self.channels)} channels")
 
     async def _resolve_entity(self, identifier: str):
         """Shared entity resolution logic for channels and destinations.
@@ -158,7 +158,7 @@ class TelegramHandler(DestinationHandler):
         try:
             return await self._resolve_entity(channel_id)
         except Exception as e:
-            _logger.error(f"[TelegramHandler] Failed to resolve {channel_id}: {e}")
+            _logger.error(f"Failed to resolve {channel_id}: {e}")
             return None
 
     def _get_channel_name(self, channel_id: str) -> str:
@@ -228,7 +228,7 @@ class TelegramHandler(DestinationHandler):
 
         content = f"{channel_name}\n{msg_id}\n"
         log_path.write_text(content, encoding='utf-8')
-        _logger.info(f"[TelegramHandler] Created log for {channel_name}: msg_id={msg_id}")
+        _logger.info(f"Created log for {channel_name}: msg_id={msg_id}")
 
     def _read_telegram_log(self, channel_id: str) -> Optional[int]:
         """Read last processed message ID from telegram log.
@@ -258,7 +258,7 @@ class TelegramHandler(DestinationHandler):
             if len(lines) >= 2:
                 return int(lines[1])
         except Exception as e:
-            _logger.error(f"[TelegramHandler] Error reading log for {channel_id}: {e}")
+            _logger.error(f"Error reading log for {channel_id}: {e}")
         return None
 
     def _update_telegram_log(self, channel_id: str, msg_id: int) -> None:
@@ -286,7 +286,7 @@ class TelegramHandler(DestinationHandler):
         content = f"{channel_name}\n{msg_id}\n"
         log_path.write_text(content, encoding='utf-8')
         # Only log at debug level to avoid spam
-        _logger.debug(f"[TelegramHandler] Updated log for {channel_name}: msg_id={msg_id}")
+        _logger.debug(f"Updated log for {channel_name}: msg_id={msg_id}")
 
     async def fetch_latest_messages(self):
         """Fetch latest message from each channel for connection proof.
@@ -311,7 +311,7 @@ class TelegramHandler(DestinationHandler):
                             await self.msg_callback(message_data, is_latest=True)
                     break
             except Exception as e:
-                _logger.error(f"[TelegramHandler] Error fetching from {channel_name}: {e}")
+                _logger.error(f"Error fetching from {channel_name}: {e}")
 
     async def poll_missed_messages(self, metrics_collector=None):
         """Poll for messages that may have been missed during downtime.
@@ -371,7 +371,7 @@ class TelegramHandler(DestinationHandler):
                                     break
                                 # We have missed messages, log detection
                                 _logger.warning(
-                                    f"[TelegramHandler] Detected missed messages in {channel_name}: "
+                                    f"Detected missed messages in {channel_name}: "
                                     f"log_id={last_processed_id}, newest_id={newest_msg_id}"
                                 )
 
@@ -391,7 +391,7 @@ class TelegramHandler(DestinationHandler):
 
                             for message in messages_to_process:
                                 _logger.warning(
-                                    f"[TelegramHandler] Processing missed message: "
+                                    f"Processing missed message: "
                                     f"{channel_name} msg_id={message.id}"
                                 )
 
@@ -406,18 +406,18 @@ class TelegramHandler(DestinationHandler):
                             if metrics_collector:
                                 metrics_collector.increment("telegram_missed_messages_caught", missed_count)
                             _logger.warning(
-                                f"[TelegramHandler] Processed {missed_count} missed messages "
+                                f"Processed {missed_count} missed messages "
                                 f"from {channel_name} (newest_id={newest_msg_id})"
                             )
 
                         # Log polling activity (similar to RSSHandler)
-                        _logger.info(f"[TelegramHandler] {channel_name} polled; missed={missed_count}")
+                        _logger.info(f"{channel_name} polled; missed={missed_count}")
 
                     except Exception as e:
-                        _logger.error(f"[TelegramHandler] Error polling {channel_name}: {e}")
+                        _logger.error(f"Error polling {channel_name}: {e}")
 
             except Exception as e:
-                _logger.error(f"[TelegramHandler] Error in poll loop: {e}", exc_info=True)
+                _logger.error(f"Error in poll loop: {e}", exc_info=True)
 
     def setup_handlers(self, callback) -> None:
         """Setup message event handlers for monitoring new messages.
@@ -432,8 +432,8 @@ class TelegramHandler(DestinationHandler):
 
         configured_unique = len(self.config.get_all_channel_ids())
         resolved_count = len(self.channels)
-        _logger.info(f"[TelegramHandler] Channels in configuration: {configured_unique}")
-        _logger.info(f"[TelegramHandler] Channels successfully resolved: {resolved_count}")
+        _logger.info(f"Channels in configuration: {configured_unique}")
+        _logger.info(f"Channels successfully resolved: {resolved_count}")
 
         @self.client.on(events.NewMessage())
         async def handle_message(event):
@@ -447,7 +447,7 @@ class TelegramHandler(DestinationHandler):
                 if telegram_msg_id:
                     self._update_telegram_log(channel_id, telegram_msg_id)
 
-                _logger.info(f"[TelegramHandler] Received message tg_id={telegram_msg_id} from {channel_name}")
+                _logger.info(f"Received message tg_id={telegram_msg_id} from {channel_name}")
 
                 # Now create message_data and route (polling won't duplicate this message)
                 message_data = await self._create_message_data(event.message, channel_id)
@@ -455,7 +455,7 @@ class TelegramHandler(DestinationHandler):
 
             except Exception as e:
                 channel_name = self._get_channel_name(str(event.chat_id))
-                _logger.error(f"[TelegramHandler] Error handling message from {channel_name}: {e}", exc_info=True)
+                _logger.error(f"Error handling message from {channel_name}: {e}", exc_info=True)
 
     async def _create_message_data(self, message, channel_id: str) -> MessageData:
         """Create MessageData from Telegram message.
@@ -576,7 +576,7 @@ class TelegramHandler(DestinationHandler):
                 return context
 
         except Exception as e:
-            _logger.error(f"[TelegramHandler] Error getting reply context: {e}", exc_info=True)
+            _logger.error(f"Error getting reply context: {e}", exc_info=True)
 
         return None
 
@@ -599,7 +599,7 @@ class TelegramHandler(DestinationHandler):
             return False  # No media = not restricted
 
         if not isinstance(message.media, MessageMediaDocument):
-            _logger.info("[TelegramHandler] Media blocked by restricted mode: only documents are allowed in restricted mode")
+            _logger.info("Media blocked by restricted mode: only documents are allowed in restricted mode")
             return True  # Non-document media = restricted
 
         document = message.media.document
@@ -622,7 +622,7 @@ class TelegramHandler(DestinationHandler):
         allowed = extension_allowed and mime_allowed
         if not allowed:
             _logger.info(
-                f"[TelegramHandler] Media blocked by restricted mode: "
+                f"Media blocked by restricted mode: "
                 f"type={type(message.media).__name__}, ext={file_extension}, mime={mime_type}"
             )
         return not allowed  # Return True if restricted (not allowed), False if allowed
@@ -644,12 +644,12 @@ class TelegramHandler(DestinationHandler):
                     file_size = os.path.getsize(media_path)
                     file_size_mb = file_size / (1024 * 1024)
                     _logger.info(
-                        f"[TelegramHandler] Media downloaded successfully: "
+                        f"Media downloaded successfully: "
                         f"{os.path.basename(media_path)} ({file_size_mb:.2f} MB)"
                     )
                 return media_path
         except Exception as e:
-            _logger.error(f"[TelegramHandler] Media download failed: {e}")
+            _logger.error(f"Media download failed: {e}")
         return None
 
     @staticmethod
@@ -740,7 +740,7 @@ class TelegramHandler(DestinationHandler):
             self._dest_cache[channel_specifier] = chat_id
             return chat_id
         except Exception as e:
-            _logger.error(f"[TelegramHandler] Failed to resolve destination {channel_specifier}: {e}")
+            _logger.error(f"Failed to resolve destination {channel_specifier}: {e}")
             return None
 
     def _get_rate_limit_key(self, destination_identifier) -> str:
@@ -795,7 +795,7 @@ class TelegramHandler(DestinationHandler):
                                               caption=content or None, parse_mode='html')
                 else:
                     # Content too long for caption - send media captionless, then chunk content at 4096
-                    _logger.info(f"[TelegramHandler] Content exceeds {self.MAX_CAPTION_LENGTH} chars, sending media captionless and text separately")
+                    _logger.info(f"Content exceeds {self.MAX_CAPTION_LENGTH} chars, sending media captionless and text separately")
                     await self.client.send_file(destination_chat_id, media_path, caption=None)
 
                     # Chunk the FULL content at Telegram's message limit (4096 chars)
@@ -822,7 +822,7 @@ class TelegramHandler(DestinationHandler):
             return False
 
         except Exception as e:
-            _logger.error(f"[TelegramHandler] Copy send failed: {e}")
+            _logger.error(f"Copy send failed: {e}")
             return False
 
     def format_message(self, message_data: MessageData, destination: Dict) -> str:

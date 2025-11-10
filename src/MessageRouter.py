@@ -122,7 +122,7 @@ class MessageRouter:
 
         # Early exit if channel is not monitored by any destination
         if not channel_is_configured:
-            _logger.info(f"[MessageRouter] No configured matches for channel {message_data.channel_name} ({message_data.channel_id})")
+            _logger.info(f"No configured matches for channel {message_data.channel_name} ({message_data.channel_id})")
             return destinations
 
         # Collect all matching destinations
@@ -189,7 +189,7 @@ class MessageRouter:
             keep = int(parser_config.get('keep_first_lines', 0) or 0)
 
             if keep <= 0:
-                _logger.warning(f"[MessageRouter] Invalid keep_first_lines={keep}, must be > 0")
+                _logger.warning(f"Invalid keep_first_lines={keep}, must be > 0")
                 return message_data
 
             lines = text.split('\n')
@@ -211,7 +211,7 @@ class MessageRouter:
 
         # Validate values
         if front < 0 or back < 0:
-            _logger.warning(f"[MessageRouter] Invalid parser values: front={front}, back={back} must be nonnegative")
+            _logger.warning(f"Invalid parser values: front={front}, back={back} must be nonnegative")
             return message_data
 
         # Skip parsing if both are 0
@@ -288,14 +288,14 @@ class MessageRouter:
         # Check file extension
         file_extension = path.suffix.lower()
         if file_extension not in ALLOWED_EXTENSIONS:
-            _logger.info(f"[MessageRouter] Skipping attachment with disallowed extension: {path.name}")
+            _logger.info(f"Skipping attachment with disallowed extension: {path.name}")
             return None
 
         # Check MIME type
         mime_type, _ = mimetypes.guess_type(str(path))
         if not mime_type or mime_type not in ALLOWED_MIME_TYPES:
             _logger.info(
-                f"[MessageRouter] Skipping attachment with disallowed MIME type: "
+                f"Skipping attachment with disallowed MIME type: "
                 f"{path.name} (extension={file_extension}, mime={mime_type})"
             )
             return None
@@ -304,7 +304,7 @@ class MessageRouter:
         file_size = path.stat().st_size
         if file_size > 100 * 1024 * 1024:  # Log if > 100MB
             _logger.info(
-                f"[MessageRouter] Reading {file_size / (1024*1024):.1f}MB attachment for keyword checking: {path.name}"
+                f"Reading {file_size / (1024*1024):.1f}MB attachment for keyword checking: {path.name}"
             )
 
         # Read entire file content
@@ -313,14 +313,14 @@ class MessageRouter:
                 content = f.read()
 
             _logger.debug(
-                f"[MessageRouter] Extracted {len(content)} chars from {path.name} "
+                f"Extracted {len(content)} chars from {path.name} "
                 f"for keyword checking"
             )
             return content
 
         except Exception as e:
             _logger.warning(
-                f"[MessageRouter] Failed to read attachment {path.name}: {e}"
+                f"Failed to read attachment {path.name}: {e}"
             )
             return None
 

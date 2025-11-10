@@ -113,10 +113,10 @@ def _load_existing_config(config_dir: Path, config_filename='config.json'):
     config_path = config_dir / config_filename
 
     if not config_path.exists():
-        _logger.info(f"[Discover] No existing config found at {config_path}")
+        _logger.info(f"No existing config found at {config_path}")
         return set(), {}
 
-    _logger.info(f"[Discover] Loading existing config: {config_path}")
+    _logger.info(f"Loading existing config: {config_path}")
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             existing_config = json.load(f)
@@ -133,10 +133,10 @@ def _load_existing_config(config_dir: Path, config_filename='config.json'):
                     existing_channel_ids.add(ch_id)
                     existing_channel_details[ch_id] = ch_id
 
-        _logger.info(f"[Discover] Found {len(existing_channel_ids)} existing channels in config")
+        _logger.info(f"Found {len(existing_channel_ids)} existing channels in config")
         return existing_channel_ids, existing_channel_details
     except Exception as e:
-        _logger.error(f"[Discover] Error loading config: {e}")
+        _logger.error(f"Error loading config: {e}")
         return None, None
 
 
@@ -236,8 +236,8 @@ def _save_discovered_config(channels, config_dir: Path):
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
 
-    _logger.info(f"[Discover] Configuration saved to {config_path}")
-    _logger.info(f"[Discover] Note: To send to Telegram instead, change type to 'telegram' and set env_key to a Telegram channel ID")
+    _logger.info(f"Configuration saved to {config_path}")
+    _logger.info(f"Note: To send to Telegram instead, change type to 'telegram' and set env_key to a Telegram channel ID")
 
 
 async def discover_channels(diff_mode=False, generate_config=False):
@@ -260,17 +260,17 @@ async def discover_channels(diff_mode=False, generate_config=False):
     config_filename = config.config_file
 
     if not api_id or not api_hash:
-        _logger.error("[Discover] Missing TELEGRAM_API_ID or TELEGRAM_API_HASH in .env file")
+        _logger.error("Missing TELEGRAM_API_ID or TELEGRAM_API_HASH in .env file")
         return
 
-    _logger.info("[Discover] Connecting to Telegram...")
+    _logger.info("Connecting to Telegram...")
     session_path = str(config_dir / "watchtower_session.session")
     client = TelegramClient(session_path, api_id, api_hash)
 
     await client.start()
-    _logger.info("[Discover] Connected to Telegram")
+    _logger.info("Connected to Telegram")
 
-    _logger.info("[Discover] Fetching all dialogs (channels, groups, bots, users):")
+    _logger.info("Fetching all dialogs (channels, groups, bots, users):")
     dialogs = await client.get_dialogs()
 
     channels = []
@@ -300,7 +300,7 @@ async def discover_channels(diff_mode=False, generate_config=False):
     await client.disconnect()
 
     if not channels:
-        _logger.warning("[Discover] No dialogs found!")
+        _logger.warning("No dialogs found!")
         return
 
     if diff_mode:
@@ -318,7 +318,7 @@ async def discover_channels(diff_mode=False, generate_config=False):
             entity_type = ch.get('type', 'Unknown')
             type_counts[entity_type] = type_counts.get(entity_type, 0) + 1
 
-        _logger.info(f"[Discover] Found {len(channels)} total dialogs:")
+        _logger.info(f"Found {len(channels)} total dialogs:")
         for entity_type, count in sorted(type_counts.items()):
             _logger.info(f"  {entity_type}: {count}")
 

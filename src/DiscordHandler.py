@@ -77,7 +77,7 @@ class DiscordHandler(DestinationHandler):
                     elif response.status_code not in [200, 204]:
                         body = (response.text or "")[:200]
                         _logger.error(
-                            f"[DiscordHandler] Unsuccessful status code from Discord webhook (sent media): "
+                            f"Unsuccessful status code from Discord webhook (sent media): "
                             f"status={response.status_code}, body={body}"
                         )
                         return False
@@ -98,7 +98,7 @@ class DiscordHandler(DestinationHandler):
                 elif response.status_code not in [200, 204]:
                     body = (response.text or "")[:200]
                     _logger.error(
-                        f"[DiscordHandler] Unsuccessful status code from Discord webhook (chunk {chunk_index}/{len(chunks)}): "
+                        f"Unsuccessful status code from Discord webhook (chunk {chunk_index}/{len(chunks)}): "
                         f"status={response.status_code}, body={body}"
                     )
                     return False
@@ -106,7 +106,7 @@ class DiscordHandler(DestinationHandler):
             return True
 
         except Exception as e:
-            _logger.error(f"[DiscordHandler] Discord send failed: {e}")
+            _logger.error(f"Discord send failed: {e}")
             return False
 
     def _extract_retry_after(self, response: requests.Response) -> Optional[float]:
@@ -125,7 +125,7 @@ class DiscordHandler(DestinationHandler):
             body = response.json()
             return body.get('retry_after', 1.0)
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            _logger.warning(f"[DiscordHandler] Rate limited (429) but couldn't parse retry_after: {e}")
+            _logger.warning(f"Rate limited (429) but couldn't parse retry_after: {e}")
             return None
 
     def _handle_rate_limit(self, webhook_url: str, response: requests.Response) -> None:

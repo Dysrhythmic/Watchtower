@@ -70,7 +70,7 @@ def setup_logger(name: str, use_color=None) -> logging.Logger:
         # Configure root logger on first call
         handler = logging.StreamHandler(sys.stderr)
         formatter = ColoredFormatter(
-            fmt='%(asctime)s - %(levelname)s - %(message)s',
+            fmt='%(asctime)s - %(levelname)s - [%(name)s] %(message)s',
             use_color=use_color
         )
         handler.setFormatter(formatter)

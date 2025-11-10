@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from MessageData import MessageData
 from Watchtower import Watchtower
+from AppTypes import APP_TYPE_TELEGRAM
 
 class TestWatchtowerMessagePreprocessing(unittest.TestCase):
     """Tests for message preprocessing (_preprocess_message)."""
@@ -81,7 +82,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_metrics = MockMetrics.return_value
         mock_metrics.increment = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create message with media
         message_data = MessageData(
@@ -144,7 +145,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_telegram = MockTelegram.return_value
         mock_telegram.build_defanged_tg_url = Mock(return_value="hxxps://t[.]me/channel/1")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -210,7 +211,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_telegram.download_media = AsyncMock(return_value="/tmp/attachments/document.txt")
         mock_telegram.build_defanged_tg_url = Mock(return_value="hxxps://t[.]me/channel/1")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -269,7 +270,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
             return_value="hxxps://t[.]me/malware_samples/999"
         )
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -335,7 +336,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_telegram = MockTelegram.return_value
         mock_telegram.build_defanged_tg_url = Mock(return_value="hxxps://t[.]me/ch/1")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -392,7 +393,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         mock_telegram = MockTelegram.return_value
         mock_telegram.build_defanged_tg_url = Mock(return_value="hxxps://t[.]me/ch/1")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -452,7 +453,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_discord.format_message = Mock(return_value="**Formatted Discord Message**")
         mock_discord.send_message = Mock(return_value=True)
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -516,7 +517,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
         mock_telegram.send_copy = AsyncMock(return_value=True)
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -578,7 +579,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_discord.format_message = Mock(return_value="Message with media")
         mock_discord.send_message = Mock(return_value=True)
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -644,7 +645,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_discord.format_message = Mock(return_value="Text only message")
         mock_discord.send_message = Mock(return_value=True)
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -710,7 +711,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         mock_discord.format_message = Mock(return_value="Message")
         mock_discord.send_message = Mock(return_value=True)  # Success
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -774,7 +775,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_metrics = MockMetrics.return_value
         mock_metrics.increment = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -839,7 +840,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_metrics = MockMetrics.return_value
         mock_metrics.increment = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -909,7 +910,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_metrics = MockMetrics.return_value
         mock_metrics.increment = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -969,7 +970,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_metrics = MockMetrics.return_value
         mock_metrics.increment = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -1026,7 +1027,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         mock_discord = MockDiscord.return_value
         mock_discord.send_message = Mock(return_value=True)
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -1093,7 +1094,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_metrics = MockMetrics.return_value
         mock_metrics.increment = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -1160,7 +1161,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_metrics = MockMetrics.return_value
         mock_metrics.increment = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -1226,7 +1227,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
         mock_telegram.send_copy = AsyncMock(return_value=True)
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Very long content
         long_content = "A" * 2000
@@ -1291,7 +1292,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_metrics = MockMetrics.return_value
         mock_metrics.increment = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -1356,7 +1357,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         mock_metrics = MockMetrics.return_value
         mock_metrics.increment = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         message_data = MessageData(
             source_type="Telegram",
@@ -1415,7 +1416,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create test file with matched and unmatched lines
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
@@ -1470,7 +1471,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
             f.write("This has MALWARE in caps\n")
@@ -1519,7 +1520,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Binary file (unsupported extension)
         with tempfile.NamedTemporaryFile(suffix='.exe', delete=False) as f:
@@ -1566,7 +1567,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Small file (1KB)
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
@@ -1619,7 +1620,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create large file (10MB) with matched lines
         with tempfile.NamedTemporaryFile(mode='w', suffix='.log', delete=False) as f:
@@ -1679,7 +1680,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         mock_config.telegramlog_dir = Path("/tmp/telegramlog")
         mock_config.tmp_dir = Path("/tmp")
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create file with 30 matched lines
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
@@ -1740,7 +1741,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         mock_discord.send_message = Mock(return_value=True)
         mock_discord.file_size_limit = 1 * 1024 * 1024  # 1MB limit
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create large file (2MB) with matched lines
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
@@ -1820,7 +1821,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
         mock_telegram.send_copy = AsyncMock(return_value=True)
         mock_telegram.file_size_limit = 1 * 1024 * 1024  # 1MB limit for testing
 
-        watchtower = Watchtower(sources=['telegram'])
+        watchtower = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create large file (2MB) with matched lines
         with tempfile.NamedTemporaryFile(mode='w', suffix='.log', delete=False) as f:

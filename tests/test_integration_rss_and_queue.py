@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from MessageData import MessageData
+from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_RSS
 
 
 def create_mock_config(extra_attrs=None):
@@ -86,7 +87,7 @@ class TestRSSIntegration(unittest.TestCase):
         mock_post.return_value.status_code = 200
 
         # Create Watchtower
-        app = Watchtower(sources=["rss"])
+        app = Watchtower(sources=[APP_TYPE_RSS])
 
         # Create RSS message
         msg = MessageData(
@@ -147,7 +148,7 @@ class TestRSSIntegration(unittest.TestCase):
         mock_telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
         mock_telegram.send_copy = AsyncMock(return_value=True)
 
-        app = Watchtower(sources=["rss"])
+        app = Watchtower(sources=[APP_TYPE_RSS])
 
         # Mock Telegram handler methods
         app.telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
@@ -201,7 +202,7 @@ class TestRSSIntegration(unittest.TestCase):
         mock_config_class.return_value = mock_config
         mock_post.return_value.status_code = 200
 
-        app = Watchtower(sources=["rss"])
+        app = Watchtower(sources=[APP_TYPE_RSS])
 
         # Message without any special keywords
         msg = MessageData(
@@ -240,7 +241,7 @@ class TestQueueRetryProcessing(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Enqueue multiple items
         destinations = [
@@ -283,7 +284,7 @@ class TestQueueRetryProcessing(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Enqueue item
         destination = {
@@ -323,7 +324,7 @@ class TestQueueRetryProcessing(unittest.TestCase):
         mock_config = create_mock_config()
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Enqueue item
         destination = {
@@ -391,7 +392,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Mock Telegram operations
         app.telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
@@ -467,7 +468,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create message
         msg = MessageData(
@@ -513,7 +514,7 @@ class TestMediaCleanup(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # Create temp media files
         media_file1 = attachments_dir / "test_media1.jpg"
@@ -584,7 +585,7 @@ class TestRateLimitCoordination(unittest.TestCase):
         })
         mock_config_class.return_value = mock_config
 
-        app = Watchtower(sources=["telegram"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM])
 
         # First webhook gets 429, second succeeds
         mock_post.side_effect = [
@@ -659,7 +660,7 @@ class TestMixedSourceProcessing(unittest.TestCase):
         mock_config_class.return_value = mock_config
         mock_post.return_value.status_code = 200
 
-        app = Watchtower(sources=["telegram", "rss"])
+        app = Watchtower(sources=[APP_TYPE_TELEGRAM, APP_TYPE_RSS])
 
         # Telegram message
         msg_telegram = MessageData(

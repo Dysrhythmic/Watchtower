@@ -48,7 +48,7 @@ class TestTelegramToDiscordFlow(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"@test_channel"}),
             'destinations': [{
                 'name': 'Discord Dest',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test_channel',
@@ -69,7 +69,7 @@ class TestTelegramToDiscordFlow(unittest.TestCase):
 
         # Create test message
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test Channel",
             username="@testuser",
@@ -183,7 +183,7 @@ class TestMessageRouting(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"@test_channel"}),
             'destinations': [{
                 'name': 'Discord',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test_channel',
@@ -200,7 +200,7 @@ class TestMessageRouting(unittest.TestCase):
 
         # Message WITHOUT keyword
         msg_no_match = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test",
             username="@user",
@@ -213,7 +213,7 @@ class TestMessageRouting(unittest.TestCase):
 
         # Message WITH keyword
         msg_match = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test",
             username="@user",
@@ -235,7 +235,7 @@ class TestMessageRouting(unittest.TestCase):
             'destinations': [
                 {
                     'name': 'Discord 1',
-                    'type': 'discord',
+                    'type': 'Discord',
                     'discord_webhook_url': 'https://discord.com/webhook1',
                     'channels': [{
                         'id': '@test',
@@ -247,7 +247,7 @@ class TestMessageRouting(unittest.TestCase):
                 },
                 {
                     'name': 'Discord 2',
-                    'type': 'discord',
+                    'type': 'Discord',
                     'discord_webhook_url': 'https://discord.com/webhook2',
                     'channels': [{
                         'id': '@test',
@@ -264,7 +264,7 @@ class TestMessageRouting(unittest.TestCase):
         app = Watchtower(sources=["telegram"])
 
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -291,7 +291,7 @@ class TestParserIntegration(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"@test"}),
             'destinations': [{
                 'name': 'Discord',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test',
@@ -310,7 +310,7 @@ class TestParserIntegration(unittest.TestCase):
         app = Watchtower(sources=["telegram"])
 
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -362,7 +362,7 @@ class TestErrorHandling(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"@test"}),
             'destinations': [{
                 'name': 'Test',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test',
@@ -378,7 +378,7 @@ class TestErrorHandling(unittest.TestCase):
         app = Watchtower(sources=["telegram"])
 
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -404,7 +404,7 @@ class TestErrorHandling(unittest.TestCase):
         app = Watchtower(sources=["telegram"])
 
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -430,7 +430,7 @@ class TestMediaHandling(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"@test"}),
             'destinations': [{
                 'name': 'Discord',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': '@test',
@@ -447,7 +447,7 @@ class TestMediaHandling(unittest.TestCase):
         app = Watchtower(sources=["telegram"])
 
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -537,7 +537,7 @@ class TestConfigurationVariations(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"@chan1", "@chan2"}),
             'destinations': [{
                 'name': 'Discord',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [
                     {
@@ -563,7 +563,7 @@ class TestConfigurationVariations(unittest.TestCase):
 
         # Message from first channel
         msg1 = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@chan1",
             channel_name="Channel 1",
             username="@user",
@@ -576,7 +576,7 @@ class TestConfigurationVariations(unittest.TestCase):
 
         # Message from second channel
         msg2 = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@chan2",
             channel_name="Channel 2",
             username="@user",
@@ -597,7 +597,7 @@ class TestConfigurationVariations(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"@telegram_chan", "https://example.com/feed"}),
             'destinations': [{
                 'name': 'Discord',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [
                     {
@@ -623,7 +623,7 @@ class TestConfigurationVariations(unittest.TestCase):
 
         # Telegram message
         msg_telegram = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@telegram_chan",
             channel_name="Telegram Channel",
             username="@user",
@@ -633,7 +633,7 @@ class TestConfigurationVariations(unittest.TestCase):
 
         # RSS message
         msg_rss = MessageData(
-            source_type="rss",
+            source_type="RSS",
             channel_id="https://example.com/feed",
             channel_name="RSS Feed",
             username="RSS",
@@ -764,7 +764,7 @@ class TestNewMetrics(unittest.TestCase):
 
         # Create a message with OCR data
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123",
             channel_name="Test",
             username="@user",
@@ -777,7 +777,7 @@ class TestNewMetrics(unittest.TestCase):
         # Mock Discord send to succeed
         with patch.object(app.discord, 'send_message', return_value=True):
             destination = {
-                'type': 'discord',
+                'type': 'Discord',
                 'name': 'Test',
                 'discord_webhook_url': 'http://test.com',
                 'parser': {}
@@ -813,7 +813,7 @@ class TestNewMetrics(unittest.TestCase):
 
         # Create a message WITHOUT OCR data
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123",
             channel_name="Test",
             username="@user",
@@ -825,7 +825,7 @@ class TestNewMetrics(unittest.TestCase):
         # Mock Discord send to succeed
         with patch.object(app.discord, 'send_message', return_value=True):
             destination = {
-                'type': 'discord',
+                'type': 'Discord',
                 'name': 'Test',
                 'discord_webhook_url': 'http://test.com',
                 'parser': {}

@@ -30,7 +30,7 @@ Mock Setup Template:
     self.mock_config = Mock()
     self.mock_config.destinations = [{
         'name': 'Destination Name',
-        'type': 'discord',  # or 'telegram'
+        'type': 'Discord',  # or 'Telegram'
         'discord_webhook_url': 'https://discord.com/webhook',  # for Discord
         'channels': [{
             'id': '@channel_name',  # or numeric ID
@@ -75,7 +75,7 @@ class TestMessageRouter(unittest.TestCase):
         self.mock_config = Mock()
         self.mock_config.destinations = [{
             'name': 'Test Dest',
-            'type': 'discord',
+            'type': 'Discord',
             'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@test_channel',
@@ -90,7 +90,7 @@ class TestMessageRouter(unittest.TestCase):
     def test_match_keywords_case_insensitive(self):
         """Test keyword matching is case-insensitive."""
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test",
             username="@user",
@@ -107,7 +107,7 @@ class TestMessageRouter(unittest.TestCase):
         self.mock_config.destinations[0]['channels'][0]['keywords'] = []
 
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test",
             username="@user",
@@ -121,7 +121,7 @@ class TestMessageRouter(unittest.TestCase):
     def test_parser_trim_front_lines(self):
         """Test parser removes first N lines."""
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -140,7 +140,7 @@ class TestMessageRouter(unittest.TestCase):
     def test_parser_trim_back_lines(self):
         """Test parser removes last N lines."""
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -161,7 +161,7 @@ class TestMessageRouter(unittest.TestCase):
         self.mock_config.destinations[0]['channels'][0]['id'] = "-1001234567890"
 
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="-1001234567890",
             channel_name="Test",
             username="@user",
@@ -177,7 +177,7 @@ class TestMessageRouter(unittest.TestCase):
         self.mock_config.destinations[0]['channels'][0]['ocr'] = True
 
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test",
             username="@user",
@@ -193,7 +193,7 @@ class TestMessageRouter(unittest.TestCase):
     def test_no_match_wrong_channel(self):
         """Test no match when channel ID doesn't match."""
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@different_channel",
             channel_name="Different",
             username="@user",
@@ -207,7 +207,7 @@ class TestMessageRouter(unittest.TestCase):
     def test_parser_both_trim_directions(self):
         """Test parser trims both front and back lines."""
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -229,7 +229,7 @@ class TestMessageRouter(unittest.TestCase):
     def test_parser_no_trimming(self):
         """Test parser with no trimming configured."""
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -243,7 +243,7 @@ class TestMessageRouter(unittest.TestCase):
     def test_multiple_keyword_matches(self):
         """Test message matching multiple keywords."""
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test",
             username="@user",
@@ -262,7 +262,7 @@ class TestMessageRouter(unittest.TestCase):
         self.mock_config.destinations[0]['channels'][0]['id'] = "https://example.com/feed.xml"
 
         msg = MessageData(
-            source_type="rss",
+            source_type="RSS",
             channel_id="https://example.com/feed.xml",
             channel_name="RSS Feed",
             username="RSS",
@@ -298,7 +298,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         # Configure webhook with restricted channel
         self.mock_config.destinations = [{
             'name': 'Test Dest',
-            'type': 'discord',
+            'type': 'Discord',
             'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@restricted_channel',
@@ -327,7 +327,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         # Configure webhook with non-restricted channel
         self.mock_config.destinations = [{
             'name': 'Test Dest',
-            'type': 'discord',
+            'type': 'Discord',
             'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@open_channel',
@@ -356,7 +356,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         # Configure webhook with OCR enabled
         self.mock_config.destinations = [{
             'name': 'Test Dest',
-            'type': 'discord',
+            'type': 'Discord',
             'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@ocr_channel',
@@ -385,7 +385,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         # Configure webhook with OCR disabled
         self.mock_config.destinations = [{
             'name': 'Test Dest',
-            'type': 'discord',
+            'type': 'Discord',
             'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@no_ocr_channel',
@@ -428,7 +428,7 @@ class TestParserPlaceholder(unittest.TestCase):
         This test verifies only the placeholder is returned when all content is stripped.
         """
         msg = MessageData(
-            source_type="rss",
+            source_type="RSS",
             channel_id="https://example.com/feed",
             channel_name="RSS Feed",
             username="RSS",
@@ -462,7 +462,7 @@ class TestParserPlaceholder(unittest.TestCase):
         Tests: Bug #3 - Parser placeholder for single-line messages
         """
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -603,7 +603,7 @@ class TestParserKeywordIndependence(unittest.TestCase):
         self.mock_config = Mock()
         self.mock_config.destinations = [{
             'name': 'Test Dest',
-            'type': 'discord',
+            'type': 'Discord',
             'discord_webhook_url': 'https://discord.com/webhook',
             'channels': [{
                 'id': '@test_channel',
@@ -622,7 +622,7 @@ class TestParserKeywordIndependence(unittest.TestCase):
         """
         # Message where keyword is in line that will be trimmed
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test",
             username="@user",
@@ -657,7 +657,7 @@ class TestParserEdgeCases(unittest.TestCase):
         Should return placeholder message.
         """
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -680,7 +680,7 @@ class TestParserEdgeCases(unittest.TestCase):
         Negative values should be treated as zero (no trimming).
         """
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -733,7 +733,7 @@ class TestMultipleDestinationsConfig(unittest.TestCase):
         mock_config.destinations = [
             {
                 'name': 'Dest A (Restricted)',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook_a',
                 'channels': [{
                     'id': '@test_channel',
@@ -745,7 +745,7 @@ class TestMultipleDestinationsConfig(unittest.TestCase):
             },
             {
                 'name': 'Dest B (Open)',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook_b',
                 'channels': [{
                     'id': '@test_channel',
@@ -792,7 +792,7 @@ class TestMultipleDestinationsConfig(unittest.TestCase):
 
         # Create message with restricted media (photo)
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test Channel",
             username="@user",
@@ -908,7 +908,7 @@ class TestMultipleDestinationsConfig(unittest.TestCase):
 
         # Create message with multiple lines
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test Channel",
             username="@user",

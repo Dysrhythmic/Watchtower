@@ -169,7 +169,7 @@ class TestOCRMultipleDestinations(unittest.TestCase):
         mock_config.destinations = [
             {
                 'name': 'Dest A (OCR enabled)',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook_a',
                 'channels': [{
                     'id': '@test_channel',
@@ -181,7 +181,7 @@ class TestOCRMultipleDestinations(unittest.TestCase):
             },
             {
                 'name': 'Dest B (OCR disabled)',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook_b',
                 'channels': [{
                     'id': '@test_channel',
@@ -200,9 +200,9 @@ class TestOCRMultipleDestinations(unittest.TestCase):
 
         mock_router = Mock()
         mock_router.get_destinations = Mock(return_value=[
-            {'name': 'Dest A', 'type': 'discord', 'discord_webhook_url': 'url_a', 'parser': None,
+            {'name': 'Dest A', 'type': 'Discord', 'discord_webhook_url': 'url_a', 'parser': None,
              'restricted_mode': False, 'ocr': True, 'keywords': []},
-            {'name': 'Dest B', 'type': 'discord', 'discord_webhook_url': 'url_b', 'parser': None,
+            {'name': 'Dest B', 'type': 'Discord', 'discord_webhook_url': 'url_b', 'parser': None,
              'restricted_mode': False, 'ocr': False, 'keywords': []}
         ])
         mock_router.is_ocr_enabled_for_channel = Mock(return_value=True)  # At least one dest has OCR
@@ -238,7 +238,7 @@ class TestOCRMultipleDestinations(unittest.TestCase):
 
         # Create message with media using actual test image
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test_channel",
             channel_name="Test Channel",
             username="@user",

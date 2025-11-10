@@ -32,7 +32,7 @@ Mock Setup Template:
     config_data = {
         "destinations": [{
             "name": "Test Destination",
-            "type": "discord",  # or "telegram"
+            "type": "Discord",  # or "Telegram"
             "env_key": "DISCORD_WEBHOOK_URL",
             "channels": [{
                 "id": "@channel_name",
@@ -88,7 +88,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{"id": "@test", "keywords": {"inline": []}}]
             }]
@@ -108,7 +108,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -141,7 +141,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{"id": "@test", "keywords": {"inline": []}}]
             }]
@@ -191,7 +191,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -222,7 +222,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "RSS Destination",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "https://example.com/feed.xml",
@@ -248,7 +248,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",  # Type must be explicit
+                "type": "Discord",  # Type must be explicit (capitalized)
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{"id": "@test", "keywords": {"inline": []}}]
             }]
@@ -270,14 +270,14 @@ class TestConfigManager(unittest.TestCase):
                         # Config loads successfully with explicit type
                         config = ConfigManager()
                         self.assertEqual(len(config.destinations), 1)
-                        self.assertEqual(config.destinations[0]['type'], 'discord')
+                        self.assertEqual(config.destinations[0]['type'], 'Discord')
 
     def test_discord_only_without_telegram_credentials(self):
         """Test that Discord-only config with only RSS sources works without Telegram credentials."""
         config_data = {
             "destinations": [{
                 "name": "Discord Only",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [],  # No Telegram channel sources
                 "rss": [{"url": "https://example.com/feed.xml", "name": "Security Feed"}]
@@ -299,7 +299,7 @@ class TestConfigManager(unittest.TestCase):
                         # Should succeed without Telegram credentials
                         config = ConfigManager()
                         self.assertEqual(len(config.destinations), 1)
-                        self.assertEqual(config.destinations[0]['type'], 'discord')
+                        self.assertEqual(config.destinations[0]['type'], 'Discord')
                         # Telegram credentials should be None
                         self.assertIsNone(config.api_id)
                         self.assertIsNone(config.api_hash)
@@ -309,7 +309,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Telegram Dest",
-                "type": "telegram",
+                "type": "Telegram",
                 "env_key": "TELEGRAM_CHANNEL",
                 "channels": [],
                 "rss": [{"url": "https://example.com/feed.xml", "name": "Feed"}]
@@ -339,7 +339,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Discord with Telegram Source",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{"id": "@telegram_channel", "keywords": {"inline": []}}]
             }]
@@ -368,7 +368,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "RSS to Discord",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [],
                 "rss": [
@@ -401,7 +401,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -467,13 +467,13 @@ class TestConfigManager(unittest.TestCase):
             "destinations": [
                 {
                     "name": "Discord 1",
-                    "type": "discord",
+                    "type": "Discord",
                     "env_key": "DISCORD_WEBHOOK_1",
                     "channels": [{"id": "@test1", "keywords": {"inline": []}}]
                 },
                 {
                     "name": "Discord 2",
-                    "type": "discord",
+                    "type": "Discord",
                     "env_key": "DISCORD_WEBHOOK_2",
                     "channels": [{"id": "@test2", "keywords": {"inline": []}}]
                 }
@@ -505,7 +505,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -532,7 +532,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -554,7 +554,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -576,7 +576,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -600,7 +600,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -635,7 +635,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "-1001234567890",
@@ -659,7 +659,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{"id": "@test", "keywords": {"inline": []}}]
             }]
@@ -688,7 +688,7 @@ class TestConfigManager(unittest.TestCase):
             "destinations": [
                 {
                     "name": "Dest1",
-                    "type": "discord",
+                    "type": "Discord",
                     "env_key": "DISCORD_WEBHOOK",
                     "channels": [
                         {"id": "@chan1", "keywords": {"inline": []}},
@@ -697,7 +697,7 @@ class TestConfigManager(unittest.TestCase):
                 },
                 {
                     "name": "Dest2",
-                    "type": "discord",
+                    "type": "Discord",
                     "env_key": "DISCORD_WEBHOOK",
                     "channels": [
                         {"id": "@chan3", "keywords": {"inline": []}}
@@ -723,7 +723,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -797,7 +797,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "MissingEnv",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "NONEXISTENT_WEBHOOK",
                 "channels": [{"id": "@test", "keywords": {"inline": []}}]
             }]
@@ -821,7 +821,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "NoSources",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": []  # No channels
                 # No RSS either
@@ -841,7 +841,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "InvalidChannels",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [
                     {"keywords": {"inline": []}}  # Missing required 'id' field
@@ -862,7 +862,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -885,7 +885,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -908,7 +908,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -931,7 +931,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [{
                     "id": "@test",
@@ -957,7 +957,7 @@ class TestConfigManager(unittest.TestCase):
         config_data = {
             "destinations": [{
                 "name": "Test",
-                "type": "discord",
+                "type": "Discord",
                 "env_key": "DISCORD_WEBHOOK",
                 "channels": [],
                 "rss": [{
@@ -984,7 +984,7 @@ class TestConfigManager(unittest.TestCase):
             "destinations": [
                 {
                     "name": "Dest1",
-                    "type": "discord",
+                    "type": "Discord",
                     "env_key": "DISCORD_WEBHOOK",
                     "channels": [],
                     "rss": [
@@ -993,7 +993,7 @@ class TestConfigManager(unittest.TestCase):
                 },
                 {
                     "name": "Dest2",
-                    "type": "discord",
+                    "type": "Discord",
                     "env_key": "DISCORD_WEBHOOK",
                     "channels": [],
                     "rss": [

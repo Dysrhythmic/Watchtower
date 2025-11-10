@@ -141,7 +141,7 @@ class TestRSSHandlerTimestampTracking(unittest.TestCase):
     def test_first_run_initializes_timestamp_emits_nothing(self):
         """
         Given: No timestamp file exists for feed
-        When: _read_last_ts() called
+        When: _read_last_timestamp() called
         Then: File created with current time, returns None
 
         Tests: src/RSSHandler.py:40-45 (first run initialization)
@@ -156,7 +156,7 @@ class TestRSSHandlerTimestampTracking(unittest.TestCase):
         self.assertFalse(log_path.exists())
 
         # When: Read timestamp (first run)
-        result = handler._read_last_ts(rss_name)
+        result = handler._read_last_timestamp(rss_name)
 
         # Then: Returns None (no messages emitted)
         self.assertIsNone(result)
@@ -170,7 +170,7 @@ class TestRSSHandlerTimestampTracking(unittest.TestCase):
     def test_subsequent_run_reads_existing_timestamp(self):
         """
         Given: Timestamp file exists with timestamp
-        When: _read_last_ts() called
+        When: _read_last_timestamp() called
         Then: Returns timestamp as float
 
         Tests: src/RSSHandler.py:46-53 (subsequent run)
@@ -184,7 +184,7 @@ class TestRSSHandlerTimestampTracking(unittest.TestCase):
         log_path.write_text(test_dt.isoformat(), encoding='utf-8')
 
         # When: Read timestamp
-        result = handler._read_last_ts(rss_name)
+        result = handler._read_last_timestamp(rss_name)
 
         # Then: Returns timestamp
         self.assertIsNotNone(result)
@@ -193,7 +193,7 @@ class TestRSSHandlerTimestampTracking(unittest.TestCase):
     def test_write_last_ts_updates_file(self):
         """
         Given: Timestamp to write
-        When: _write_last_ts() called
+        When: _write_last_timestamp() called
         Then: File updated with new timestamp
 
         Tests: src/RSSHandler.py:55-58 (timestamp writing)
@@ -204,14 +204,14 @@ class TestRSSHandlerTimestampTracking(unittest.TestCase):
         test_timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc).timestamp()
 
         # When: Write timestamp
-        handler._write_last_ts(rss_name, test_timestamp)
+        handler._write_last_timestamp(rss_name, test_timestamp)
 
         # Then: File contains timestamp
         log_path = self.mock_config.rsslog_dir / f"{rss_name}.txt"
         self.assertTrue(log_path.exists())
 
         # Read it back
-        result = handler._read_last_ts(rss_name)
+        result = handler._read_last_timestamp(rss_name)
         self.assertEqual(result, test_timestamp)
 
 
@@ -311,7 +311,7 @@ class TestRSSHandlerEntryProcessing(unittest.TestCase):
 
         # Then: MessageData created
         self.assertIsNotNone(message_data)
-        self.assertEqual(message_data.source_type, "rss")
+        self.assertEqual(message_data.source_type, "RSS")
         self.assertEqual(message_data.channel_id, "http://feed.com")
         self.assertEqual(message_data.channel_name, "test_feed")
         self.assertEqual(message_data.username, "RSS")
@@ -497,7 +497,7 @@ class TestRSSHandlerFeedPolling(unittest.TestCase):
         # Run one iteration
         async def run_one_iteration():
             # Initialize timestamp
-            self.handler._read_last_ts('test_feed')
+            self.handler._read_last_timestamp('test_feed')
 
             # Mock sleep to exit after one iteration
             original_sleep = self.handler._sleep

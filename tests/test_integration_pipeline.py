@@ -83,7 +83,7 @@ class TestWatchtowerOCRIntegration(unittest.TestCase):
 
         # Create message data with media
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -143,7 +143,7 @@ class TestWatchtowerOCRIntegration(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -205,7 +205,7 @@ class TestWatchtowerDefangedURLs(unittest.TestCase):
 
         # Create Telegram message
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="testchannel",
             username="test_user",
@@ -268,7 +268,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
 
         # Create message with media
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -280,7 +280,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
 
         # Destination with restricted mode
         destinations = [
-            {'type': 'telegram', 'restricted_mode': True, 'telegram_dst_channel': '@channel'}
+            {'type': 'Telegram', 'restricted_mode': True, 'telegram_dst_channel': '@channel'}
         ]
 
         # When: Check media restrictions
@@ -326,7 +326,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -337,7 +337,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
         message_data.original_message = Mock()
 
         destinations = [
-            {'type': 'telegram', 'restricted_mode': True, 'telegram_dst_channel': '@channel'}
+            {'type': 'Telegram', 'restricted_mode': True, 'telegram_dst_channel': '@channel'}
         ]
 
         # When: Check media restrictions

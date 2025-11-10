@@ -69,7 +69,7 @@ class TestRSSIntegration(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"https://example.com/feed.xml"}),
             'destinations': [{
                 'name': 'Security Alerts',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': 'https://example.com/feed.xml',
@@ -90,7 +90,7 @@ class TestRSSIntegration(unittest.TestCase):
 
         # Create RSS message
         msg = MessageData(
-            source_type="rss",
+            source_type="RSS",
             channel_id="https://example.com/feed.xml",
             channel_name="Security Feed",
             username="RSS",
@@ -101,7 +101,7 @@ class TestRSSIntegration(unittest.TestCase):
         # Process message through routing
         destinations = app.router.get_destinations(msg)
         self.assertEqual(len(destinations), 1)
-        self.assertEqual(destinations[0]['type'], 'discord')
+        self.assertEqual(destinations[0]['type'], 'Discord')
         self.assertIn('CVE', destinations[0]['keywords'])
 
         # Format and send
@@ -129,7 +129,7 @@ class TestRSSIntegration(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"https://threatfeeds.io/rss"}),
             'destinations': [{
                 'name': 'Threat Intelligence',
-                'type': 'telegram',
+                'type': 'Telegram',
                 'telegram_dst_channel': '@threat_alerts',
                 'channels': [{
                     'id': 'https://threatfeeds.io/rss',
@@ -155,7 +155,7 @@ class TestRSSIntegration(unittest.TestCase):
 
         # Create RSS message
         msg = MessageData(
-            source_type="rss",
+            source_type="RSS",
             channel_id="https://threatfeeds.io/rss",
             channel_name="ThreatFeeds",
             username="RSS",
@@ -166,7 +166,7 @@ class TestRSSIntegration(unittest.TestCase):
         # Route and verify
         destinations = app.router.get_destinations(msg)
         self.assertEqual(len(destinations), 1)
-        self.assertEqual(destinations[0]['type'], 'telegram')
+        self.assertEqual(destinations[0]['type'], 'Telegram')
         self.assertIn('ransomware', destinations[0]['keywords'])
 
     @patch('TelegramHandler.TelegramClient')
@@ -187,7 +187,7 @@ class TestRSSIntegration(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"https://example.com/all.xml"}),
             'destinations': [{
                 'name': 'All News',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [{
                     'id': 'https://example.com/all.xml',
@@ -205,7 +205,7 @@ class TestRSSIntegration(unittest.TestCase):
 
         # Message without any special keywords
         msg = MessageData(
-            source_type="rss",
+            source_type="RSS",
             channel_id="https://example.com/all.xml",
             channel_name="General News",
             username="RSS",
@@ -244,9 +244,9 @@ class TestQueueRetryProcessing(unittest.TestCase):
 
         # Enqueue multiple items
         destinations = [
-            {'name': 'Dest1', 'type': 'discord', 'discord_webhook_url': 'https://discord.com/webhook1'},
-            {'name': 'Dest2', 'type': 'discord', 'discord_webhook_url': 'https://discord.com/webhook2'},
-            {'name': 'Dest3', 'type': 'discord', 'discord_webhook_url': 'https://discord.com/webhook3'},
+            {'name': 'Dest1', 'type': 'Discord', 'discord_webhook_url': 'https://discord.com/webhook1'},
+            {'name': 'Dest2', 'type': 'Discord', 'discord_webhook_url': 'https://discord.com/webhook2'},
+            {'name': 'Dest3', 'type': 'Discord', 'discord_webhook_url': 'https://discord.com/webhook3'},
         ]
 
         for dest in destinations:
@@ -288,7 +288,7 @@ class TestQueueRetryProcessing(unittest.TestCase):
         # Enqueue item
         destination = {
             'name': 'Test',
-            'type': 'discord',
+            'type': 'Discord',
             'discord_webhook_url': 'https://discord.com/webhook'
         }
 
@@ -328,7 +328,7 @@ class TestQueueRetryProcessing(unittest.TestCase):
         # Enqueue item
         destination = {
             'name': 'Test',
-            'type': 'discord',
+            'type': 'Discord',
             'discord_webhook_url': 'https://discord.com/webhook'
         }
         app.message_queue.enqueue(
@@ -378,7 +378,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"@source_channel"}),
             'destinations': [{
                 'name': 'Mirror Channel',
-                'type': 'telegram',
+                'type': 'Telegram',
                 'telegram_dst_channel': '@destination_channel',
                 'channels': [{
                     'id': '@source_channel',
@@ -399,7 +399,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
 
         # Create source message
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@source_channel",
             channel_name="Source Channel",
             username="@testuser",
@@ -411,7 +411,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
         # Route and verify
         destinations = app.router.get_destinations(msg)
         self.assertEqual(len(destinations), 1)
-        self.assertEqual(destinations[0]['type'], 'telegram')
+        self.assertEqual(destinations[0]['type'], 'Telegram')
 
         # Send to Telegram
         formatted = app.telegram.format_message(msg, destinations[0])
@@ -441,7 +441,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
             'destinations': [
                 {
                     'name': 'Public Feed',
-                    'type': 'telegram',
+                    'type': 'Telegram',
                     'telegram_dst_channel': '@public_feed',
                     'channels': [{
                         'id': '@news_source',
@@ -453,7 +453,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
                 },
                 {
                     'name': 'Private Archive',
-                    'type': 'telegram',
+                    'type': 'Telegram',
                     'telegram_dst_channel': '@private_archive',
                     'channels': [{
                         'id': '@news_source',
@@ -471,7 +471,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
 
         # Create message
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@news_source",
             channel_name="News Source",
             username="@reporter",
@@ -482,7 +482,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
         # Route to multiple Telegram destinations
         destinations = app.router.get_destinations(msg)
         self.assertEqual(len(destinations), 2)
-        self.assertTrue(all(d['type'] == 'telegram' for d in destinations))
+        self.assertTrue(all(d['type'] == 'Telegram' for d in destinations))
         self.assertEqual(destinations[0]['telegram_dst_channel'], '@public_feed')
         self.assertEqual(destinations[1]['telegram_dst_channel'], '@private_archive')
 
@@ -558,7 +558,7 @@ class TestRateLimitCoordination(unittest.TestCase):
             'destinations': [
                 {
                     'name': 'Webhook 1',
-                    'type': 'discord',
+                    'type': 'Discord',
                     'discord_webhook_url': 'https://discord.com/webhook1',
                     'channels': [{
                         'id': '@test',
@@ -570,7 +570,7 @@ class TestRateLimitCoordination(unittest.TestCase):
                 },
                 {
                     'name': 'Webhook 2',
-                    'type': 'discord',
+                    'type': 'Discord',
                     'discord_webhook_url': 'https://discord.com/webhook2',
                     'channels': [{
                         'id': '@test',
@@ -593,7 +593,7 @@ class TestRateLimitCoordination(unittest.TestCase):
         ]
 
         msg = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@test",
             channel_name="Test",
             username="@user",
@@ -636,7 +636,7 @@ class TestMixedSourceProcessing(unittest.TestCase):
             'get_all_channel_ids': Mock(return_value={"@telegram_ch", "https://rss.feed/xml"}),
             'destinations': [{
                 'name': 'Combined Feed',
-                'type': 'discord',
+                'type': 'Discord',
                 'discord_webhook_url': 'https://discord.com/webhook',
                 'channels': [
                     {
@@ -663,7 +663,7 @@ class TestMixedSourceProcessing(unittest.TestCase):
 
         # Telegram message
         msg_telegram = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="@telegram_ch",
             channel_name="Telegram Channel",
             username="@user",
@@ -673,7 +673,7 @@ class TestMixedSourceProcessing(unittest.TestCase):
 
         # RSS message
         msg_rss = MessageData(
-            source_type="rss",
+            source_type="RSS",
             channel_id="https://rss.feed/xml",
             channel_name="RSS Feed",
             username="RSS",

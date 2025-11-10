@@ -85,7 +85,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
 
         # Create message with media
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="invoices_channel",
             username="test_user",
@@ -147,7 +147,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="normal_channel",
             username="test_user",
@@ -213,7 +213,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -272,7 +272,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="-1001234567890",
             channel_name="malware_samples",
             username="threat_actor",
@@ -338,7 +338,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -395,7 +395,7 @@ class TestWatchtowerMessagePreprocessing(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="text_only",
             username="user",
@@ -455,7 +455,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -464,7 +464,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         )
 
         destination = {
-            'type': 'discord',
+            'type': 'Discord',
             'name': 'Discord Feed',
             'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
@@ -519,7 +519,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="source_channel",
             username="test_user",
@@ -528,7 +528,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         )
 
         destination = {
-            'type': 'telegram',
+            'type': 'Telegram',
             'name': 'Telegram Feed',
             'telegram_dst_channel': '@target_channel',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
@@ -581,7 +581,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -593,7 +593,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         )
 
         destination = {
-            'type': 'discord',
+            'type': 'Discord',
             'name': 'Discord Feed',
             'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
@@ -647,7 +647,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -657,7 +657,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         )
 
         destination = {
-            'type': 'discord',
+            'type': 'Discord',
             'name': 'Discord Feed',
             'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
@@ -713,7 +713,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -722,7 +722,7 @@ class TestWatchtowerDispatchLogic(unittest.TestCase):
         )
 
         destination = {
-            'type': 'discord',
+            'type': 'Discord',
             'name': 'Discord Feed',
             'discord_webhook_url': 'https://discord.com/api/webhooks/123/token',
             'parser': {'trim_front_lines': 0, 'trim_back_lines': 0}
@@ -777,7 +777,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -786,7 +786,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         )
 
         destination = {
-            'type': 'discord',
+            'type': 'Discord',
             'name': 'Discord Feed',
             'discord_webhook_url': 'https://discord.com/api/webhooks/123/token'
         }
@@ -842,7 +842,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -854,7 +854,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         )
 
         destination = {
-            'type': 'discord',
+            'type': 'Discord',
             'name': 'Discord Feed',
             'discord_webhook_url': 'https://discord.com/api/webhooks/123/token'
         }
@@ -912,7 +912,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -972,7 +972,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -1029,7 +1029,7 @@ class TestWatchtowerDiscordSending(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="test_channel",
             username="test_user",
@@ -1096,7 +1096,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="source_channel",
             username="test_user",
@@ -1105,7 +1105,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         )
 
         destination = {
-            'type': 'telegram',
+            'type': 'Telegram',
             'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
@@ -1163,7 +1163,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="source_channel",
             username="test_user",
@@ -1175,7 +1175,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         )
 
         destination = {
-            'type': 'telegram',
+            'type': 'Telegram',
             'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
@@ -1232,7 +1232,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         long_content = "A" * 2000
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="source_channel",
             username="test_user",
@@ -1241,7 +1241,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         )
 
         destination = {
-            'type': 'telegram',
+            'type': 'Telegram',
             'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
@@ -1294,7 +1294,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="source_channel",
             username="test_user",
@@ -1304,7 +1304,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         )
 
         destination = {
-            'type': 'telegram',
+            'type': 'Telegram',
             'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
@@ -1359,7 +1359,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         watchtower = Watchtower(sources=['telegram'])
 
         message_data = MessageData(
-            source_type="telegram",
+            source_type="Telegram",
             channel_id="123456",
             channel_name="source_channel",
             username="test_user",
@@ -1368,7 +1368,7 @@ class TestWatchtowerTelegramSending(unittest.TestCase):
         )
 
         destination = {
-            'type': 'telegram',
+            'type': 'Telegram',
             'telegram_dst_channel': '@target_channel',
             'name': 'Telegram Feed'
         }
@@ -1750,7 +1750,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
 
         try:
             message_data = MessageData(
-                source_type="telegram",
+                source_type="Telegram",
                 channel_id="123456",
                 channel_name="test_channel",
                 username="test_user",
@@ -1830,7 +1830,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
 
         try:
             message_data = MessageData(
-                source_type="telegram",
+                source_type="Telegram",
                 channel_id="123456",
                 channel_name="source_channel",
                 username="test_user",
@@ -1842,7 +1842,7 @@ class TestWatchtowerFileSizeLimitChecking(unittest.TestCase):
             )
 
             destination = {
-                'type': 'telegram',
+                'type': 'Telegram',
                 'telegram_dst_channel': '@target_channel',
                 'keywords': ['exploit']
             }

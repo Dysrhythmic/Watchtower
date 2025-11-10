@@ -396,7 +396,7 @@ class TestSaveDiscoveredConfig(unittest.TestCase):
             self.assertIn("destinations", saved_config)
             self.assertEqual(len(saved_config["destinations"]), 1)
             self.assertEqual(saved_config["destinations"][0]["name"], "Auto-Generated Feed")
-            self.assertEqual(saved_config["destinations"][0]["type"], "discord")
+            self.assertEqual(saved_config["destinations"][0]["type"], "Discord")
             self.assertEqual(len(saved_config["destinations"][0]["channels"]), 2)
 
             # Verify channels are just the info dicts

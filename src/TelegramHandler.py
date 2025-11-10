@@ -473,7 +473,7 @@ class TelegramHandler(DestinationHandler):
         self._msg_counter += 1
 
         username = self._extract_username_from_sender(message.sender)
-        media_type = self._get_media_type(message.media)
+        attachment_type = self._get_attachment_type(message.media)
 
         # Get reply context if this is a reply
         reply_context = None
@@ -487,8 +487,8 @@ class TelegramHandler(DestinationHandler):
             username=username,
             timestamp=message.date,
             text=message.text or "",
-            has_media=bool(media_type),
-            media_type=media_type,
+            has_attachments=bool(attachment_type),
+            attachment_type=attachment_type,
             reply_context=reply_context,
             original_message=message
         )
@@ -523,8 +523,8 @@ class TelegramHandler(DestinationHandler):
         return f"@{getattr(sender, 'username', 'Unknown')}"
 
     @staticmethod
-    def _get_media_type(media) -> Optional[str]:
-        """Determine media type from Telegram message media.
+    def _get_attachment_type(media) -> Optional[str]:
+        """Determine attachment type from Telegram message media.
 
         Args:
             media: Telegram media object (MessageMediaPhoto, MessageMediaDocument, etc.)
@@ -553,7 +553,7 @@ class TelegramHandler(DestinationHandler):
 
         Returns:
             Optional[Dict]: Reply context with keys: message_id, author, text, time,
-                          media_type, has_media. None if reply fetch fails.
+                          attachment_type, has_attachments. None if reply fetch fails.
         """
         try:
             replied_msg = await self.client.get_messages(
@@ -563,15 +563,15 @@ class TelegramHandler(DestinationHandler):
 
             if replied_msg:
                 author = self._extract_username_from_sender(replied_msg.sender)
-                media_type = self._get_media_type(replied_msg.media)
+                attachment_type = self._get_attachment_type(replied_msg.media)
 
                 context = {
                     'message_id': replied_msg.id,
                     'author': author,
                     'text': replied_msg.text or "",
                     'time': replied_msg.date.strftime('%Y-%m-%d %H:%M:%S UTC') if replied_msg.date else "",
-                    'media_type': media_type,
-                    'has_media': bool(media_type)
+                    'attachment_type': attachment_type,
+                    'has_attachments': bool(attachment_type)
                 }
                 return context
 
@@ -580,18 +580,18 @@ class TelegramHandler(DestinationHandler):
 
         return None
 
-    def _is_media_restricted(self, message) -> bool:
-        """Check if media is restricted under restricted mode rules.
+    def _is_attachment_restricted(self, message) -> bool:
+        """Check if attachment is restricted under restricted mode rules.
 
         Args:
-            message: The Telegram message object to check for restricted media.
+            message: The Telegram message object to check for restricted attachment.
 
         Returns:
-            bool: True if media is RESTRICTED (blocked), False if media is allowed.
+            bool: True if attachment is RESTRICTED (blocked), False if attachment is allowed.
 
         Restricted mode is a security feature for CTI workflows that only allows
         specific document types (text files, logs, DBs) and blocks photos/videos.
-        This prevents accidentally downloading and executing malicious media files.
+        This prevents accidentally downloading and executing malicious attachment files.
 
         Both extension AND MIME type must match allowed lists for safety.
         """
@@ -599,8 +599,8 @@ class TelegramHandler(DestinationHandler):
             return False  # No media = not restricted
 
         if not isinstance(message.media, MessageMediaDocument):
-            _logger.info("Media blocked by restricted mode: only documents are allowed in restricted mode")
-            return True  # Non-document media = restricted
+            _logger.info("Attachment blocked by restricted mode: only documents are allowed in restricted mode")
+            return True  # Non-document attachment = restricted
 
         document = message.media.document
         extension_allowed = False
@@ -622,34 +622,34 @@ class TelegramHandler(DestinationHandler):
         allowed = extension_allowed and mime_allowed
         if not allowed:
             _logger.info(
-                f"Media blocked by restricted mode: "
+                f"Attachment blocked by restricted mode: "
                 f"type={type(message.media).__name__}, ext={file_extension}, mime={mime_type}"
             )
         return not allowed  # Return True if restricted (not allowed), False if allowed
 
-    async def download_media(self, message_data: MessageData) -> Optional[str]:
-        """Download attached media from message into tmp/attachments/.
+    async def download_attachment(self, message_data: MessageData) -> Optional[str]:
+        """Download attached file from message into tmp/attachments/.
 
         Args:
-            message_data: MessageData object containing the original Telegram message with media.
+            message_data: MessageData object containing the original Telegram message with attachment.
 
         Returns:
-            Optional[str]: Path to the downloaded media file if successful, None otherwise.
+            Optional[str]: Path to the downloaded attachment file if successful, None otherwise.
         """
         try:
             if message_data.original_message and message_data.original_message.media:
                 target_dir = str(self.config.attachments_dir) + os.sep
-                media_path = await message_data.original_message.download_media(file=target_dir)
-                if media_path:
-                    file_size = os.path.getsize(media_path)
+                attachment_path = await message_data.original_message.download_media(file=target_dir)
+                if attachment_path:
+                    file_size = os.path.getsize(attachment_path)
                     file_size_mb = file_size / (1024 * 1024)
                     _logger.info(
-                        f"Media downloaded successfully: "
-                        f"{os.path.basename(media_path)} ({file_size_mb:.2f} MB)"
+                        f"Attachment downloaded successfully: "
+                        f"{os.path.basename(attachment_path)} ({file_size_mb:.2f} MB)"
                     )
-                return media_path
+                return attachment_path
         except Exception as e:
-            _logger.error(f"Media download failed: {e}")
+            _logger.error(f"Attachment download failed: {e}")
         return None
 
     @staticmethod
@@ -760,16 +760,16 @@ class TelegramHandler(DestinationHandler):
             return float(error.seconds)
         return None
 
-    def send_message(self, content: str, destination_chat_id: int, media_path: Optional[str] = None) -> bool:
+    def send_message(self, content: str, destination_chat_id: int, attachment_path: Optional[str] = None) -> bool:
         """Send message to Telegram destination (sync wrapper for async send_copy)."""
         import asyncio
-        return asyncio.create_task(self.send_copy(destination_chat_id, content, media_path))
+        return asyncio.create_task(self.send_copy(destination_chat_id, content, attachment_path))
 
-    async def send_copy(self, destination_chat_id: int, content: str, media_path: Optional[str]) -> bool:
+    async def send_copy(self, destination_chat_id: int, content: str, attachment_path: Optional[str]) -> bool:
         """Send formatted message to Telegram destination.
 
         Sends messages from any source (Telegram, RSS, etc.) as new messages
-        with formatted content. Supports optional media attachment.
+        with formatted content. Supports optional attachment file.
 
         Handles chunking internally based on Telegram's limits:
         - Captions: 1024 chars max
@@ -778,7 +778,7 @@ class TelegramHandler(DestinationHandler):
         Args:
             destination_chat_id: Target channel/chat ID
             content: Full message text (will be chunked internally if needed)
-            media_path: Optional path to media file
+            attachment_path: Optional path to attachment file
 
         Returns:
             bool: True if successful, False otherwise
@@ -787,16 +787,16 @@ class TelegramHandler(DestinationHandler):
             # Check and wait for rate limit
             self._check_and_wait_for_rate_limit(destination_chat_id)
 
-            # Media with content
-            if media_path and os.path.exists(media_path):
+            # Attachment with content
+            if attachment_path and os.path.exists(attachment_path):
                 if len(content) <= self.MAX_CAPTION_LENGTH:
-                    # Content fits as caption - send media with caption
-                    await self.client.send_file(destination_chat_id, media_path,
+                    # Content fits as caption - send attachment with caption
+                    await self.client.send_file(destination_chat_id, attachment_path,
                                               caption=content or None, parse_mode='html')
                 else:
-                    # Content too long for caption - send media captionless, then chunk content at 4096
-                    _logger.info(f"Content exceeds {self.MAX_CAPTION_LENGTH} chars, sending media captionless and text separately")
-                    await self.client.send_file(destination_chat_id, media_path, caption=None)
+                    # Content too long for caption - send attachment captionless, then chunk content at 4096
+                    _logger.info(f"Content exceeds {self.MAX_CAPTION_LENGTH} chars, sending attachment captionless and text separately")
+                    await self.client.send_file(destination_chat_id, attachment_path, caption=None)
 
                     # Chunk the FULL content at Telegram's message limit (4096 chars)
                     # This guarantees NO content is lost
@@ -851,8 +851,8 @@ class TelegramHandler(DestinationHandler):
         if 'src_url_defanged' in message_data.metadata:
             lines.append(f"<b>Source:</b> {escape(message_data.metadata['src_url_defanged'])}")
 
-        if message_data.has_media:
-            lines.append(f"<b>Content:</b> {escape(message_data.media_type)}")
+        if message_data.has_attachments:
+            lines.append(f"<b>Content:</b> {escape(message_data.attachment_type)}")
 
         if destination.get('keywords'):
             keywords_formatted = ', '.join(f'<code>{escape(kw)}</code>' for kw in destination['keywords'])
@@ -877,7 +877,7 @@ class TelegramHandler(DestinationHandler):
         """Format reply context for Telegram display using HTML.
 
         Args:
-            reply_context: Reply metadata dict with author, time, text, media_type
+            reply_context: Reply metadata dict with author, time, text, attachment_type
 
         Returns:
             str: Formatted reply context with HTML markup
@@ -887,17 +887,17 @@ class TelegramHandler(DestinationHandler):
         time = escape(reply_context['time'])
         parts.append(f"<b>  Replying to:</b> {author} ({time})")
 
-        if reply_context.get('has_media'):
-            media_type = escape(reply_context.get('media_type', 'Other'))
-            parts.append(f"<b>  Original content:</b> {media_type}")
+        if reply_context.get('has_attachments'):
+            attachment_type = escape(reply_context.get('attachment_type', 'Other'))
+            parts.append(f"<b>  Original content:</b> {attachment_type}")
 
         original_text = reply_context.get('text', '')
         if original_text:
             if len(original_text) > 200:
                 original_text = original_text[:200] + " ..."
             parts.append(f"<b>  Original message:</b> {escape(original_text)}")
-        elif reply_context.get('has_media'):
-            parts.append("<b>  Original message:</b> [Media only, no caption]")
+        elif reply_context.get('has_attachments'):
+            parts.append("<b>  Original message:</b> [Attachment only, no caption]")
 
         return '\n'.join(parts)
 

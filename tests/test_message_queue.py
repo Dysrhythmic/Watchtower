@@ -42,17 +42,17 @@ class TestMessageQueueBasics(unittest.TestCase):
         queue = MessageQueue()
         dest = {'type': 'Discord', 'name': 'Test', 'discord_webhook_url': 'http://test'}
         content = "Test message"
-        media_path = "/tmp/test.jpg"
+        attachment_path = "/tmp/test.jpg"
 
         # When: Enqueue message
-        queue.enqueue(dest, content, media_path, "test reason")
+        queue.enqueue(dest, content, attachment_path, "test reason")
 
         # Then: Queue has 1 item with correct properties
         self.assertEqual(queue.get_queue_size(), 1)
         item = queue._queue[0]
         self.assertEqual(item.destination, dest)
         self.assertEqual(item.formatted_content, content)
-        self.assertEqual(item.media_path, media_path)
+        self.assertEqual(item.attachment_path, attachment_path)
         self.assertEqual(item.attempt_count, 0)
         self.assertGreater(item.next_retry_time, time.time())
 
@@ -265,7 +265,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         retry_item = RetryItem(
             destination=dest,
             formatted_content="Test message",
-            media_path="/tmp/test.jpg",
+            attachment_path="/tmp/test.jpg",
             attempt_count=0
         )
 
@@ -294,7 +294,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         retry_item = RetryItem(
             destination=dest,
             formatted_content="Test message",
-            media_path=None,
+            attachment_path=None,
             attempt_count=0
         )
 
@@ -325,7 +325,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         retry_item = RetryItem(
             destination=dest,
             formatted_content="Test message",
-            media_path=None,
+            attachment_path=None,
             attempt_count=0
         )
 
@@ -351,7 +351,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         retry_item = RetryItem(
             destination=dest,
             formatted_content="Test message",
-            media_path=None,
+            attachment_path=None,
             attempt_count=0
         )
 

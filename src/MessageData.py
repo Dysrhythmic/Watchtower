@@ -21,9 +21,9 @@ class MessageData:
         username: Message sender or source label
         timestamp: Message creation time
         text: Primary message text content
-        has_media: Whether message contains media attachment or not
-        media_type: Type of media (e.g., photo, video, document, etc.)
-        media_path: Local filesystem path to downloaded media
+        has_attachments: Whether message contains attachment or not
+        attachment_type: Type of attachment (e.g., photo, video, document, etc.)
+        attachment_path: Local filesystem path to downloaded attachment
         reply_context: Data related to the message being replied to
         original_message: Original platform-specific message object
         ocr_enabled: Whether OCR processing should be applied or not
@@ -40,9 +40,9 @@ class MessageData:
 
     text: str = ""
 
-    has_media: bool = False
-    media_type: Optional[str] = None
-    media_path: Optional[str] = None
+    has_attachments: bool = False
+    attachment_type: Optional[str] = None
+    attachment_path: Optional[str] = None
 
     reply_context: Optional[Dict] = None
 

@@ -16,7 +16,7 @@ What This Tests:
 Test Pattern - Restricted Mode:
     1. Create mock Telegram message with MessageMediaDocument
     2. Configure document with attributes (file_name, mime_type)
-    3. Call handler._is_media_restricted(message)
+    3. Call handler._is_attachment_restricted(message)
     4. Assert True (restricted) or False (allowed) based on file type
     5. Check ALLOWED_EXTENSIONS and ALLOWED_MIME_TYPES
 
@@ -133,7 +133,7 @@ class TestTelegramHandler(unittest.TestCase):
         mock_msg = Mock()
         mock_msg.media = MessageMediaPhoto()
 
-        is_restricted = self.handler._is_media_restricted(mock_msg)
+        is_restricted = self.handler._is_attachment_restricted(mock_msg)
         self.assertTrue(is_restricted)  # Photo is restricted, should return True
 
     def test_no_media_is_allowed(self):
@@ -141,7 +141,7 @@ class TestTelegramHandler(unittest.TestCase):
         mock_msg = Mock()
         mock_msg.media = None
 
-        is_restricted = self.handler._is_media_restricted(mock_msg)
+        is_restricted = self.handler._is_attachment_restricted(mock_msg)
         self.assertFalse(is_restricted)  # No media is not restricted, should return False
 
     def test_format_message_with_keywords(self):
@@ -257,7 +257,7 @@ class TestTelegramSendOperations(unittest.TestCase):
         result = asyncio.run(handler.send_copy(
             destination_chat_id=destination,
             content=text,
-            media_path=None
+            attachment_path=None
         ))
 
         # Then: Single send_message call
@@ -291,7 +291,7 @@ class TestTelegramSendOperations(unittest.TestCase):
         result = asyncio.run(handler.send_copy(
             destination_chat_id=destination,
             content=text,
-            media_path=None
+            attachment_path=None
         ))
 
         # Then: Multiple send_message calls
@@ -323,7 +323,7 @@ class TestTelegramSendOperations(unittest.TestCase):
         handler.client.send_message = AsyncMock()
 
         # Test data
-        media_path = "/tmp/test.jpg"
+        attachment_path = "/tmp/test.jpg"
         mock_exists.return_value = True  # Media file exists
         caption = "A" * 500  # Under 1024 limit
         destination = 123
@@ -332,7 +332,7 @@ class TestTelegramSendOperations(unittest.TestCase):
         result = asyncio.run(handler.send_copy(
             destination_chat_id=destination,
             content=caption,
-            media_path=media_path
+            attachment_path=attachment_path
         ))
 
         # Then: Single send_file with caption
@@ -340,7 +340,7 @@ class TestTelegramSendOperations(unittest.TestCase):
         handler.client.send_file.assert_called_once()
         call_args = handler.client.send_file.call_args
         self.assertEqual(call_args[0][0], destination)
-        self.assertEqual(call_args[0][1], media_path)
+        self.assertEqual(call_args[0][1], attachment_path)
         self.assertIsNotNone(call_args[1].get('caption'))
         self.assertEqual(len(call_args[1]['caption']), 500)
 
@@ -368,7 +368,7 @@ class TestTelegramSendOperations(unittest.TestCase):
         handler.client.send_message = AsyncMock(return_value=Mock(id=124))
 
         # Test data
-        media_path = "/tmp/test.jpg"
+        attachment_path = "/tmp/test.jpg"
         mock_exists.return_value = True  # Media file exists
         long_caption = "A" * 1500  # Over 1024 limit
         destination = 123
@@ -377,14 +377,14 @@ class TestTelegramSendOperations(unittest.TestCase):
         result = asyncio.run(handler.send_copy(
             destination_chat_id=destination,
             content=long_caption,
-            media_path=media_path
+            attachment_path=attachment_path
         ))
 
         # Then: send_file called WITHOUT caption
         self.assertTrue(result)
         handler.client.send_file.assert_called_once()
         file_call_args = handler.client.send_file.call_args
-        self.assertEqual(file_call_args[0][1], media_path)
+        self.assertEqual(file_call_args[0][1], attachment_path)
         # Caption should be None (captionless)
         caption_arg = file_call_args[1].get('caption')
         self.assertTrue(caption_arg is None or caption_arg == "")
@@ -417,7 +417,7 @@ class TestTelegramSendOperations(unittest.TestCase):
         handler.client.send_message = AsyncMock(return_value=Mock(id=124))
 
         # Test data
-        media_path = "/tmp/test.jpg"
+        attachment_path = "/tmp/test.jpg"
         mock_exists.return_value = True  # Media file exists
         very_long_caption = "A" * 5500  # Over 1024 and requires chunking
         destination = 123
@@ -426,7 +426,7 @@ class TestTelegramSendOperations(unittest.TestCase):
         result = asyncio.run(handler.send_copy(
             destination_chat_id=destination,
             content=very_long_caption,
-            media_path=media_path
+            attachment_path=attachment_path
         ))
 
         # Then: send_file called captionless
@@ -474,7 +474,7 @@ class TestTelegramSendOperations(unittest.TestCase):
             result = asyncio.run(handler.send_copy(
                 destination_chat_id=destination,
                 content=text,
-                media_path=None
+                attachment_path=None
             ))
 
         # Then: Returns False, error logged
@@ -506,7 +506,7 @@ class TestTelegramSendOperations(unittest.TestCase):
             result = asyncio.run(handler.send_copy(
                 destination_chat_id=destination,
                 content=text,
-                media_path=None
+                attachment_path=None
             ))
 
         # Then: Returns False, error logged
@@ -534,7 +534,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
     def test_document_with_extension_and_mime_match_allowed(self, MockClient):
         """
         Given: Document with filename="data.csv", mime_type="text/csv"
-        When: _is_media_restricted() called
+        When: _is_attachment_restricted() called
         Then: Returns False (not restricted - function returns False when allowed)
 
         Tests: src/TelegramHandler.py:224-248 (document validation)
@@ -552,7 +552,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = "text/csv"
 
         # Test
-        is_restricted = handler._is_media_restricted(message)
+        is_restricted = handler._is_attachment_restricted(message)
 
         # Should be allowed (function returns False when not restricted)
         self.assertFalse(is_restricted)
@@ -561,7 +561,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
     def test_document_with_extension_match_mime_mismatch_blocked(self, MockClient):
         """
         Given: Document with filename="malware.csv", mime_type="application/x-msdownload"
-        When: _is_media_restricted() called
+        When: _is_attachment_restricted() called
         Then: Returns True (restricted - function returns True when blocked)
 
         Tests: src/TelegramHandler.py:242 (SECURITY: extension match but MIME mismatch)
@@ -581,7 +581,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = "application/x-msdownload"  # Executable!
 
         # Test
-        is_restricted = handler._is_media_restricted(message)
+        is_restricted = handler._is_attachment_restricted(message)
 
         # Should be BLOCKED (function returns True when restricted)
         self.assertTrue(is_restricted)
@@ -590,7 +590,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
     def test_document_with_mime_match_extension_mismatch_blocked(self, MockClient):
         """
         Given: Document with filename="data.exe", mime_type="text/csv"
-        When: _is_media_restricted() called
+        When: _is_attachment_restricted() called
         Then: Returns True (restricted - function returns True when blocked)
 
         Tests: src/TelegramHandler.py:242 (SECURITY: MIME match but extension mismatch)
@@ -610,7 +610,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = "text/csv"
 
         # Test
-        is_restricted = handler._is_media_restricted(message)
+        is_restricted = handler._is_attachment_restricted(message)
 
         # Should be BLOCKED (function returns True when restricted)
         self.assertTrue(is_restricted)
@@ -619,7 +619,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
     def test_document_without_filename_attribute_blocked(self, MockClient):
         """
         Given: Document without file_name attribute
-        When: _is_media_restricted() called
+        When: _is_attachment_restricted() called
         Then: Returns True (restricted - function returns True when blocked)
 
         Tests: src/TelegramHandler.py:231-237 (missing filename handling)
@@ -635,7 +635,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = "text/csv"
 
         # Test
-        is_restricted = handler._is_media_restricted(message)
+        is_restricted = handler._is_attachment_restricted(message)
 
         # Should be BLOCKED (function returns True when restricted)
         self.assertTrue(is_restricted)
@@ -644,7 +644,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
     def test_document_without_mime_type_blocked(self, MockClient):
         """
         Given: Document with filename but no mime_type attribute
-        When: _is_media_restricted() called
+        When: _is_attachment_restricted() called
         Then: Returns True (restricted - function returns True when blocked)
 
         Tests: src/TelegramHandler.py:239-240 (missing MIME handling)
@@ -662,7 +662,7 @@ class TestRestrictedModeComplete(unittest.TestCase):
         message.media.document.mime_type = None
 
         # Test
-        is_restricted = handler._is_media_restricted(message)
+        is_restricted = handler._is_attachment_restricted(message)
 
         # Should be BLOCKED (function returns True when restricted)
         self.assertTrue(is_restricted)
@@ -732,8 +732,8 @@ class TestTelegramReplyContext(unittest.TestCase):
         self.assertEqual(result['author'], '@replyuser')
         self.assertEqual(result['text'], 'This is the original message')
         self.assertEqual(result['time'], '2025-01-01 12:00:00 UTC')
-        self.assertFalse(result['has_media'])
-        self.assertIsNone(result['media_type'])
+        self.assertFalse(result['has_attachments'])
+        self.assertIsNone(result['attachment_type'])
 
     @patch('TelegramHandler.TelegramClient')
     def test_reply_context_missing(self, MockClient):
@@ -1259,12 +1259,12 @@ class TestTelegramLogCleanup(unittest.TestCase):
         result = TelegramHandler._extract_username_from_sender(channel)
         self.assertEqual(result, "Channel")
 
-    def test_get_media_type_other(self):
-        """Test _get_media_type returns 'Other' for unknown media types."""
+    def test_get_attachment_type_other(self):
+        """Test _get_attachment_type returns 'Other' for unknown media types."""
         from telethon.tl.types import MessageMediaGeo  # Or any other media type
 
         unknown_media = Mock()  # Not Photo or Document
-        result = TelegramHandler._get_media_type(unknown_media)
+        result = TelegramHandler._get_attachment_type(unknown_media)
         self.assertEqual(result, "Other")
 
     def test_build_message_url_no_message_id(self):

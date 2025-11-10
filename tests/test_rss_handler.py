@@ -317,7 +317,7 @@ class TestRSSHandlerEntryProcessing(unittest.TestCase):
         self.assertEqual(message_data.username, "RSS")
         self.assertIn("New Entry", message_data.text)
         self.assertIn("http://test.com/new", message_data.text)
-        self.assertFalse(message_data.has_media)
+        self.assertFalse(message_data.has_attachments)
 
     def test_extract_entry_timestamp_prefers_updated(self):
         """

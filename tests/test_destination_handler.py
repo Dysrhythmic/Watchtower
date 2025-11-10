@@ -34,7 +34,7 @@ Concrete Handler Template (for testing abstract base):
         def _extract_retry_after(self, error_or_response):
             return 1.0  # Default 1 second for tests
 
-        def send_message(self, content, destination_identifier, media_path=None):
+        def send_message(self, content, destination_identifier, attachment_path=None):
             return True
 
         def format_message(self, message_data, destination):
@@ -81,7 +81,7 @@ class TestDestinationHandler(unittest.TestCase):
                 return str(destination_identifier)
             def _extract_retry_after(self, error_or_response):
                 return 1.0  # Default 1 second for tests
-            def send_message(self, content, destination_identifier, media_path=None):
+            def send_message(self, content, destination_identifier, attachment_path=None):
                 return True
             def format_message(self, message_data, destination):
                 return "formatted"

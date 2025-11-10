@@ -24,7 +24,7 @@ Destinations:
 - Attachment keyword checking for safe text-based files (enabled by default, validates both extension and MIME type)
 - Configuration validation with duplicate destination detection and helpful warnings about default values
 - RSS feed monitoring support
-- Comprehensive test suite with 309 tests covering unit and integration scenarios
+- Comprehensive test suite with 316 tests achieving 73% code coverage
 - Telegram polling every 5 minutes to catch messages missed during downtime or event handler failures
 - Message retry queue with exponential backoff (5s, 10s, 20s) for failed deliveries
 - Rate limit handling for both Discord and Telegram with pre-emptive waiting
@@ -376,60 +376,116 @@ Private channels (those with invite links like `https://t.me/+ewIIWdHcmfM5ZjAx`)
 
 ## Testing
 
+The project includes a comprehensive test suite with **316 tests** achieving **73% code coverage**. All tests are designed to run offline without requiring API credentials or network access.
+
 ### Running Tests
 
-Run all tests:
+**Install test dependencies:**
 ```bash
-python3 -m unittest discover tests/
+pip install pytest pytest-cov pytest-asyncio
 ```
 
-Run specific test file:
+**Run all tests:**
 ```bash
-python3 -m unittest tests/test_telegram_handler.py
+python -m pytest tests/
 ```
 
-Run specific test class:
+**Run all tests with verbose output:**
 ```bash
-python3 -m unittest tests.test_telegram_handler.TestTelegramLogFunctionality
+python -m pytest tests/ -v
+```
+
+**Run specific test file:**
+```bash
+python -m pytest tests/test_telegram_handler.py
+```
+
+**Run specific test class:**
+```bash
+python -m pytest tests/test_telegram_handler.py::TestTelegramLogFunctionality
+```
+
+**Run specific test method:**
+```bash
+python -m pytest tests/test_telegram_handler.py::TestTelegramLogFunctionality::test_create_telegram_log
+```
+
+**Run tests matching a pattern:**
+```bash
+python -m pytest tests/ -k "telegram"
+python -m pytest tests/ -k "routing"
 ```
 
 ### Test Coverage
 
-The test suite includes **309 tests** covering:
+**Generate coverage report:**
+```bash
+python -m pytest tests/ --cov=src --cov-report=term-missing
+```
 
-- **Configuration** (654 lines): Loading, validation, keyword resolution, parser validation
-- **Telegram Handler** (1215 lines): Message formatting, restricted mode, URL defanging, log files
-- **Discord Handler** (313 lines): Webhook sending, message chunking, rate limits
-- **Message Router** (934 lines): Keyword matching, destination routing, attachment checking, parsing
-- **RSS Handler** (569 lines): Feed parsing, deduplication, timestamp tracking
-- **OCR Handler** (269 lines): Text extraction from images
-- **Message Queue** (370 lines): Retry logic, exponential backoff
-- **Metrics** (397 lines): Counter tracking, persistence
-- **Integration Tests** (2536 lines): End-to-end flows including:
-  - Telegram → Discord/Telegram pipelines
-  - RSS → Discord/Telegram flows
-  - Queue retry processing with multiple items
-  - Media cleanup operations
-  - Rate limit coordination across destinations
-  - Mixed source processing
+**Generate HTML coverage report:**
+```bash
+python -m pytest tests/ --cov=src --cov-report=html
+# Open htmlcov/index.html in browser
+```
 
-**Overall coverage: 69%** across 1,480 statements in the src/ directory.
+**Current coverage: 73%** across 1,708 statements in the src/ directory.
 
 Modules with highest coverage:
+- AllowedFileTypes.py: 100%
+- AppTypes.py: 100%
 - MessageData.py: 100%
-- DiscordHandler.py: 96%
+- SendStatus.py: 100%
 - MetricsCollector.py: 96%
-- MessageRouter.py: 93%
+- DiscordHandler.py: 96%
+- MessageRouter.py: 88%
+- Discover.py: 87%
+
+### Test Organization
+
+The test suite includes:
+
+- **Unit Tests**: Test individual components in isolation
+  - `test_config.py` - Configuration loading and validation
+  - `test_telegram_handler.py` - Telegram message handling
+  - `test_discord_handler.py` - Discord webhook operations
+  - `test_routing_refactored.py` - Message routing logic
+  - `test_message_queue.py` - Retry queue operations
+  - `test_rss_handler.py` - RSS feed parsing
+  - `test_ocr_handler.py` - OCR availability checks
+  - `test_metrics.py` - Metrics tracking
+
+- **Integration Tests**: Test complete workflows
+  - `test_integration.py` - Telegram → Discord/Telegram flows
+  - `test_integration_pipeline.py` - End-to-end message processing
+  - `test_integration_rss_and_queue.py` - RSS feeds and retry queue
+
+- **Helper Tests**: Test utility components
+  - `test_message_data.py` - Message data structures
+  - `test_destination_handler.py` - Base handler functionality
+  - `test_simple_units_refactored.py` - Simple unit tests
+  - `test_handlers_refactored.py` - Handler integration tests
+  - `test_media_handling.py` - Media file operations
+  - `test_discover.py` - Channel discovery
 
 ### Test Requirements
 
-Tests use mock objects and don't require:
+Tests use mock objects and **don't require**:
 - Real Telegram API credentials
 - Real Discord webhooks
 - Network access
 - External services
+- EasyOCR installation (OCR tests check graceful degradation)
 
-All tests run offline using unittest.mock for external dependencies.
+All tests run **offline** using `unittest.mock` for external dependencies.
+
+### Continuous Testing
+
+The test suite is designed for continuous integration:
+- All 316 tests pass with 100% success rate
+- Average test execution time: ~2 seconds
+- No external dependencies required
+- Safe to run in CI/CD pipelines
 
 ## Discover Command
 

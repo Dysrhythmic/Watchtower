@@ -9,7 +9,7 @@ What This Tests:
     - Default values for optional fields
     - Metadata dict extensibility
     - OCR fields (ocr_enabled, ocr_raw)
-    - Media handling fields (media_path, has_media, media_type)
+    - Media handling fields (attachment_path, has_attachments, attachment_type)
     - Reply context structure
     - Source type handling (telegram, rss)
 
@@ -23,7 +23,7 @@ Test Pattern - Basic Creation:
 
 Test Pattern - Optional Fields:
     1. Create MessageData with optional fields:
-       - has_media, media_type, media_path
+       - has_attachments, attachment_type, attachment_path
        - ocr_enabled, ocr_raw
        - reply_context, original_message
     2. Assert optional fields set correctly
@@ -39,9 +39,9 @@ MessageData Structure:
         text: Message content
 
     Optional:
-        has_media: bool - Whether message has attachments
-        media_type: str - "Photo", "Document", "Other"
-        media_path: str - Path to downloaded media file
+        has_attachments: bool - Whether message has attachments
+        attachment_type: str - "Photo", "Document", "Other"
+        attachment_path: str - Path to downloaded media file
         ocr_enabled: bool - Whether OCR was used
         ocr_raw: str - Extracted OCR text
         reply_context: dict - Original message being replied to
@@ -122,8 +122,8 @@ class TestMessageData(unittest.TestCase):
         )
 
         self.assertEqual(msg.text, "")
-        self.assertFalse(msg.has_media)
-        self.assertIsNone(msg.media_type)
+        self.assertFalse(msg.has_attachments)
+        self.assertIsNone(msg.attachment_type)
 
     def test_metadata_defaults_empty_dict(self):
         """Test metadata defaults to empty dict."""

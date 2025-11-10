@@ -12,26 +12,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from MessageData import MessageData
 from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_RSS
 
-
-def create_mock_config(extra_attrs=None):
-    """Helper to create properly configured mock config."""
-    mock_config = Mock()
-    mock_config.tmp_dir = Path("/tmp")
-    mock_config.attachments_dir = Path("/tmp/attachments")
-    mock_config.rsslog_dir = Path("/tmp/rsslog")
-    mock_config.telegramlog_dir = Path("/tmp/telegramlog")
-    mock_config.project_root = Path("/tmp")
-    mock_config.config_dir = Path("/tmp/config")
-    mock_config.api_id = "123"
-    mock_config.api_hash = "abc"
-    mock_config.get_all_channel_ids = Mock(return_value=set())
-    mock_config.destinations = []
-
-    if extra_attrs:
-        for key, value in extra_attrs.items():
-            setattr(mock_config, key, value)
-
-    return mock_config
+# Import shared helper from conftest
+from conftest import create_mock_config
 
 
 class TestTelegramToDiscordFlow(unittest.TestCase):
@@ -125,7 +107,7 @@ class TestRetryQueueIntegration(unittest.TestCase):
         app.message_queue.enqueue(
             destination=destination,
             formatted_content="Test message",
-            media_path=None,
+            attachment_path=None,
             reason="rate limit"
         )
         self.assertEqual(app.message_queue.get_queue_size(), 1)
@@ -480,7 +462,7 @@ class TestQueueProcessing(unittest.TestCase):
         app.message_queue.enqueue(
             destination={'name': 'Test'},
             formatted_content="Test",
-            media_path=None
+            attachment_path=None
         )
 
         item = app.message_queue._queue[0]
@@ -513,7 +495,7 @@ class TestQueueProcessing(unittest.TestCase):
         app.message_queue.enqueue(
             destination={'name': 'Test'},
             formatted_content="Test",
-            media_path=None
+            attachment_path=None
         )
 
         item = app.message_queue._queue[0]
@@ -771,7 +753,7 @@ class TestNewMetrics(unittest.TestCase):
             username="@user",
             timestamp=datetime.now(timezone.utc),
             text="Test message",
-            has_media=False
+            has_attachments=False
         )
         message_data.ocr_raw = "Some OCR extracted text"
 
@@ -820,7 +802,7 @@ class TestNewMetrics(unittest.TestCase):
             username="@user",
             timestamp=datetime.now(timezone.utc),
             text="Test message",
-            has_media=False
+            has_attachments=False
         )
 
         # Mock Discord send to succeed

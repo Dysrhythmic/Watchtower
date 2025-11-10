@@ -258,11 +258,11 @@ class Watchtower:
                 self.metrics.increment("total_msgs_no_destination")
                 return False
 
-            media_passes_restrictions = await self._handle_media_restrictions(message_data, destinations)
+            attachment_passes_restrictions = await self._handle_attachment_restrictions(message_data, destinations)
 
             success_count = 0
             for destination in destinations:
-                success = await self._dispatch_to_destination(message_data, destination, media_passes_restrictions)
+                success = await self._dispatch_to_destination(message_data, destination, attachment_passes_restrictions)
                 if success:
                     success_count += 1
 
@@ -279,12 +279,12 @@ class Watchtower:
 
         finally:
             # Clean up stored attachments after all destinations have been processed
-            if message_data.media_path and os.path.exists(message_data.media_path):
+            if message_data.attachment_path and os.path.exists(message_data.attachment_path):
                 try:
-                    os.remove(message_data.media_path)
-                    _logger.info(f"Cleaned up stored attachment file: {message_data.media_path}")
+                    os.remove(message_data.attachment_path)
+                    _logger.info(f"Cleaned up stored attachment file: {message_data.attachment_path}")
                 except Exception as e:
-                    _logger.error(f"Error removing stored attachment file at {message_data.media_path}: {e}")
+                    _logger.error(f"Error removing stored attachment file at {message_data.attachment_path}: {e}")
 
     async def _preprocess_message(self, message_data: MessageData):
         """Pre-process message with OCR and defanged URLs
@@ -293,21 +293,21 @@ class Watchtower:
         accidental navigation to potentially malicious content
         """
         ocr_needed = False
-        if message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_media:
+        if message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_attachments:
             ocr_needed = self.router.is_ocr_enabled_for_channel(message_data.channel_id, message_data.channel_name, message_data.source_type)
         if ocr_needed and self.ocr.is_available():
-            if not message_data.media_path:
-                message_data.media_path = await self.telegram.download_media(message_data)
-            if message_data.media_path and os.path.exists(message_data.media_path):
+            if not message_data.attachment_path:
+                message_data.attachment_path = await self.telegram.download_attachment(message_data)
+            if message_data.attachment_path and os.path.exists(message_data.attachment_path):
                 # Only attempt OCR on image files
-                if self._is_image_file(message_data.media_path):
-                    ocr_text = self.ocr.extract_text(message_data.media_path)
+                if self._is_image_file(message_data.attachment_path):
+                    ocr_text = self.ocr.extract_text(message_data.attachment_path)
                     if ocr_text:
                         message_data.ocr_enabled = True
                         message_data.ocr_raw = ocr_text
                         self.metrics.increment("ocr_processed")
                 else:
-                    _logger.info(f"Skipping OCR for non-image file: {message_data.media_path}")
+                    _logger.info(f"Skipping OCR for non-image file: {message_data.attachment_path}")
 
         if message_data.source_type == APP_TYPE_TELEGRAM and message_data.original_message:
             telegram_msg_id = getattr(message_data.original_message, "id", None)
@@ -332,7 +332,7 @@ class Watchtower:
         file_ext = os.path.splitext(file_path)[1].lower()
         return file_ext in image_extensions
 
-    async def _handle_media_restrictions(self, message_data: MessageData, destinations: List[Dict]) -> bool:
+    async def _handle_attachment_restrictions(self, message_data: MessageData, destinations: List[Dict]) -> bool:
         """Check media restrictions and download media if needed.
 
         Evaluates whether any destination requires restricted mode filtering,
@@ -348,27 +348,27 @@ class Watchtower:
         """
         any_destination_has_restricted_mode = any(destination.get('restricted_mode', False) for destination in destinations)
 
-        media_passes_restrictions = True
-        if any_destination_has_restricted_mode and message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_media and message_data.original_message:
+        attachment_passes_restrictions = True
+        if any_destination_has_restricted_mode and message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_attachments and message_data.original_message:
             # _is_media_restricted returns True if media IS restricted, so invert for "passes" check
-            media_passes_restrictions = not self.telegram._is_media_restricted(message_data.original_message)
+            attachment_passes_restrictions = not self.telegram._is_attachment_restricted(message_data.original_message)
 
-        if message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_media and not message_data.media_path:
-            should_download_media = False
+        if message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_attachments and not message_data.attachment_path:
+            should_download_attachment = False
             for destination in destinations:
                 if destination['type'] in (APP_TYPE_DISCORD, APP_TYPE_TELEGRAM):
                     if not destination.get('restricted_mode', False):
-                        should_download_media = True
+                        should_download_attachment = True
                         break
-                    elif media_passes_restrictions:
-                        should_download_media = True
+                    elif attachment_passes_restrictions:
+                        should_download_attachment = True
                         break
-            if should_download_media:
-                message_data.media_path = await self.telegram.download_media(message_data)
+            if should_download_attachment:
+                message_data.attachment_path = await self.telegram.download_attachment(message_data)
 
-        return media_passes_restrictions
+        return attachment_passes_restrictions
 
-    async def _dispatch_to_destination(self, message_data: MessageData, destination: Dict, media_passes_restrictions: bool) -> bool:
+    async def _dispatch_to_destination(self, message_data: MessageData, destination: Dict, attachment_passes_restrictions: bool) -> bool:
         """Dispatch message to a single destination
 
         Applies destination specific parsing, formats the message, determines media inclusion,
@@ -377,24 +377,24 @@ class Watchtower:
         Args:
             message_data: The message to send
             destination: Destination configuration (contains type, parser, restricted_mode, etc.)
-            media_passes_restrictions: Whether media passed restricted mode checks
+            attachment_passes_restrictions: Whether media passed restricted mode checks
 
         Returns:
             bool: True if sent successfully to at least one destination, False otherwise
         """
         parsed_message = self.router.parse_msg(message_data, destination['parser'])
 
-        include_media = False
-        if parsed_message.media_path:
-            if not destination.get('restricted_mode', False) or media_passes_restrictions:
-                include_media = True
+        include_attachment = False
+        if parsed_message.attachment_path:
+            if not destination.get('restricted_mode', False) or attachment_passes_restrictions:
+                include_attachment = True
 
         if destination['type'] == APP_TYPE_DISCORD:
             content = self.discord.format_message(parsed_message, destination)
-            status = await self._send_to_discord(parsed_message, destination, content, include_media)
+            status = await self._send_to_discord(parsed_message, destination, content, include_attachment)
         elif destination['type'] == APP_TYPE_TELEGRAM:
             content = self.telegram.format_message(parsed_message, destination)
-            status = await self._send_to_telegram(parsed_message, destination, content, include_media)
+            status = await self._send_to_telegram(parsed_message, destination, content, include_attachment)
         else:
             status = SendStatus.FAILED
 
@@ -402,7 +402,7 @@ class Watchtower:
 
         return status == SendStatus.SENT
 
-    async def _send_to_discord(self, parsed_message: MessageData, destination: Dict, content: str, include_media: bool) -> SendStatus:
+    async def _send_to_discord(self, parsed_message: MessageData, destination: Dict, content: str, include_attachment: bool) -> SendStatus:
         """Send message to Discord webhook.
 
         Appends a note if media was blocked by restricted mode, then sends via HTTP POST.
@@ -411,26 +411,26 @@ class Watchtower:
             parsed_message: The parsed message with applied parser rules
             destination: Discord webhook destination config
             content: Formatted message text
-            include_media: Whether to include media attachment
+            include_attachment: Whether to include media attachment
 
         Returns:
             SendStatus: SENT if successful, QUEUED if enqueued for retry, FAILED otherwise
         """
-        if parsed_message.has_media and not include_media:
+        if parsed_message.has_attachments and not include_attachment:
             if destination.get('restricted_mode', False):
                 content += "\n**[Media attachment filtered due to restricted mode]**"
             else:
-                content += f"\n**[Media type {parsed_message.media_type} could not be forwarded to Discord]**"
+                content += f"\n**[Media type {parsed_message.attachment_type} could not be forwarded to Discord]**"
 
-        media_path = parsed_message.media_path if include_media else None
+        attachment_path = parsed_message.attachment_path if include_attachment else None
 
-        if media_path:
-            content, should_send_media = self._check_file_size_and_modify_content(
-                content, media_path, self.discord.file_size_limit, destination
+        if attachment_path:
+            content, should_send_attachment = self._check_file_size_and_modify_content(
+                content, attachment_path, self.discord.file_size_limit, destination, parsed_message
             )
-            media_path = media_path if should_send_media else None
+            attachment_path = attachment_path if should_send_attachment else None
 
-        success = self.discord.send_message(content, destination['discord_webhook_url'], media_path)
+        success = self.discord.send_message(content, destination['discord_webhook_url'], attachment_path)
 
         if success:
             self.metrics.increment("messages_sent_discord")
@@ -441,32 +441,32 @@ class Watchtower:
             self.message_queue.enqueue(
                 destination=destination,
                 formatted_content=content,
-                media_path=media_path,
+                media_path=attachment_path,
                 reason="Discord send failed (likely rate limit)"
             )
             self.metrics.increment("messages_queued_retry")
             return SendStatus.QUEUED
 
-    async def _send_to_telegram(self, parsed_message: MessageData, destination: Dict, content: str, include_media: bool) -> SendStatus:
+    async def _send_to_telegram(self, parsed_message: MessageData, destination: Dict, content: str, include_attachment: bool) -> SendStatus:
         """Send message to Telegram channel
 
         Args:
             parsed_message: The parsed message with applied parser rules
             destination: Telegram destination config
             content: Formatted message text
-            include_media: Whether to include media attachment
+            include_attachment: Whether to include media attachment
 
         Returns:
             SendStatus: SENT if successful, QUEUED if enqueued for retry, FAILED otherwise
         """
-        media_path = self._get_media_for_send(parsed_message, destination, include_media)
+        attachment_path = self._get_attachment_for_send(parsed_message, destination, include_attachment)
 
         # Check file size limit before sending
-        if media_path:
-            content, should_send_media = self._check_file_size_and_modify_content(
-                content, media_path, self.telegram.file_size_limit, destination
+        if attachment_path:
+            content, should_send_attachment = self._check_file_size_and_modify_content(
+                content, attachment_path, self.telegram.file_size_limit, destination, parsed_message
             )
-            media_path = media_path if should_send_media else None
+            attachment_path = attachment_path if should_send_attachment else None
 
         dst_channel_specifier = destination['telegram_dst_channel'] # as specified in config
 
@@ -476,7 +476,7 @@ class Watchtower:
             return SendStatus.FAILED
 
         try:
-            ok = await self.telegram.send_copy(destination_chat_id, content, media_path)
+            ok = await self.telegram.send_copy(destination_chat_id, content, attachment_path)
             if ok:
                 self.metrics.increment("messages_sent_telegram")
                 if parsed_message.ocr_raw:
@@ -486,7 +486,7 @@ class Watchtower:
                 self.message_queue.enqueue(
                     destination=destination,
                     formatted_content=content,
-                    media_path=media_path,
+                    media_path=attachment_path,
                     reason="Telegram send failed (likely rate limit)"
                 )
                 self.metrics.increment("messages_queued_retry")
@@ -495,14 +495,14 @@ class Watchtower:
             _logger.error(f"Failed to send to {dst_channel_specifier}: {e}")
             return SendStatus.FAILED
 
-    def _extract_matched_lines_from_attachment(self, media_path: str, keywords: List[str]) -> dict:
+    def _extract_matched_lines_from_attachment(self, attachment_path: str, keywords: List[str]) -> dict:
         """Extract lines from attachment file that match keywords, or first N lines if no keywords.
 
         Streams the file line-by-line to avoid loading large files into memory.
         If keywords are provided, returns matching lines. If no keywords, returns first 100 lines.
 
         Args:
-            media_path: Path to the attachment file
+            attachment_path: Path to the attachment file
             keywords: List of keywords to match against (empty list = no keywords)
 
         Returns:
@@ -518,11 +518,11 @@ class Watchtower:
             'is_sample': False
         }
 
-        if not media_path:
+        if not attachment_path:
             return result
 
         try:
-            path = Path(media_path)
+            path = Path(attachment_path)
             if not path.exists():
                 return result
 
@@ -554,38 +554,42 @@ class Watchtower:
             return result
 
         except Exception as e:
-            _logger.warning(f"Failed to extract lines from {media_path}: {e}")
+            _logger.warning(f"Failed to extract lines from {attachment_path}: {e}")
             return result
 
     def _check_file_size_and_modify_content(
         self,
         content: str,
-        media_path: Optional[str],
+        attachment_path: Optional[str],
         file_size_limit: int,
-        destination: Dict
+        destination: Dict,
+        parsed_message: 'MessageData'
     ) -> tuple[str, bool]:
         """Check if attachment exceeds file size limit and modify content if needed.
 
         If the attachment file exceeds the destination's file size limit, extracts
         the lines that matched keywords (or first 100 lines if no keywords) and appends
-        them to the message content with block quote formatting. The media should then be skipped.
+        them to the message content with block quote formatting. The attachment should then be skipped.
+
+        Uses cached attachment info from routing phase if available to avoid re-reading the file.
 
         Args:
             content: Formatted message content (Discord markdown or Telegram HTML)
-            media_path: Path to attachment file (or None)
+            attachment_path: Path to attachment file (or None)
             file_size_limit: Maximum file size in bytes for this destination
             destination: Destination config with keywords and type
+            parsed_message: MessageData with metadata that may contain cached attachment info
 
         Returns:
-            tuple[str, bool]: (modified_content, should_include_media)
+            tuple[str, bool]: (modified_content, should_include_attachment)
                 modified_content: Content with matched/sampled lines appended if file too large
-                should_include_media: False if file too large, True otherwise
+                should_include_attachment: False if file too large, True otherwise
         """
-        if not media_path:
+        if not attachment_path:
             return content, False
 
         try:
-            file_size = Path(media_path).stat().st_size
+            file_size = Path(attachment_path).stat().st_size
 
             if file_size <= file_size_limit:
                 return content, True
@@ -593,12 +597,23 @@ class Watchtower:
             # File is too large, extract matched lines or sample
             file_size_mb = file_size / (1024 * 1024)
             _logger.info(
-                f"Attachment {Path(media_path).name} ({file_size_mb:.1f}MB) "
-                f"exceeds limit ({file_size_limit / (1024*1024):.1f}MB), streaming file for keyword extraction"
+                f"Attachment {Path(attachment_path).name} ({file_size_mb:.1f}MB) "
+                f"exceeds limit ({file_size_limit / (1024*1024):.1f}MB), using cached data or streaming file for keyword extraction"
             )
 
             keywords = destination.get('keywords', [])
-            result = self._extract_matched_lines_from_attachment(media_path, keywords)
+
+            # Check if already extracted during routing (avoids duplicate file read)
+            cached_info = parsed_message.metadata.get('attachment_info')
+            if cached_info:
+                result = {
+                    'matched_lines': cached_info['matched_lines'],
+                    'total_lines': cached_info['total_lines'],
+                    'is_sample': False  # Routing only extracts matches, not samples
+                }
+            else:
+                # Fallback: read file (shouldn't happen in normal flow after routing)
+                result = self._extract_matched_lines_from_attachment(attachment_path, keywords)
 
             matched_lines = result['matched_lines']
             total_lines = result['total_lines']
@@ -641,21 +656,21 @@ class Watchtower:
             return content, False
 
         except Exception as e:
-            _logger.error(f"Error checking file size for {media_path}: {e}")
+            _logger.error(f"Error checking file size for {attachment_path}: {e}")
             return content, True  # On error, try to send without attachment
 
-    def _get_media_for_send(self, parsed_message: MessageData, destination: Dict, include_media: bool) -> Optional[str]:
+    def _get_attachment_for_send(self, parsed_message: MessageData, destination: Dict, include_attachment: bool) -> Optional[str]:
         """Determine which media file to send based on restricted mode and OCR settings.
 
         Args:
             parsed_message: The message being sent
             destination: Destination configuration
-            include_media: Whether media should be included at all
+            include_attachment: Whether media should be included at all
 
         Returns:
             Path to media file or None if media should not be sent
         """
-        if not include_media or not parsed_message.media_path:
+        if not include_attachment or not parsed_message.attachment_path:
             return None
 
         if destination.get('restricted_mode', False):
@@ -663,7 +678,7 @@ class Watchtower:
                 return None
             return None
 
-        return parsed_message.media_path
+        return parsed_message.attachment_path
 
 def main():
     """Main entry point for Watchtower CLI.

@@ -30,13 +30,13 @@ class RetryItem:
     Attributes:
         destination: Destination configuration dict
         formatted_content: Message text ready to send
-        media_path: Optional path to media file attachment
+        attachment_path: Optional path to media file attachment
         attempt_count: Number of retry attempts made (zero indexed)
         next_retry_time: Unix timestamp when next retry should occur
     """
     destination: Dict
     formatted_content: str
-    media_path: Optional[str]
+    attachment_path: Optional[str]
     attempt_count: int = 0
     next_retry_time: float = 0.0
 
@@ -63,13 +63,13 @@ class MessageQueue:
     def enqueue(self,
                 destination: Dict,
                 formatted_content: str,
-                media_path: Optional[str],
+                attachment_path: Optional[str],
                 reason: str = "rate limit"):
         """Add failed message to retry queue."""
         retry_item = RetryItem(
             destination=destination,
             formatted_content=formatted_content,
-            media_path=media_path,
+            attachment_path=attachment_path,
             attempt_count=0,
             next_retry_time=time.time() + self.INITIAL_BACKOFF
         )
@@ -142,7 +142,7 @@ class MessageQueue:
                 return watchtower.discord.send_message(
                     retry_item.formatted_content,
                     dest['discord_webhook_url'],
-                    retry_item.media_path
+                    retry_item.attachment_path
                 )
             elif dest['type'] == APP_TYPE_TELEGRAM:
                 # Telegram sending requires async
@@ -152,7 +152,7 @@ class MessageQueue:
                     result = await watchtower.telegram.send_copy(
                         chat_id,
                         retry_item.formatted_content,
-                        retry_item.media_path
+                        retry_item.attachment_path
                     )
                     return result
                 return False

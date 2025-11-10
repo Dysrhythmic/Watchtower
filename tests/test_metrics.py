@@ -325,7 +325,7 @@ class TestMetricsIntegration(unittest.TestCase):
             username="@user",
             timestamp=datetime.now(timezone.utc),
             text="Test message",
-            has_media=False
+            has_attachments=False
         )
         message_data.ocr_raw = "Some OCR text"
 
@@ -384,7 +384,7 @@ class TestMetricsIntegration(unittest.TestCase):
             username="@user",
             timestamp=datetime.now(timezone.utc),
             text="Test message",
-            has_media=False
+            has_attachments=False
         )
 
         # Mock Discord send

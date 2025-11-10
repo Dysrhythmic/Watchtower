@@ -203,7 +203,7 @@ class RSSHandler:
             username=APP_TYPE_RSS,
             timestamp=datetime.fromtimestamp(timestamp, tz=timezone.utc),
             text=text,
-            has_media=False
+            has_attachments=False
         )
 
         return message_data, timestamp

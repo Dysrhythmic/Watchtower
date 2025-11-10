@@ -23,7 +23,7 @@ Test Pattern - Message Formatting:
 
 Test Pattern - Sending:
     1. Mock requests.post to return success/failure responses
-    2. Call handler.send_message(content, webhook_url, media_path)
+    2. Call handler.send_message(content, webhook_url, attachment_path)
     3. Check requests.post was called with correct parameters
     4. For rate limit tests: return Mock response with status_code=429
 
@@ -215,7 +215,7 @@ class TestDiscordChunking(unittest.TestCase):
         webhook_url = "https://discord.com/api/webhooks/test"
 
         # When: send_message() called
-        result = handler.send_message(text, webhook_url, media_path=None)
+        result = handler.send_message(text, webhook_url, attachment_path=None)
 
         # Then: Success
         self.assertTrue(result)
@@ -250,7 +250,7 @@ class TestDiscordChunking(unittest.TestCase):
         text = "A" * 2000  # Exactly at limit
         webhook_url = "https://discord.com/api/webhooks/test"
 
-        result = handler.send_message(text, webhook_url, media_path=None)
+        result = handler.send_message(text, webhook_url, attachment_path=None)
 
         # Should succeed with single POST
         self.assertTrue(result)
@@ -280,8 +280,8 @@ class TestDiscordReplyContext(unittest.TestCase):
             'author': '@originaluser',
             'text': 'This is the original message being replied to',
             'time': '2025-01-01 12:00:00 UTC',
-            'media_type': None,
-            'has_media': False
+            'attachment_type': None,
+            'has_attachments': False
         }
 
         # Create message with reply context
@@ -356,8 +356,8 @@ class TestDiscordReplyContext(unittest.TestCase):
             'author': '@mediauser',
             'text': '',  # No text
             'time': '2025-01-01 13:00:00 UTC',
-            'media_type': 'Photo',
-            'has_media': True
+            'attachment_type': 'Photo',
+            'has_attachments': True
         }
 
         msg = MessageData(
@@ -374,7 +374,7 @@ class TestDiscordReplyContext(unittest.TestCase):
         self.assertIn("**  Replying to:**", formatted)
         self.assertIn("@mediauser", formatted)
         self.assertIn("**  Original content:** Photo", formatted)
-        self.assertIn("**  Original message:** [Media only, no caption]", formatted)
+        self.assertIn("**  Original message:** [Attachment only, no caption]", formatted)
 
     def test_format_message_with_reply_context_long_text(self):
         """Test that reply context truncates long original messages."""
@@ -388,8 +388,8 @@ class TestDiscordReplyContext(unittest.TestCase):
             'author': '@longuser',
             'text': long_text,
             'time': '2025-01-01 14:00:00 UTC',
-            'media_type': None,
-            'has_media': False
+            'attachment_type': None,
+            'has_attachments': False
         }
 
         msg = MessageData(

@@ -27,26 +27,8 @@ from MessageData import MessageData
 from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_RSS
 from SendStatus import SendStatus
 
-
-def create_mock_config(extra_attrs=None):
-    """Helper to create properly configured mock config."""
-    mock_config = Mock()
-    mock_config.tmp_dir = Path("/tmp")
-    mock_config.attachments_dir = Path("/tmp/attachments")
-    mock_config.rsslog_dir = Path("/tmp/rsslog")
-    mock_config.telegramlog_dir = Path("/tmp/telegramlog")
-    mock_config.project_root = Path("/tmp")
-    mock_config.config_dir = Path("/tmp/config")
-    mock_config.api_id = "123"
-    mock_config.api_hash = "abc"
-    mock_config.get_all_channel_ids = Mock(return_value=set())
-    mock_config.destinations = []
-
-    if extra_attrs:
-        for key, value in extra_attrs.items():
-            setattr(mock_config, key, value)
-
-    return mock_config
+# Import shared helper from conftest
+from conftest import create_mock_config
 
 
 class TestRSSIntegration(unittest.TestCase):
@@ -255,7 +237,7 @@ class TestQueueRetryProcessing(unittest.TestCase):
             app.message_queue.enqueue(
                 destination=dest,
                 formatted_content="Test message",
-                media_path=None,
+                attachment_path=None,
                 reason="test"
             )
 
@@ -298,7 +280,7 @@ class TestQueueRetryProcessing(unittest.TestCase):
         app.message_queue.enqueue(
             destination=destination,
             formatted_content="Test",
-            media_path=None
+            attachment_path=None
         )
         after_enqueue = time.time()
 
@@ -336,7 +318,7 @@ class TestQueueRetryProcessing(unittest.TestCase):
         app.message_queue.enqueue(
             destination=destination,
             formatted_content="Test",
-            media_path=None
+            attachment_path=None
         )
 
         item = app.message_queue._queue[0]
@@ -418,7 +400,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
         # Send to Telegram
         formatted = app.telegram.format_message(msg, destinations[0])
         result = asyncio.run(app._send_to_telegram(
-            msg, destinations[0], formatted, include_media=False
+            msg, destinations[0], formatted, include_attachment=False
         ))
 
         self.assertEqual(result, SendStatus.SENT)

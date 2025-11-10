@@ -76,7 +76,7 @@ class TestWatchtowerOCRIntegration(unittest.TestCase):
 
         # Mock Telegram handler
         mock_telegram = MockTelegram.return_value
-        mock_telegram.download_media = AsyncMock(return_value="/tmp/attachments/test.jpg")
+        mock_telegram.download_attachment = AsyncMock(return_value="/tmp/attachments/test.jpg")
 
         # Create Watchtower instance
         watchtower = Watchtower(sources=['telegram'])
@@ -89,8 +89,8 @@ class TestWatchtowerOCRIntegration(unittest.TestCase):
             username="test_user",
             timestamp=datetime.now(timezone.utc),
             text="Test message",
-            has_media=True,
-            media_path=None  # Not yet downloaded
+            has_attachments=True,
+            attachment_path=None  # Not yet downloaded
         )
         message_data.original_message = Mock()
 
@@ -149,7 +149,7 @@ class TestWatchtowerOCRIntegration(unittest.TestCase):
             username="test_user",
             timestamp=datetime.now(timezone.utc),
             text="Test message",
-            has_media=True
+            has_attachments=True
         )
         message_data.original_message = Mock()
 
@@ -239,7 +239,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
     def test_media_restrictions_enforced_for_restricted_destinations(self, MockConfig, MockRouter, MockTelegram, MockOCR, MockDiscord, MockQueue, MockMetrics):
         """
         Given: Telegram message with media, destination with restricted_mode=True
-        When: _handle_media_restrictions() called
+        When: _handle_attachment_restrictions() called
         Then: Media restriction check performed
 
         Tests: src/Watchtower.py:267-271 (restricted mode check)
@@ -261,8 +261,8 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
 
         # Mock Telegram handler with restriction check
         mock_telegram = MockTelegram.return_value
-        mock_telegram._is_media_restricted = Mock(return_value=False)  # Media allowed (not restricted)
-        mock_telegram.download_media = AsyncMock(return_value="/tmp/attachments/test.jpg")
+        mock_telegram._is_attachment_restricted = Mock(return_value=False)  # Media allowed (not restricted)
+        mock_telegram.download_attachment = AsyncMock(return_value="/tmp/attachments/test.jpg")
 
         watchtower = Watchtower(sources=['telegram'])
 
@@ -274,7 +274,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
             username="test_user",
             timestamp=datetime.now(timezone.utc),
             text="Test message",
-            has_media=True
+            has_attachments=True
         )
         message_data.original_message = Mock()
 
@@ -284,10 +284,10 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
         ]
 
         # When: Check media restrictions
-        result = asyncio.run(watchtower._handle_media_restrictions(message_data, destinations))
+        result = asyncio.run(watchtower._handle_attachment_restrictions(message_data, destinations))
 
         # Then: Restriction check performed
-        mock_telegram._is_media_restricted.assert_called_once()
+        mock_telegram._is_attachment_restricted.assert_called_once()
         self.assertTrue(result)  # Media allowed
 
     @patch('MetricsCollector.MetricsCollector')
@@ -300,7 +300,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
     def test_media_blocked_when_restricted_mode_fails(self, MockConfig, MockRouter, MockTelegram, MockOCR, MockDiscord, MockQueue, MockMetrics):
         """
         Given: Telegram message with media that fails restricted mode check
-        When: _handle_media_restrictions() called
+        When: _handle_attachment_restrictions() called
         Then: Returns False (media blocked)
 
         Tests: src/Watchtower.py:269-271 (restriction failure)
@@ -320,8 +320,8 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
 
         # Mock Telegram handler with restriction check that fails
         mock_telegram = MockTelegram.return_value
-        mock_telegram._is_media_restricted = Mock(return_value=True)  # Media BLOCKED (restricted=True)
-        mock_telegram.download_media = AsyncMock(return_value="/tmp/attachments/test.jpg")
+        mock_telegram._is_attachment_restricted = Mock(return_value=True)  # Media BLOCKED (restricted=True)
+        mock_telegram.download_attachment = AsyncMock(return_value="/tmp/attachments/test.jpg")
 
         watchtower = Watchtower(sources=['telegram'])
 
@@ -332,7 +332,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
             username="test_user",
             timestamp=datetime.now(timezone.utc),
             text="Test message",
-            has_media=True
+            has_attachments=True
         )
         message_data.original_message = Mock()
 
@@ -341,7 +341,7 @@ class TestWatchtowerRestrictedMode(unittest.TestCase):
         ]
 
         # When: Check media restrictions
-        result = asyncio.run(watchtower._handle_media_restrictions(message_data, destinations))
+        result = asyncio.run(watchtower._handle_attachment_restrictions(message_data, destinations))
 
         # Then: Media blocked
         self.assertFalse(result)

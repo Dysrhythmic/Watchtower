@@ -26,6 +26,9 @@ class MessageRouter:
     configuration (OCR, restricted mode, parsers).
     """
 
+    # Maximum file size for keyword matching during routing (500MB)
+    MAX_ROUTING_ATTACHMENT_SIZE = 500 * 1024 * 1024
+
     def __init__(self, config: ConfigManager):
         """Initialize router with configuration.
 
@@ -145,21 +148,24 @@ class MessageRouter:
                 searchable_text = f"{searchable_text}\n{message_data.ocr_raw}" if searchable_text else message_data.ocr_raw
 
             # Check text-based attachments (enabled by default)
-            if dst_channel_config.get('check_attachments', True) and message_data.media_path:
-                attachment_text = self._extract_attachment_text(message_data.media_path)
-                if attachment_text:
-                    searchable_text = (
-                        f"{searchable_text}\n{attachment_text}"
-                        if searchable_text
-                        else attachment_text
-                    )
+            keywords = dst_channel_config.get('keywords', [])
+            attachment_matched = False
+            if dst_channel_config.get('check_attachments', True) and message_data.attachment_path and keywords:
+                attachment_info = self._extract_attachment_text(message_data.attachment_path, keywords)
+                if attachment_info and attachment_info['has_matches']:
+                    # Cache attachment info for later use (avoid re-reading file)
+                    message_data.metadata['attachment_info'] = attachment_info
+                    attachment_matched = True
 
             # Perform case-insensitive keyword matching
-            keywords = dst_channel_config.get('keywords')
             if not keywords:
                 # No keywords configured, forward all messages from this channel
                 destinations.append(self._make_dest_entry(destination, dst_channel_config, matched=[]))
+            elif attachment_matched:
+                # Attachment matched keywords, add this destination
+                destinations.append(self._make_dest_entry(destination, dst_channel_config, matched=keywords))
             elif searchable_text:
+                # Check text content for keyword matches
                 matched = [kw for kw in keywords if kw.lower() in searchable_text.lower()]
                 if matched:
                     destinations.append(self._make_dest_entry(destination, dst_channel_config, matched=matched))
@@ -251,9 +257,9 @@ class MessageRouter:
             username=original.username,
             timestamp=original.timestamp,
             text=new_text,
-            has_media=original.has_media,
-            media_type=original.media_type,
-            media_path=original.media_path,
+            has_attachments=original.has_attachments,
+            attachment_type=original.attachment_type,
+            attachment_path=original.attachment_path,
             reply_context=original.reply_context,
             original_message=original.original_message,
             ocr_enabled=original.ocr_enabled,
@@ -261,27 +267,34 @@ class MessageRouter:
             metadata=original.metadata
         )
 
-    def _extract_attachment_text(self, media_path: Optional[str]) -> Optional[str]:
-        """Extract searchable text from attachments.
+    def _extract_attachment_text(self, attachment_path: Optional[str], keywords: List[str]) -> Optional[Dict]:
+        """Extract searchable text from attachments using line-by-line streaming.
 
-        Supports searchable text-based files. Reads entire file for complete keyword checking.
-        Files must pass both extension and MIME type checks to be processed. This helps prevent
-        potentially unwanted files from being read even if they have spoofed extensions.
+        Streams file line-by-line to avoid loading large files into memory. Checks each line
+        for keyword matches and can exit early when matches are found. Files must pass both
+        extension and MIME type checks to be processed.
 
         Args:
-            media_path: Path to downloaded media file
+            attachment_path: Path to downloaded attachment file
+            keywords: List of keywords to match against
 
         Returns:
-            Extracted text content (entire file), or None if:
-            - Extension not in allowed list
-            - MIME type not in allowed list
-            - File doesn't exist
-            - Read error occurred
+            Dict with:
+                - has_matches: True if any keyword matched
+                - matched_lines: List of lines that matched keywords
+                - total_lines: Total number of lines scanned
+                - file_size: File size in bytes
+            Returns None if:
+                - Extension not in allowed list
+                - MIME type not in allowed list
+                - File doesn't exist
+                - File exceeds MAX_ROUTING_ATTACHMENT_SIZE
+                - Read error occurred
         """
-        if not media_path:
+        if not attachment_path:
             return None
 
-        path = Path(media_path)
+        path = Path(attachment_path)
         if not path.exists():
             return None
 
@@ -300,23 +313,50 @@ class MessageRouter:
             )
             return None
 
-        # Log file size for large files
+        # Safety check: refuse to read extremely large files during routing
         file_size = path.stat().st_size
+        if file_size > self.MAX_ROUTING_ATTACHMENT_SIZE:
+            _logger.warning(
+                f"Attachment {path.name} ({file_size / (1024*1024):.1f}MB) exceeds "
+                f"routing size limit ({self.MAX_ROUTING_ATTACHMENT_SIZE / (1024*1024):.1f}MB), "
+                f"skipping keyword matching in attachment"
+            )
+            return None
+
         if file_size > 100 * 1024 * 1024:  # Log if > 100MB
             _logger.info(
-                f"Reading {file_size / (1024*1024):.1f}MB attachment for keyword checking: {path.name}"
+                f"Streaming {file_size / (1024*1024):.1f}MB attachment for keyword checking: {path.name}"
             )
 
-        # Read entire file content
+        # Stream file line-by-line for keyword matching
         try:
+            matched_lines = []
+            total_lines = 0
+            has_matches = False
+
             with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
+                for line in f:
+                    total_lines += 1
+                    line_stripped = line.rstrip('\n\r')
+
+                    # Check for keyword matches (case-insensitive)
+                    if keywords:
+                        if any(kw.lower() in line_stripped.lower() for kw in keywords):
+                            matched_lines.append(line_stripped)
+                            has_matches = True
+
+            result = {
+                'has_matches': has_matches,
+                'matched_lines': matched_lines,
+                'total_lines': total_lines,
+                'file_size': file_size
+            }
 
             _logger.debug(
-                f"Extracted {len(content)} chars from {path.name} "
-                f"for keyword checking"
+                f"Scanned {total_lines} lines from {path.name}, "
+                f"found {len(matched_lines)} matches"
             )
-            return content
+            return result
 
         except Exception as e:
             _logger.warning(

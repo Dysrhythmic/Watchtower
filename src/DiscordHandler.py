@@ -40,17 +40,17 @@ class DiscordHandler(DestinationHandler):
         """Maximum file size in bytes for Discord."""
         return self._FILE_SIZE_LIMIT
 
-    def send_message(self, content: str, webhook_url: str, media_path: Optional[str] = None) -> bool:
+    def send_message(self, content: str, webhook_url: str, attachment_path: Optional[str] = None) -> bool:
         """Send message to Discord webhook.
 
-        Sends media attachment with first chunk if media_path provided. Remaining
+        Sends attachment file with first chunk if attachment_path provided. Remaining
         chunks are sent as text-only messages. Returns False on any error (rate limit,
         network failure, invalid webhook).
 
         Args:
             content: Message text to send
             webhook_url: Discord webhook URL
-            media_path: Optional path to media file attachment
+            attachment_path: Optional path to attachment file
 
         Returns:
             bool: True if all chunks sent successfully, False otherwise
@@ -61,8 +61,8 @@ class DiscordHandler(DestinationHandler):
             chunks = self._chunk_text(content, self.MAX_MSG_LENGTH)
             chunks_sent = 0
 
-            if media_path and os.path.exists(media_path):
-                with open(media_path, 'rb') as f:
+            if attachment_path and os.path.exists(attachment_path):
+                with open(attachment_path, 'rb') as f:
                     files = {'file': f}
                     data = {
                         'username': self._USERNAME,
@@ -174,8 +174,8 @@ class DiscordHandler(DestinationHandler):
         if 'src_url_defanged' in message_data.metadata:
             lines.append(f"**Source:** {message_data.metadata['src_url_defanged']}")
 
-        if message_data.has_media:
-            lines.append(f"**Content:** {message_data.media_type}")
+        if message_data.has_attachments:
+            lines.append(f"**Content:** {message_data.attachment_type}")
 
         if destination.get('keywords'):
             lines.append(f"**Matched:** {', '.join(f'`{keyword}`' for keyword in destination['keywords'])}")
@@ -207,16 +207,16 @@ class DiscordHandler(DestinationHandler):
         parts = []
         parts.append(f"**  Replying to:** {reply_context['author']} ({reply_context['time']})")
 
-        if reply_context.get('has_media'):
-            media_type = reply_context.get('media_type', 'Other')
-            parts.append(f"**  Original content:** {media_type}")
+        if reply_context.get('has_attachments'):
+            attachment_type = reply_context.get('attachment_type', 'Other')
+            parts.append(f"**  Original content:** {attachment_type}")
 
         original_text = reply_context.get('text', '')
         if original_text:
             if len(original_text) > 200:
                 original_text = original_text[:200] + " ..."
             parts.append(f"**  Original message:** {original_text}")
-        elif reply_context.get('has_media'):
-            parts.append("**  Original message:** [Media only, no caption]")
+        elif reply_context.get('has_attachments'):
+            parts.append("**  Original message:** [Attachment only, no caption]")
 
         return '\n'.join(parts)

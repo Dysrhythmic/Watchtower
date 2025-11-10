@@ -29,7 +29,6 @@ Destinations:
 - Message retry queue with exponential backoff (5s, 10s, 20s) for failed deliveries
 - Rate limit handling for both Discord and Telegram with pre-emptive waiting
 - Graceful shutdown with cleanup of temporary files and metrics persistence
-- Lightweight for compatibility running on devices with limited storage capacity such as a Raspberry Pi
 
 ## Requirements
 - Python 3.9+

@@ -59,8 +59,7 @@ class MessageRouter:
     def is_ocr_enabled_for_channel(self, src_channel_id: str, src_channel_name: str, src_type: str) -> bool:
         """Check if any destination has OCR enabled for this channel.
 
-        OCR (Optical Character Recognition) extracts text from images for
-        keyword matching and message forwarding.
+        OCR extracts text from images for keyword matching and message forwarding.
 
         Args:
             src_channel_id: Channel's unique identifier

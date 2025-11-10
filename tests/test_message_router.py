@@ -63,6 +63,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from MessageRouter import MessageRouter
 from MessageData import MessageData
 from TelegramHandler import TelegramHandler
+from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_RSS
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 
 
@@ -310,7 +311,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         router = MessageRouter(self.mock_config)
 
         # Test with matching channel
-        result = router.is_channel_restricted('@restricted_channel', '@restricted_channel')
+        result = router.is_channel_restricted('@restricted_channel', '@restricted_channel', APP_TYPE_TELEGRAM)
 
         # Should return True
         self.assertTrue(result)
@@ -339,7 +340,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         router = MessageRouter(self.mock_config)
 
         # Test with matching channel
-        result = router.is_channel_restricted('@open_channel', '@open_channel')
+        result = router.is_channel_restricted('@open_channel', '@open_channel', APP_TYPE_TELEGRAM)
 
         # Should return False
         self.assertFalse(result)
@@ -368,7 +369,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         router = MessageRouter(self.mock_config)
 
         # Test with matching channel
-        result = router.is_ocr_enabled_for_channel('@ocr_channel', '@ocr_channel')
+        result = router.is_ocr_enabled_for_channel('@ocr_channel', '@ocr_channel', APP_TYPE_TELEGRAM)
 
         # Should return True
         self.assertTrue(result)
@@ -397,7 +398,7 @@ class TestMessageRouterBranchCoverage(unittest.TestCase):
         router = MessageRouter(self.mock_config)
 
         # Test with matching channel
-        result = router.is_ocr_enabled_for_channel('@no_ocr_channel', '@no_ocr_channel')
+        result = router.is_ocr_enabled_for_channel('@no_ocr_channel', '@no_ocr_channel', APP_TYPE_TELEGRAM)
 
         # Should return False
         self.assertFalse(result)

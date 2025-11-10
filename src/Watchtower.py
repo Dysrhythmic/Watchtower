@@ -356,7 +356,7 @@ class Watchtower:
         """
         ocr_needed = False
         if message_data.source_type == APP_TYPE_TELEGRAM and message_data.has_media:
-            ocr_needed = self.router.is_ocr_enabled_for_channel(message_data.channel_id, message_data.channel_name)
+            ocr_needed = self.router.is_ocr_enabled_for_channel(message_data.channel_id, message_data.channel_name, message_data.source_type)
         if ocr_needed and self.ocr.is_available():
             if not message_data.media_path:
                 message_data.media_path = await self.telegram.download_media(message_data)

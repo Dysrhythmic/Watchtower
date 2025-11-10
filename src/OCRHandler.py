@@ -1,5 +1,5 @@
 """
-OCRHandler - Optical Character Recognition for image text extraction
+OCRHandler - Optical Character Recognition for text extraction from images
 
 This module provides OCR capabilities using EasyOCR to extract text from images.
 Primary use case is extracting text from screenshots for keyword matching and routing.

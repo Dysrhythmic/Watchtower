@@ -441,7 +441,7 @@ class Watchtower:
             self.message_queue.enqueue(
                 destination=destination,
                 formatted_content=content,
-                media_path=attachment_path,
+                attachment_path=attachment_path,
                 reason="Discord send failed (likely rate limit)"
             )
             self.metrics.increment("messages_queued_retry")
@@ -486,7 +486,7 @@ class Watchtower:
                 self.message_queue.enqueue(
                     destination=destination,
                     formatted_content=content,
-                    media_path=attachment_path,
+                    attachment_path=attachment_path,
                     reason="Telegram send failed (likely rate limit)"
                 )
                 self.metrics.increment("messages_queued_retry")

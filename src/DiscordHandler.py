@@ -11,6 +11,7 @@ Discord API Details:
 """
 import os
 import json
+import time
 import requests
 from typing import Optional, Dict
 from LoggerSetup import setup_logger
@@ -56,7 +57,12 @@ class DiscordHandler(DestinationHandler):
             bool: True if all chunks sent successfully, False otherwise
         """
         try:
-            self._check_and_wait_for_rate_limit(webhook_url)
+            # Check if rate limited and skip immediately if so
+            if self.is_rate_limited(webhook_url):
+                wait_until = self._rate_limits[webhook_url]
+                wait_time = wait_until - time.time()
+                _logger.info(f"[DiscordHandler] Webhook {webhook_url[:50]}... is rate limited for {wait_time:.1f}s more, skipping send")
+                return False
 
             chunks = self._chunk_text(content, self.MAX_MSG_LENGTH)
             chunks_sent = 0

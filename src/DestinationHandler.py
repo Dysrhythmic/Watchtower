@@ -61,27 +61,26 @@ class DestinationHandler(AbstractBaseClass):
         """
         pass
 
-    def _check_and_wait_for_rate_limit(self, destination_id) -> None:
-        """Check if destination is rate limited and wait if necessary.
+    def is_rate_limited(self, destination_id) -> bool:
+        """Check if destination is currently rate limited without waiting.
 
-        This method is called before attempting to send a message to check if 
-        there's still an ongoing rate limit from a previous failed attempt.
+        Args:
+            destination_id: Unique identifier for the destination
 
-        The actual rate limit detection happens in subclass implementations when they
-        receive platform-specific error responses. When a rate limit error is detected,
-        subclasses call _store_rate_limit() to record the wait time, which this method
-        then enforces on subsequent sends.
+        Returns:
+            bool: True if currently rate limited, False otherwise
         """
         if destination_id in self._rate_limits:
             wait_until = self._rate_limits[destination_id]
             now = time.time()
 
             if now < wait_until:
-                wait_time = wait_until - now
-                _logger.info(f"[{self.__class__.__name__}] Rate limited, waiting {wait_time:.1f}s before sending")
-                time.sleep(wait_time)
-                # Clean up expired rate limit
+                return True
+            else:
+                # Rate limit has expired, clean up
                 del self._rate_limits[destination_id]
+                return False
+        return False
 
     def _store_rate_limit(self, destination_id, wait_seconds: float) -> None:
         """Store rate limit information for a destination."""

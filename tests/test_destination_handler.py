@@ -138,9 +138,12 @@ class TestDestinationHandler(unittest.TestCase):
         # Set rate limit that expires in the past
         self.handler._rate_limits["expired"] = time.time() - 10
 
-        # Should not be rate limited
-        result = self.handler._check_and_wait_for_rate_limit("expired")
-        self.assertIsNone(result)
+        # Should not be rate limited (expired rate limits return False)
+        is_limited = self.handler.is_rate_limited("expired")
+        self.assertFalse(is_limited)
+
+        # Verify expired entry was cleaned up
+        self.assertNotIn("expired", self.handler._rate_limits)
 
     def test_chunk_text_preserves_newlines(self):
         """Test chunking preserves newline boundaries when possible."""

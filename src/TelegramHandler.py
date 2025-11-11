@@ -20,6 +20,7 @@ Telegram API Details:
 """
 import asyncio
 import os
+import time
 from html import escape
 from typing import Optional, Dict
 from telethon import TelegramClient, events, utils
@@ -725,7 +726,12 @@ class TelegramHandler(DestinationHandler):
             bool: True if successful, False otherwise
         """
         try:
-            self._check_and_wait_for_rate_limit(destination_chat_id)
+            # Check if rate limited and skip immediately if so
+            if self.is_rate_limited(destination_chat_id):
+                wait_until = self._rate_limits[destination_chat_id]
+                wait_time = wait_until - time.time()
+                _logger.info(f"[TelegramHandler] Destination {destination_chat_id} is rate limited for {wait_time:.1f}s more, skipping send")
+                return False
 
             # Attachment with content
             if attachment_path and os.path.exists(attachment_path):

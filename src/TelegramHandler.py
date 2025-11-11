@@ -730,7 +730,7 @@ class TelegramHandler(DestinationHandler):
             if self.is_rate_limited(destination_chat_id):
                 wait_until = self._rate_limits[destination_chat_id]
                 wait_time = wait_until - time.time()
-                _logger.info(f"[TelegramHandler] Destination {destination_chat_id} is rate limited for {wait_time:.1f}s more, skipping send")
+                _logger.info(f"Destination {destination_chat_id} is rate limited for {wait_time:.1f}s, skipping send")
                 return False
 
             # Attachment with content

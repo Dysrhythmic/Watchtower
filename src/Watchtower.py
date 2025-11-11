@@ -475,6 +475,9 @@ class Watchtower:
             _logger.warning(f"Skipping unresolved destination: {dst_channel_specifier}")
             return SendStatus.FAILED
 
+        # Cache resolved chat_id for retry queue to check rate limits
+        destination['telegram_dst_id'] = destination_chat_id
+
         try:
             ok = await self.telegram.send_message(content, destination_chat_id, attachment_path)
             if ok:

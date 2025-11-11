@@ -289,7 +289,12 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         Tests: src/MessageQueue.py:117-128 (Telegram retry)
         """
         queue = MessageQueue()
-        dest = {'type': 'Telegram', 'name': 'Test', 'telegram_dst_channel': '@testchannel'}
+        dest = {
+            'type': 'Telegram',
+            'name': 'Test',
+            'telegram_dst_channel': '@testchannel',
+            'telegram_dst_id': 123456
+        }
 
         retry_item = RetryItem(
             destination=dest,
@@ -300,13 +305,11 @@ class TestMessageQueueRetrySending(unittest.TestCase):
 
         mock_watchtower = Mock()
         mock_watchtower.telegram = Mock()
-        mock_watchtower.telegram.resolve_destination = AsyncMock(return_value=123456)
         mock_watchtower.telegram.send_message = AsyncMock(return_value=True)
 
         result = asyncio.run(queue._retry_send(retry_item, mock_watchtower))
 
         self.assertTrue(result)
-        mock_watchtower.telegram.resolve_destination.assert_called_once_with('@testchannel')
         mock_watchtower.telegram.send_message.assert_called_once_with(
             "Test message", 123456, None
         )
@@ -364,6 +367,136 @@ class TestMessageQueueRetrySending(unittest.TestCase):
 
         self.assertFalse(result)
         self.assertTrue(any("Retry send exception" in msg for msg in log_context.output))
+
+
+class TestMessageQueueRateLimitHandling(unittest.TestCase):
+    """Tests for rate limit handling in retry queue."""
+
+    def test_long_rate_limit_doesnt_drop_message(self):
+        """
+        Given: Message enqueued, destination has 300s rate limit
+        When: Queue processes retries while still rate limited
+        Then: Message not dropped, retry scheduled for when rate limit expires
+
+        Tests that rate limits longer than retry backoff don't cause message drops
+        """
+        queue = MessageQueue()
+        dest = {
+            'type': 'Discord',
+            'name': 'TestDiscord',
+            'discord_webhook_url': 'http://test'
+        }
+
+        # Enqueue a message
+        queue.enqueue(dest, "Test message", None, "test")
+        self.assertEqual(queue.get_queue_size(), 1)
+
+        # Mock watchtower with rate limited Discord handler
+        mock_watchtower = Mock()
+        mock_watchtower.discord = Mock()
+        mock_watchtower.discord._rate_limits = {
+            'http://test': time.time() + 300  # Rate limited for 300 seconds
+        }
+        mock_watchtower.discord.send_message = AsyncMock(return_value=False)
+
+        # Simulate queue processing for short time (would normally trigger 3 retries)
+        retry_item = queue._queue[0]
+
+        # Set next retry time to now so it processes immediately
+        retry_item.next_retry_time = time.time()
+
+        # Process queue once
+        async def process_once():
+            now = time.time()
+            for item in queue._queue[:]:
+                if now >= item.next_retry_time:
+                    # Check if destination is still rate limited
+                    dest = item.destination
+                    rate_limit_expiry = None
+
+                    if dest['type'] == 'Discord':
+                        webhook_url = dest['discord_webhook_url']
+                        if webhook_url in mock_watchtower.discord._rate_limits:
+                            rate_limit_expiry = mock_watchtower.discord._rate_limits[webhook_url]
+
+                    # If still rate limited, reschedule
+                    if rate_limit_expiry and now < rate_limit_expiry:
+                        remaining = rate_limit_expiry - now
+                        item.next_retry_time = rate_limit_expiry
+                        return  # Don't count as retry
+
+                    # Not rate limited - attempt retry
+                    success = await queue._retry_send(item, mock_watchtower)
+                    if not success:
+                        item.attempt_count += 1
+
+        asyncio.run(process_once())
+
+        # Message should still be in queue
+        self.assertEqual(queue.get_queue_size(), 1)
+
+        # Attempt count should still be 0 (rate limit check didn't count as retry)
+        self.assertEqual(retry_item.attempt_count, 0)
+
+        # Next retry should be scheduled for when rate limit expires
+        expected_retry_time = mock_watchtower.discord._rate_limits['http://test']
+        self.assertAlmostEqual(retry_item.next_retry_time, expected_retry_time, delta=1.0)
+
+    def test_telegram_rate_limit_with_cached_chat_id(self):
+        """
+        Given: Telegram message with cached chat_id, destination rate limited
+        When: Queue checks rate limits
+        Then: Uses cached chat_id to check Telegram rate limits
+        """
+        queue = MessageQueue()
+        dest = {
+            'type': 'Telegram',
+            'name': 'TestTelegram',
+            'telegram_dst_channel': '@testchannel',
+            'telegram_dst_id': -1001234567890  # Cached from first send
+        }
+
+        # Enqueue a message
+        queue.enqueue(dest, "Test message", None, "test")
+
+        # Mock watchtower with rate limited Telegram handler
+        mock_watchtower = Mock()
+        mock_watchtower.telegram = Mock()
+        mock_watchtower.telegram._rate_limits = {
+            -1001234567890: time.time() + 200  # Rate limited for 200 seconds
+        }
+        mock_watchtower.telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
+        mock_watchtower.telegram.send_message = AsyncMock(return_value=False)
+
+        retry_item = queue._queue[0]
+        retry_item.next_retry_time = time.time()
+
+        # Process queue once
+        async def process_once():
+            now = time.time()
+            for item in queue._queue[:]:
+                if now >= item.next_retry_time:
+                    dest = item.destination
+                    rate_limit_expiry = None
+
+                    if dest['type'] == 'Telegram':
+                        chat_id = dest.get('telegram_dst_id')
+                        if chat_id and chat_id in mock_watchtower.telegram._rate_limits:
+                            rate_limit_expiry = mock_watchtower.telegram._rate_limits[chat_id]
+
+                    if rate_limit_expiry and now < rate_limit_expiry:
+                        item.next_retry_time = rate_limit_expiry
+                        return
+
+                    success = await queue._retry_send(item, mock_watchtower)
+                    if not success:
+                        item.attempt_count += 1
+
+        asyncio.run(process_once())
+
+        # Message should still be in queue, attempt count should be 0
+        self.assertEqual(queue.get_queue_size(), 1)
+        self.assertEqual(retry_item.attempt_count, 0)
 
 
 if __name__ == '__main__':

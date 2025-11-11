@@ -250,7 +250,8 @@ class TestTelegramAttachmentFlow(unittest.TestCase):
         destination = {
             'name': 'TestTelegram',
             'type': APP_TYPE_TELEGRAM,
-            'telegram_dst_channel': '-1001234567890'
+            'telegram_dst_channel': '-1001234567890',
+            'telegram_dst_id': -1001234567890
         }
 
         # Manually enqueue a message with attachment
@@ -363,7 +364,8 @@ class TestOCRAndCaptionFlow(unittest.TestCase):
         destination = {
             'name': 'TestTelegram',
             'type': APP_TYPE_TELEGRAM,
-            'telegram_dst_channel': '-1001234567890'
+            'telegram_dst_channel': '-1001234567890',
+            'telegram_dst_id': -1001234567890
         }
 
         # Enqueue message with long content and attachment

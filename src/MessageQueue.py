@@ -93,7 +93,31 @@ class MessageQueue:
             # Iterate over copy to safely remove items during iteration
             for retry_item in self._queue[:]:
                 if now >= retry_item.next_retry_time:
-                    # Attempt retry
+                    # Check if destination is still rate limited
+                    dest = retry_item.destination
+                    rate_limit_expiry = None
+
+                    if dest['type'] == APP_TYPE_DISCORD:
+                        webhook_url = dest['discord_webhook_url']
+                        if webhook_url in watchtower.discord._rate_limits:
+                            rate_limit_expiry = watchtower.discord._rate_limits[webhook_url]
+
+                    elif dest['type'] == APP_TYPE_TELEGRAM:
+                        chat_id = dest.get('telegram_dst_id')
+                        if chat_id and chat_id in watchtower.telegram._rate_limits:
+                            rate_limit_expiry = watchtower.telegram._rate_limits[chat_id]
+
+                    # If still rate limited, reschedule for when it expires (don't count as retry)
+                    if rate_limit_expiry and now < rate_limit_expiry:
+                        remaining = rate_limit_expiry - now
+                        retry_item.next_retry_time = rate_limit_expiry
+                        _logger.info(
+                            f"Destination {dest['name']} still rate limited for {remaining:.1f}s, "
+                            f"will retry when rate limit expires"
+                        )
+                        continue  # Skip this item without counting as retry attempt
+
+                    # Not rate limited,attempt retry
                     success = await self._retry_send(retry_item, watchtower)
 
                     if success:
@@ -145,9 +169,8 @@ class MessageQueue:
                     retry_item.attachment_path
                 )
             elif dest['type'] == APP_TYPE_TELEGRAM:
-                # Telegram sending requires async
-                channel_spec = dest['telegram_dst_channel']
-                chat_id = await watchtower.telegram.resolve_destination(channel_spec)
+                chat_id = dest.get('telegram_dst_id')
+
                 if chat_id:
                     result = await watchtower.telegram.send_message(
                         retry_item.formatted_content,

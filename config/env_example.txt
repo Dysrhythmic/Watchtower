@@ -6,6 +6,7 @@ TELEGRAM_API_HASH=your_telegram_api_hash_here
 
 # Add your Telegram destination channels as environment variables, e.g.:
 TELEGRAM_CHANNEL_GENERAL=-1001234567890
+TELEGRAM_CHANNEL_PERSONAL=-12345678910
 
 
 # === Discord  Configuration ===
@@ -17,4 +18,3 @@ DISCORD_WEBHOOK_GENERAL_FEED=webhook_url_3
 
 # === General Configuration ===
 CONFIG_FILE=config.json
-# Add the discord webhook and Telegram channel environment variable names to your specified JSON configuration file

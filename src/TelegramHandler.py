@@ -336,7 +336,7 @@ class TelegramHandler(DestinationHandler):
                             messages_to_process.reverse()
 
                             for message in messages_to_process:
-                                _logger.warning(
+                                _logger.info(
                                     f"Processing missed message: "
                                     f"{channel_name} msg_id={message.id}"
                                 )
@@ -351,7 +351,7 @@ class TelegramHandler(DestinationHandler):
                             missed_count = len(messages_to_process)
                             if self._metrics:
                                 self._metrics.increment("messages_first_missed_telegram", missed_count)
-                            _logger.warning(
+                            _logger.info(
                                 f"Processed {missed_count} missed messages "
                                 f"from {channel_name} (newest_id={newest_msg_id})"
                             )

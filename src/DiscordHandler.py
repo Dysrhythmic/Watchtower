@@ -1,120 +1,230 @@
-import logging
+"""
+DiscordHandler - Discord webhook message delivery
+
+This module handles sending messages to Discord channels via webhooks. Implements
+chunking for long messages, media attachment support, and rate limit handling.
+
+Discord API Details:
+    - Max message length: 2000 characters
+    - Rate limit response: 429 status code with retry_after in seconds
+    - Success status codes: 200, 204
+"""
 import os
+import json
+import time
 import requests
-from typing import List, Optional, Dict
+from typing import Optional, Dict
+from LoggerSetup import setup_logger
 from MessageData import MessageData
+from DestinationHandler import DestinationHandler
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+_logger = setup_logger(__name__)
 
-class DiscordHandler:
-    """Handles Discord webhook operations."""
-    
-    MAX_LENGTH = 2000
-    
-    def send_message(self, content: str, url: str, media_path: Optional[str] = None) -> bool:
-        """Send message to Discord webhook."""
+
+class DiscordHandler(DestinationHandler):
+    """Handles Discord webhook operations.
+
+    Sends messages to Discord channels via webhook URLs. Automatically chunks
+    long messages and handles rate limiting.
+    """
+
+    _USERNAME = 'Watchtower'
+    _AVATAR_URL = "https://raw.githubusercontent.com/Dysrhythmic/Watchtower/master/watchtower.png"
+    _FILE_SIZE_LIMIT = 25 * 1024 * 1024  # 25MB for Discord free tier
+    MAX_MSG_LENGTH = 2000
+
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def file_size_limit(self) -> int:
+        """Maximum file size in bytes for Discord."""
+        return self._FILE_SIZE_LIMIT
+
+    async def send_message(self, content: str, webhook_url: str, attachment_path: Optional[str] = None) -> bool:
+        """Send message to Discord webhook.
+
+        Sends attachment file with first chunk if attachment_path provided. Remaining
+        chunks are sent as text-only messages. Returns False on any error (rate limit,
+        network failure, invalid webhook).
+
+        Args:
+            content: Message text to send
+            webhook_url: Discord webhook URL
+            attachment_path: Optional path to attachment file
+
+        Returns:
+            bool: True if all chunks sent successfully, False otherwise
+        """
         try:
-            chunks = self._chunk_text(content)
+            # Check if rate limited and skip immediately if so
+            if self.is_rate_limited(webhook_url):
+                wait_until = self._rate_limits[webhook_url]
+                wait_time = wait_until - time.time()
+                _logger.info(f"Webhook {webhook_url[:50]}... is rate limited for {wait_time:.1f}s more, skipping send")
+                return False
+
+            chunks = self._chunk_text(content, self.MAX_MSG_LENGTH)
             chunks_sent = 0
-            
-            if media_path and os.path.exists(media_path):
-                # Send first chunk with media
-                with open(media_path, 'rb') as f:
+
+            if attachment_path and os.path.exists(attachment_path):
+                with open(attachment_path, 'rb') as f:
                     files = {'file': f}
-                    data = {'username': 'Watchtower', 'content': chunks[0]}
-                    response = requests.post(url, files=files, data=data, timeout=15)
-                    if response.status_code not in [200, 204]:
+                    data = {
+                        'username': self._USERNAME,
+                        'avatar_url': self._AVATAR_URL,
+                        'content': chunks[0]
+                    }
+                    response = requests.post(webhook_url, files=files, data=data, timeout=15)
+
+                    if response.status_code == 429:
+                        self._handle_rate_limit(webhook_url, response)
+                        return False
+                    elif response.status_code not in [200, 204]:
                         body = (response.text or "")[:200]
-                        logger.error(
-                            f"[DiscordHandler] Unsuccessful status code from Discord webhook (media): "
+                        _logger.error(
+                            f"Unsuccessful status code from Discord webhook (sent media): "
                             f"status={response.status_code}, body={body}"
                         )
                         return False
-                    chunks_sent = 1
+                    chunks_sent = 1  # First chunk sent with media
 
-            # Send text content
-            for idx, chunk in enumerate(chunks[chunks_sent:], start=chunks_sent + 1):
-                payload = {"username": "Watchtower", "content": chunk}
-                response = requests.post(url, json=payload, timeout=5)
-                if response.status_code not in [200, 204]:
-                    body = (response.text or "")[:200]
-                    logger.error(
-                            f"[DiscordHandler] Unsuccessful status code from Discord webhook (chunk {idx}/{len(chunks)}): "
-                            f"status={response.status_code}, body={body}"
-                        )
+            # Send remaining chunks as text-only messages
+            for chunk_index, chunk in enumerate(chunks[chunks_sent:], start=chunks_sent + 1):
+                payload = {
+                    "username": self._USERNAME,
+                    "avatar_url": self._AVATAR_URL,
+                    "content": chunk
+                }
+
+                # Blocks until compelete, helps ensure msg chunk order
+                response = requests.post(webhook_url, json=payload, timeout=5)
+
+                if response.status_code == 429:
+                    self._handle_rate_limit(webhook_url, response)
                     return False
-                chunks_sent += 1
-            
+                elif response.status_code not in [200, 204]:
+                    body = (response.text or "")[:200]
+                    _logger.error(
+                        f"Unsuccessful status code from Discord webhook (chunk {chunk_index}/{len(chunks)}): "
+                        f"status={response.status_code}, body={body}"
+                    )
+                    return False
+
             return True
-            
+
         except Exception as e:
-            logger.error(f"[DiscordHandler] Discord send failed: {e}")
+            _logger.error(f"Discord send failed: {e}")
             return False
-    
-    def _chunk_text(self, text: str) -> List[str]:
-        """Split text into Discord compatible chunks."""
-        if len(text) <= self.MAX_LENGTH:
-            return [text]
-        
-        chunks = []
-        while text:
-            if len(text) <= self.MAX_LENGTH:
-                chunks.append(text)
-                break
-            
-            # Split on newlines where possible
-            split_point = text.rfind('\n', 0, self.MAX_LENGTH)
-            if split_point == -1:
-                split_point = self.MAX_LENGTH
-            
-            chunks.append(text[:split_point])
-            text = text[split_point:].lstrip('\n')
-        
-        return chunks
-    
-    def format_message(self, msg: MessageData, dest: Dict) -> str:
-        """Format message for Discord."""
+
+    def _extract_retry_after(self, response: requests.Response) -> Optional[float]:
+        """Extract retry_after value from Discord 429 rate limit response.
+
+        Discord returns rate limit info in JSON body with 'retry_after' field
+        specifying seconds to wait.
+
+        Args:
+            response: 429 HTTP response from Discord API
+
+        Returns:
+            Optional[float]: Retry after seconds if successfully extracted, None if parsing fails
+        """
+        try:
+            body = response.json()
+            return body.get('retry_after', 1.0)
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            _logger.warning(f"Rate limited (429) but couldn't parse retry_after: {e}")
+            return None
+
+    def _handle_rate_limit(self, webhook_url: str, response: requests.Response) -> None:
+        """Parse 429 rate limit response and store retry information.
+
+        Args:
+            webhook_url: Webhook URL being rate limited
+            response: 429 HTTP response from Discord API
+        """
+        retry_after = self._extract_retry_after(response)
+        if retry_after is None:
+            retry_after = 1.0  # Fallback if extraction fails
+        self._store_rate_limit(webhook_url, retry_after)
+
+    def format_message(self, message_data: MessageData, destination: Dict) -> str:
+        """Format message for Discord with metadata and markdown formatting.
+
+        Creates a formatted message with metadata (source, sender, time),
+        matched keywords, message text, and OCR text.
+
+        Args:
+            message_data: Message to format
+            destination: Destination config (includes matched keywords)
+
+        Returns:
+            str: Formatted message ready for Discord delivery
+
+        Format Structure:
+            **New message from:** Channel Name
+            **By:** Username
+            **Time:** YYYY-MM-DD HH:MM:SS UTC
+            **Source:** (defanged URL if available)
+            **Content:** (media type if present)
+            **Matched:** keyword1, keyword2 (if any)
+            **Message:**
+            Message text content
+            **OCR:**
+            > Quoted OCR text
+        """
         lines = [
-            f"**New message from:** {msg.channel_name}",
-            f"**By:** {msg.username}",
-            f"**Time:** {msg.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            f"**New message from:** {message_data.channel_name}",
+            f"**By:** {message_data.username}",
+            f"**Time:** {message_data.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}"
         ]
-        
-        if msg.has_media:
-            lines.append(f"**Content:** {msg.media_type}")
-        
-        if dest['keywords']:
-            lines.append(f"**Matched:** {', '.join(f'`{keyword}`' for keyword in dest['keywords'])}")
-        
-        if msg.reply_context:
-            lines.append(self._format_reply_context(msg.reply_context))
-        
-        if msg.text:
-            lines.append(f"**Message:**\n{msg.text}")
-        
+
+        if 'src_url_defanged' in message_data.metadata:
+            lines.append(f"**Source:** {message_data.metadata['src_url_defanged']}")
+
+        if message_data.has_attachments:
+            lines.append(f"**Content:** {message_data.attachment_type}")
+
+        if destination.get('keywords'):
+            lines.append(f"**Matched:** {', '.join(f'`{keyword}`' for keyword in destination['keywords'])}")
+
+        if message_data.reply_context:
+            lines.append(self._format_reply_context(message_data.reply_context))
+
+        if message_data.text:
+            lines.append(f"**Message:**\n{message_data.text}")
+
+        if message_data.ocr_raw:
+            ocr_quoted = '\n'.join(f"> {line}" for line in message_data.ocr_raw.split('\n'))
+            lines.append(f"**OCR:**\n{ocr_quoted}")
+
         return '\n'.join(lines)
-    
+
     def _format_reply_context(self, reply_context: Dict) -> str:
-        """Format reply context for Discord display."""
+        """Format source reply-to information for Discord display.
+
+        Shows author, timestamp, and content of the message being replied to.
+        Truncates long text to 200 characters.
+
+        Args:
+            reply_context: Reply metadata dict with author, time, text, media info
+
+        Returns:
+            str: Formatted reply context section
+        """
         parts = []
-        
         parts.append(f"**  Replying to:** {reply_context['author']} ({reply_context['time']})")
-        
-        if reply_context.get('has_media'):
-            media_type = reply_context.get('media_type', 'Other')
-            parts.append(f"**  Original content:** {media_type}")
-        
-        # Original message text (truncate if too long)
+
+        if reply_context.get('has_attachments'):
+            attachment_type = reply_context.get('attachment_type', 'Other')
+            parts.append(f"**  Original content:** {attachment_type}")
+
         original_text = reply_context.get('text', '')
         if original_text:
             if len(original_text) > 200:
                 original_text = original_text[:200] + " ..."
             parts.append(f"**  Original message:** {original_text}")
-        elif reply_context.get('has_media'):
-            parts.append("**  Original message:** [Media only, no caption]")
-        
+        elif reply_context.get('has_attachments'):
+            parts.append("**  Original message:** [Attachment only, no caption]")
+
         return '\n'.join(parts)

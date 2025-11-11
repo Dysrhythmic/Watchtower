@@ -1,3 +1,14 @@
-telethon==1.34.0
-requests==2.31.0
-python-dotenv==1.0.0
+# Core dependencies (required)
+telethon>=1.34.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+feedparser>=6.0.10
+
+# OCR dependencies (optional but recommended)
+# If you don't need OCR functionality, you can skip these
+easyocr>=1.7.1
+opencv-python-headless>=4.8.0
+pillow>=9.5.0
+
+# If you want CPU-only PyTorch, install with:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu

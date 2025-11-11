@@ -1,3 +1,5 @@
 .env
 *.session
-attachments/
+*.session-journal
+tmp/
+__pycache__

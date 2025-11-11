@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 import sys
 import os
@@ -66,7 +67,7 @@ class TestTelegramToDiscordFlow(unittest.TestCase):
 
         # Verify Discord formatting and send work
         formatted = app.discord.format_message(msg, destinations[0])
-        success = app.discord.send_message(formatted, mock_config.destinations[0]['discord_webhook_url'], None)
+        success = asyncio.run(app.discord.send_message(formatted, mock_config.destinations[0]['discord_webhook_url'], None))
 
         self.assertTrue(success)
         mock_post.assert_called_once()
@@ -100,7 +101,7 @@ class TestRetryQueueIntegration(unittest.TestCase):
         }
 
         # First send fails with 429
-        success = app.discord.send_message("Test message", destination['discord_webhook_url'], None)
+        success = asyncio.run(app.discord.send_message("Test message", destination['discord_webhook_url'], None))
         self.assertFalse(success)
 
         # Should be enqueueable
@@ -332,7 +333,7 @@ class TestErrorHandling(unittest.TestCase):
         # Mock network error
         mock_post.side_effect = Exception("Connection failed")
 
-        success = app.discord.send_message("Test", "https://discord.com/webhook", None)
+        success = asyncio.run(app.discord.send_message("Test", "https://discord.com/webhook", None))
         self.assertFalse(success)
 
     @patch('TelegramHandler.TelegramClient')

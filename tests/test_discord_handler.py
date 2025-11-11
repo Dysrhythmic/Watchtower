@@ -53,6 +53,7 @@ How to Add New Tests:
     6. For rate limit tests: mock 429 response with retry_after header
     7. Use self.assertIn/assertEqual for verification
 """
+import asyncio
 import unittest
 import sys
 import os
@@ -112,7 +113,7 @@ class TestDiscordHandler(unittest.TestCase):
     def test_send_message_success(self, mock_post):
         """Test successful message send."""
         mock_post.return_value.status_code = 200
-        success = self.handler.send_message("Test", "https://discord.com/webhook", None)
+        success = asyncio.run(self.handler.send_message("Test", "https://discord.com/webhook", None))
         self.assertTrue(success)
         mock_post.assert_called_once()
 
@@ -124,7 +125,7 @@ class TestDiscordHandler(unittest.TestCase):
         mock_response.json.return_value = {'retry_after': 5.5}
         mock_post.return_value = mock_response
 
-        success = self.handler.send_message("Test", "https://discord.com/webhook", None)
+        success = asyncio.run(self.handler.send_message("Test", "https://discord.com/webhook", None))
         self.assertFalse(success)
 
     @patch('requests.post')
@@ -134,7 +135,7 @@ class TestDiscordHandler(unittest.TestCase):
 
         with patch('builtins.open', create=True) as mock_file:
             mock_file.return_value.__enter__.return_value.read.return_value = b'fake image data'
-            success = self.handler.send_message("Test", "https://discord.com/webhook", "/tmp/test.jpg")
+            success = asyncio.run(self.handler.send_message("Test", "https://discord.com/webhook", "/tmp/test.jpg"))
             self.assertTrue(success)
 
     @patch('requests.post')
@@ -142,7 +143,7 @@ class TestDiscordHandler(unittest.TestCase):
         """Test handling network errors."""
         mock_post.side_effect = Exception("Network error")
 
-        success = self.handler.send_message("Test", "https://discord.com/webhook", None)
+        success = asyncio.run(self.handler.send_message("Test", "https://discord.com/webhook", None))
         self.assertFalse(success)
 
     @patch('requests.post')
@@ -153,7 +154,7 @@ class TestDiscordHandler(unittest.TestCase):
         mock_response.text = "Internal Server Error"
         mock_post.return_value = mock_response
 
-        success = self.handler.send_message("Test", "https://discord.com/webhook", None)
+        success = asyncio.run(self.handler.send_message("Test", "https://discord.com/webhook", None))
         self.assertFalse(success)
 
     def test_format_message_includes_all_fields(self):
@@ -179,7 +180,7 @@ class TestDiscordHandler(unittest.TestCase):
 
         # Create message longer than 2000 chars
         long_text = "a" * 3000
-        success = self.handler.send_message(long_text, "https://discord.com/webhook", None)
+        success = asyncio.run(self.handler.send_message(long_text, "https://discord.com/webhook", None))
 
         # Should succeed and call post multiple times
         self.assertTrue(success)
@@ -215,7 +216,7 @@ class TestDiscordChunking(unittest.TestCase):
         webhook_url = "https://discord.com/api/webhooks/test"
 
         # When: send_message() called
-        result = handler.send_message(text, webhook_url, attachment_path=None)
+        result = asyncio.run(handler.send_message(text, webhook_url, attachment_path=None))
 
         # Then: Success
         self.assertTrue(result)
@@ -250,7 +251,7 @@ class TestDiscordChunking(unittest.TestCase):
         text = "A" * 2000  # Exactly at limit
         webhook_url = "https://discord.com/api/webhooks/test"
 
-        result = handler.send_message(text, webhook_url, attachment_path=None)
+        result = asyncio.run(handler.send_message(text, webhook_url, attachment_path=None))
 
         # Should succeed with single POST
         self.assertTrue(result)
@@ -318,7 +319,7 @@ class TestDiscordReplyContext(unittest.TestCase):
         with patch('builtins.open', create=True) as mock_file:
             with patch('os.path.exists', return_value=True):
                 mock_file.return_value.__enter__.return_value.read.return_value = b'fake image data'
-                success = self.handler.send_message("Test", "https://discord.com/webhook", "/tmp/test.jpg")
+                success = asyncio.run(self.handler.send_message("Test", "https://discord.com/webhook", "/tmp/test.jpg"))
                 self.assertFalse(success)
 
     @patch('requests.post')
@@ -332,7 +333,7 @@ class TestDiscordReplyContext(unittest.TestCase):
         with patch('builtins.open', create=True) as mock_file:
             with patch('os.path.exists', return_value=True):
                 mock_file.return_value.__enter__.return_value.read.return_value = b'fake image data'
-                success = self.handler.send_message("Test", "https://discord.com/webhook", "/tmp/test.jpg")
+                success = asyncio.run(self.handler.send_message("Test", "https://discord.com/webhook", "/tmp/test.jpg"))
                 self.assertFalse(success)
 
     @patch('requests.post')
@@ -344,7 +345,7 @@ class TestDiscordReplyContext(unittest.TestCase):
         mock_response.json.side_effect = ValueError("Invalid JSON")
         mock_post.return_value = mock_response
 
-        success = self.handler.send_message("Test", "https://discord.com/webhook", None)
+        success = asyncio.run(self.handler.send_message("Test", "https://discord.com/webhook", None))
         self.assertFalse(success)
 
     def test_format_message_with_reply_context_media_only(self):

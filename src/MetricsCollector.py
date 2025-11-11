@@ -7,7 +7,7 @@ storage.
 Metrics include:
   messages_received_telegram
   total_msgs_no_destination
-  telegram_missed_messages_caught
+  telegram_missed_msgs_caught
   messages_received_rss
   messages_sent_telegram
   messages_sent_discord

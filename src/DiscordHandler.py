@@ -40,7 +40,7 @@ class DiscordHandler(DestinationHandler):
         """Maximum file size in bytes for Discord."""
         return self._FILE_SIZE_LIMIT
 
-    def send_message(self, content: str, webhook_url: str, attachment_path: Optional[str] = None) -> bool:
+    async def send_message(self, content: str, webhook_url: str, attachment_path: Optional[str] = None) -> bool:
         """Send message to Discord webhook.
 
         Sends attachment file with first chunk if attachment_path provided. Remaining
@@ -90,6 +90,8 @@ class DiscordHandler(DestinationHandler):
                     "avatar_url": self._AVATAR_URL,
                     "content": chunk
                 }
+
+                # Blocks until compelete, helps ensure msg chunk order
                 response = requests.post(webhook_url, json=payload, timeout=5)
 
                 if response.status_code == 429:

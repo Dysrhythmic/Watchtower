@@ -138,7 +138,7 @@ class TestMessageQueue:
         # Mock watchtower
         mock_watchtower = Mock()
         mock_watchtower.discord = Mock()
-        mock_watchtower.discord.send_message = Mock(return_value=True)
+        mock_watchtower.discord.send_message = AsyncMock(return_value=True)
 
         # Run one iteration
         async def run_one_iteration():

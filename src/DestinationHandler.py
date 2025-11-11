@@ -127,7 +127,7 @@ class DestinationHandler(AbstractBaseClass):
         return chunks
 
     @abstractmethod
-    def send_message(self, content: str, destination_id, media_path: Optional[str] = None) -> bool:
+    async def send_message(self, content: str, destination_id, media_path: Optional[str] = None) -> bool:
         """Send message to destination.
 
         Subclasses implement platform-specific sending logic. E.g.:

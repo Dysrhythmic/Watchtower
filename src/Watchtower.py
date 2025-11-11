@@ -83,11 +83,11 @@ class Watchtower:
 
         # Use provided instances for dependency injection or create defaults
         self.config = config or ConfigManager()
-        self.telegram = telegram or TelegramHandler(self.config)
+        self.metrics = metrics or MetricsCollector(self.config.tmp_dir / "metrics.json")
+        self.telegram = telegram or TelegramHandler(self.config, self.metrics)
         self.router = router or MessageRouter(self.config)
         self.discord = discord or DiscordHandler()
         self.ocr = ocr or OCRHandler()
-        self.metrics = metrics or MetricsCollector(self.config.tmp_dir / "metrics.json")
         self.message_queue = message_queue or MessageQueue(self.metrics)
 
         self.sources = sources
@@ -143,7 +143,7 @@ class Watchtower:
             await self.telegram.fetch_latest_messages()
             tasks.append(asyncio.create_task(self.telegram.run()))
             # Start polling for missed messages
-            tasks.append(asyncio.create_task(self.telegram.poll_missed_messages(self.metrics)))
+            tasks.append(asyncio.create_task(self.telegram.poll_missed_messages()))
 
         if APP_TYPE_RSS in self.sources and self.config.rss_feeds:
             from RSSHandler import RSSHandler
@@ -282,7 +282,7 @@ class Watchtower:
             if message_data.attachment_path and os.path.exists(message_data.attachment_path):
                 try:
                     os.remove(message_data.attachment_path)
-                    _logger.info(f"Cleaned up stored attachment file: {message_data.attachment_path}")
+                    _logger.debug(f"Cleaned up stored attachment file: {message_data.attachment_path}")
                 except Exception as e:
                     _logger.error(f"Error removing stored attachment file at {message_data.attachment_path}: {e}")
 
@@ -307,7 +307,7 @@ class Watchtower:
                         message_data.ocr_raw = ocr_text
                         self.metrics.increment("ocr_processed")
                 else:
-                    _logger.info(f"Skipping OCR for non-image file: {message_data.attachment_path}")
+                    _logger.debug(f"Skipping OCR for non-image file: {message_data.attachment_path}")
 
         if message_data.source_type == APP_TYPE_TELEGRAM and message_data.original_message:
             telegram_msg_id = getattr(message_data.original_message, "id", None)
@@ -430,7 +430,7 @@ class Watchtower:
             )
             attachment_path = attachment_path if should_send_attachment else None
 
-        success = self.discord.send_message(content, destination['discord_webhook_url'], attachment_path)
+        success = await self.discord.send_message(content, destination['discord_webhook_url'], attachment_path)
 
         if success:
             self.metrics.increment("messages_sent_discord")
@@ -476,7 +476,7 @@ class Watchtower:
             return SendStatus.FAILED
 
         try:
-            ok = await self.telegram.send_copy(destination_chat_id, content, attachment_path)
+            ok = await self.telegram.send_message(content, destination_chat_id, attachment_path)
             if ok:
                 self.metrics.increment("messages_sent_telegram")
                 if parsed_message.ocr_raw:

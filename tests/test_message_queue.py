@@ -133,7 +133,7 @@ class TestMessageQueueRetryLogic(unittest.TestCase):
         # Mock watchtower with successful Discord send
         mock_watchtower = Mock()
         mock_watchtower.discord = Mock()
-        mock_watchtower.discord.send_message = Mock(return_value=True)
+        mock_watchtower.discord.send_message = AsyncMock(return_value=True)
 
         # Run one iteration of process_queue
         async def run_one_iteration():
@@ -170,7 +170,7 @@ class TestMessageQueueRetryLogic(unittest.TestCase):
         # Mock watchtower with failing Discord send
         mock_watchtower = Mock()
         mock_watchtower.discord = Mock()
-        mock_watchtower.discord.send_message = Mock(return_value=False)
+        mock_watchtower.discord.send_message = AsyncMock(return_value=False)
 
         # Run one iteration
         async def run_one_iteration():
@@ -212,7 +212,7 @@ class TestMessageQueueRetryLogic(unittest.TestCase):
         # Mock failing send
         mock_watchtower = Mock()
         mock_watchtower.discord = Mock()
-        mock_watchtower.discord.send_message = Mock(return_value=False)
+        mock_watchtower.discord.send_message = AsyncMock(return_value=False)
 
         # Run one iteration
         async def run_one_iteration():
@@ -271,7 +271,7 @@ class TestMessageQueueRetrySending(unittest.TestCase):
 
         mock_watchtower = Mock()
         mock_watchtower.discord = Mock()
-        mock_watchtower.discord.send_message = Mock(return_value=True)
+        mock_watchtower.discord.send_message = AsyncMock(return_value=True)
 
         result = asyncio.run(queue._retry_send(retry_item, mock_watchtower))
 
@@ -301,14 +301,14 @@ class TestMessageQueueRetrySending(unittest.TestCase):
         mock_watchtower = Mock()
         mock_watchtower.telegram = Mock()
         mock_watchtower.telegram.resolve_destination = AsyncMock(return_value=123456)
-        mock_watchtower.telegram.send_copy = AsyncMock(return_value=True)
+        mock_watchtower.telegram.send_message = AsyncMock(return_value=True)
 
         result = asyncio.run(queue._retry_send(retry_item, mock_watchtower))
 
         self.assertTrue(result)
         mock_watchtower.telegram.resolve_destination.assert_called_once_with('@testchannel')
-        mock_watchtower.telegram.send_copy.assert_called_once_with(
-            123456, "Test message", None
+        mock_watchtower.telegram.send_message.assert_called_once_with(
+            "Test message", 123456, None
         )
 
     def test_retry_send_telegram_resolve_fails(self):

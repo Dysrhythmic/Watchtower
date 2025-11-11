@@ -79,7 +79,7 @@ class TestTelegramHandler:
         (5500, 3),   # Way over limit - send_file + chunked messages
     ])
     @patch('os.path.exists', return_value=True)
-    def test_send_copy_caption_handling(self, mock_exists, mock_telegram_handler,
+    def test_send_message_caption_handling(self, mock_exists, mock_telegram_handler,
                                         caption_length, expected_calls):
         """
         Test caption overflow handling for various lengths.
@@ -95,8 +95,8 @@ class TestTelegramHandler:
         caption = "A" * caption_length
         destination = 123
 
-        # When: send_copy() called
-        result = asyncio.run(mock_telegram_handler.send_copy(
+        # When: send_message() called
+        result = asyncio.run(mock_telegram_handler.send_message(
             destination_chat_id=destination,
             content=caption,
             attachment_path=attachment_path
@@ -108,12 +108,12 @@ class TestTelegramHandler:
                       mock_telegram_handler.client.send_message.call_count)
         assert total_calls >= expected_calls
 
-    def test_send_copy_text_only_under_4096(self, mock_telegram_handler):
+    def test_send_message_text_only_under_4096(self, mock_telegram_handler):
         """Test sending text under Telegram's 4096 character limit."""
         mock_telegram_handler.client.send_message = AsyncMock(return_value=Mock(id=123))
 
         text = "A" * 2000  # Under 4096 limit
-        result = asyncio.run(mock_telegram_handler.send_copy(
+        result = asyncio.run(mock_telegram_handler.send_message(
             destination_chat_id=123,
             content=text,
             attachment_path=None
@@ -122,12 +122,12 @@ class TestTelegramHandler:
         assert result is True
         mock_telegram_handler.client.send_message.assert_called_once()
 
-    def test_send_copy_text_over_4096_chunked(self, mock_telegram_handler):
+    def test_send_message_text_over_4096_chunked(self, mock_telegram_handler):
         """Test text chunking for messages over 4096 chars."""
         mock_telegram_handler.client.send_message = AsyncMock(return_value=Mock(id=123))
 
         text = "A" * 6000  # Over 4096 limit
-        result = asyncio.run(mock_telegram_handler.send_copy(
+        result = asyncio.run(mock_telegram_handler.send_message(
             destination_chat_id=123,
             content=text,
             attachment_path=None
@@ -136,7 +136,7 @@ class TestTelegramHandler:
         assert result is True
         assert mock_telegram_handler.client.send_message.call_count >= 2
 
-    def test_send_copy_flood_wait_error(self, mock_telegram_handler):
+    def test_send_message_flood_wait_error(self, mock_telegram_handler):
         """Test handling of FloodWaitError."""
         from telethon.errors import FloodWaitError
 
@@ -144,7 +144,7 @@ class TestTelegramHandler:
         flood_error.seconds = 60
         mock_telegram_handler.client.send_message = AsyncMock(side_effect=flood_error)
 
-        result = asyncio.run(mock_telegram_handler.send_copy(
+        result = asyncio.run(mock_telegram_handler.send_message(
             destination_chat_id=123,
             content="Test",
             attachment_path=None
@@ -274,7 +274,7 @@ class TestDiscordHandler:
     def test_send_message_success(self, mock_post, mock_discord_handler):
         """Test successful message send."""
         mock_post.return_value.status_code = 200
-        success = mock_discord_handler.send_message("Test", "https://discord.com/webhook", None)
+        success = asyncio.run(mock_discord_handler.send_message("Test", "https://discord.com/webhook", None))
         assert success is True
         mock_post.assert_called_once()
 
@@ -286,7 +286,7 @@ class TestDiscordHandler:
         mock_response.json.return_value = {'retry_after': 5.5}
         mock_post.return_value = mock_response
 
-        success = mock_discord_handler.send_message("Test", "https://discord.com/webhook", None)
+        success = asyncio.run(mock_discord_handler.send_message("Test", "https://discord.com/webhook", None))
         assert success is False
 
     @patch('requests.post')
@@ -303,7 +303,7 @@ class TestDiscordHandler:
 
         # Text over 2000 chars
         text = "A" * 3000
-        result = mock_discord_handler.send_message(text, "https://discord.com/webhook", None)
+        result = asyncio.run(mock_discord_handler.send_message(text, "https://discord.com/webhook", None))
 
         assert result is True
         assert mock_post.call_count >= 2
@@ -323,7 +323,7 @@ class TestDiscordHandler:
         mock_post.return_value = mock_response
 
         text = "A" * 2000  # Exactly at limit
-        result = mock_discord_handler.send_message(text, "https://discord.com/webhook", None)
+        result = asyncio.run(mock_discord_handler.send_message(text, "https://discord.com/webhook", None))
 
         assert result is True
         assert mock_post.call_count == 1

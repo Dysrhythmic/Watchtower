@@ -11,6 +11,7 @@ These tests fill coverage gaps not addressed in test_integration.py:
 Tests focus on multi-component interactions rather than unit behavior.
 """
 
+import asyncio
 import unittest
 import sys
 import os
@@ -90,7 +91,7 @@ class TestRSSIntegration(unittest.TestCase):
 
         # Format and send
         formatted = app.discord.format_message(msg, destinations[0])
-        success = app.discord.send_message(formatted, destinations[0]['discord_webhook_url'], None)
+        success = asyncio.run(app.discord.send_message(formatted, destinations[0]['discord_webhook_url'], None))
 
         self.assertTrue(success)
         self.assertIn('Security Feed', formatted)
@@ -129,13 +130,13 @@ class TestRSSIntegration(unittest.TestCase):
         # Mock Telegram handler
         mock_telegram = mock_telegram_client.return_value
         mock_telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
-        mock_telegram.send_copy = AsyncMock(return_value=True)
+        mock_telegram.send_message = AsyncMock(return_value=True)
 
         app = Watchtower(sources=[APP_TYPE_RSS])
 
         # Mock Telegram handler methods
         app.telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
-        app.telegram.send_copy = AsyncMock(return_value=True)
+        app.telegram.send_message = AsyncMock(return_value=True)
 
         # Create RSS message
         msg = MessageData(
@@ -356,7 +357,6 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
         Gap filled: No tests for Telegram → Telegram forwarding
         """
         from Watchtower import Watchtower
-        import asyncio
 
         mock_config = create_mock_config({
             'get_all_channel_ids': Mock(return_value={"@source_channel"}),
@@ -379,7 +379,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
 
         # Mock Telegram operations
         app.telegram.resolve_destination = AsyncMock(return_value=-1001234567890)
-        app.telegram.send_copy = AsyncMock(return_value=True)
+        app.telegram.send_message = AsyncMock(return_value=True)
 
         # Create source message
         msg = MessageData(
@@ -405,7 +405,7 @@ class TestTelegramToTelegramFlow(unittest.TestCase):
 
         self.assertEqual(result, SendStatus.SENT)
         app.telegram.resolve_destination.assert_called_once_with('@destination_channel')
-        app.telegram.send_copy.assert_called_once()
+        app.telegram.send_message.assert_called_once()
 
     @patch('TelegramHandler.TelegramClient')
     @patch('ConfigManager.ConfigManager')
@@ -590,12 +590,12 @@ class TestRateLimitCoordination(unittest.TestCase):
 
         # Send to first destination (rate limited)
         formatted1 = app.discord.format_message(msg, destinations[0])
-        success1 = app.discord.send_message(formatted1, destinations[0]['discord_webhook_url'], None)
+        success1 = asyncio.run(app.discord.send_message(formatted1, destinations[0]['discord_webhook_url'], None))
         self.assertFalse(success1)
 
         # Send to second destination (succeeds)
         formatted2 = app.discord.format_message(msg, destinations[1])
-        success2 = app.discord.send_message(formatted2, destinations[1]['discord_webhook_url'], None)
+        success2 = asyncio.run(app.discord.send_message(formatted2, destinations[1]['discord_webhook_url'], None))
         self.assertTrue(success2)
 
 

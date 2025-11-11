@@ -217,7 +217,7 @@ class TestTelegramHandler(unittest.TestCase):
 
 class TestTelegramSendOperations(unittest.TestCase):
     """
-    Critical tests for TelegramHandler.send_copy() operations.
+    Critical tests for TelegramHandler.send_message() operations.
 
     These tests cover the highest priority gaps identified in the coverage analysis:
     - Caption overflow handling (lines 371-384) - CRITICAL USER-REPORTED ISSUE
@@ -234,10 +234,10 @@ class TestTelegramSendOperations(unittest.TestCase):
         self.mock_config.config_dir = self.mock_config.project_root / "config"
 
     @patch('TelegramHandler.TelegramClient')
-    def test_send_copy_text_only_under_4096(self, MockClient):
+    def test_send_message_text_only_under_4096(self, MockClient):
         """
         Given: Text message with 2000 chars, no media
-        When: send_copy() called
+        When: send_message() called
         Then: Single send_message() call
 
         Tests: src/TelegramHandler.py:347-403 (basic send path)
@@ -253,8 +253,8 @@ class TestTelegramSendOperations(unittest.TestCase):
         text = "A" * 2000  # Under 4096 limit
         destination = 123
 
-        # When: send_copy() called
-        result = asyncio.run(handler.send_copy(
+        # When: send_message() called
+        result = asyncio.run(handler.send_message(
             destination_chat_id=destination,
             content=text,
             attachment_path=None
@@ -268,10 +268,10 @@ class TestTelegramSendOperations(unittest.TestCase):
         self.assertEqual(len(call_args[0][1]), 2000)
 
     @patch('TelegramHandler.TelegramClient')
-    def test_send_copy_text_over_4096_chunked(self, MockClient):
+    def test_send_message_text_over_4096_chunked(self, MockClient):
         """
         Given: Text message with 6000 chars, no media
-        When: send_copy() called
+        When: send_message() called
         Then: Multiple send_message() calls with chunked text
 
         Tests: src/TelegramHandler.py:347-403 (text chunking)
@@ -287,8 +287,8 @@ class TestTelegramSendOperations(unittest.TestCase):
         text = "A" * 6000  # Over 4096 limit
         destination = 123
 
-        # When: send_copy() called
-        result = asyncio.run(handler.send_copy(
+        # When: send_message() called
+        result = asyncio.run(handler.send_message(
             destination_chat_id=destination,
             content=text,
             attachment_path=None
@@ -306,10 +306,10 @@ class TestTelegramSendOperations(unittest.TestCase):
 
     @patch('os.path.exists')
     @patch('TelegramHandler.TelegramClient')
-    def test_send_copy_media_with_caption_under_1024(self, MockClient, mock_exists):
+    def test_send_message_media_with_caption_under_1024(self, MockClient, mock_exists):
         """
         Given: Media + 500 char caption
-        When: send_copy() called
+        When: send_message() called
         Then: Single send_file() call with caption
 
         Tests: src/TelegramHandler.py:365-370 (caption within limit)
@@ -328,8 +328,8 @@ class TestTelegramSendOperations(unittest.TestCase):
         caption = "A" * 500  # Under 1024 limit
         destination = 123
 
-        # When: send_copy() called
-        result = asyncio.run(handler.send_copy(
+        # When: send_message() called
+        result = asyncio.run(handler.send_message(
             destination_chat_id=destination,
             content=caption,
             attachment_path=attachment_path
@@ -349,10 +349,10 @@ class TestTelegramSendOperations(unittest.TestCase):
 
     @patch('os.path.exists')
     @patch('TelegramHandler.TelegramClient')
-    def test_send_copy_media_with_caption_over_1024_captionless_plus_chunks(self, MockClient, mock_exists):
+    def test_send_message_media_with_caption_over_1024_captionless_plus_chunks(self, MockClient, mock_exists):
         """
         Given: Media + 1500 char caption
-        When: send_copy() called
+        When: send_message() called
         Then: send_file() captionless + send_message() with full text
 
         Tests: src/TelegramHandler.py:371-384 (CRITICAL caption overflow logic)
@@ -373,8 +373,8 @@ class TestTelegramSendOperations(unittest.TestCase):
         long_caption = "A" * 1500  # Over 1024 limit
         destination = 123
 
-        # When: send_copy() called
-        result = asyncio.run(handler.send_copy(
+        # When: send_message() called
+        result = asyncio.run(handler.send_message(
             destination_chat_id=destination,
             content=long_caption,
             attachment_path=attachment_path
@@ -398,10 +398,10 @@ class TestTelegramSendOperations(unittest.TestCase):
 
     @patch('os.path.exists')
     @patch('TelegramHandler.TelegramClient')
-    def test_send_copy_media_with_caption_over_5000_captionless_plus_chunked_text(self, MockClient, mock_exists):
+    def test_send_message_media_with_caption_over_5000_captionless_plus_chunked_text(self, MockClient, mock_exists):
         """
         Given: Media + 5500 char caption
-        When: send_copy() called
+        When: send_message() called
         Then: send_file() captionless + multiple send_message() chunks
 
         Tests: src/TelegramHandler.py:371-384 (caption overflow + chunking)
@@ -422,8 +422,8 @@ class TestTelegramSendOperations(unittest.TestCase):
         very_long_caption = "A" * 5500  # Over 1024 and requires chunking
         destination = 123
 
-        # When: send_copy() called
-        result = asyncio.run(handler.send_copy(
+        # When: send_message() called
+        result = asyncio.run(handler.send_message(
             destination_chat_id=destination,
             content=very_long_caption,
             attachment_path=attachment_path
@@ -445,10 +445,10 @@ class TestTelegramSendOperations(unittest.TestCase):
         self.assertLess(total_sent, 5600)
 
     @patch('TelegramHandler.TelegramClient')
-    def test_send_copy_flood_wait_error_enqueues(self, MockClient):
+    def test_send_message_flood_wait_error_enqueues(self, MockClient):
         """
         Given: send_message() raises FloodWaitError(60)
-        When: send_copy() called
+        When: send_message() called
         Then: Exception caught, returns False (will be enqueued by caller)
 
         Tests: src/TelegramHandler.py:396-399 (FloodWaitError handling)
@@ -469,9 +469,9 @@ class TestTelegramSendOperations(unittest.TestCase):
         text = "Test message"
         destination = 123
 
-        # When: send_copy() called
+        # When: send_message() called
         with self.assertLogs(level='WARNING') as log_context:
-            result = asyncio.run(handler.send_copy(
+            result = asyncio.run(handler.send_message(
                 destination_chat_id=destination,
                 content=text,
                 attachment_path=None
@@ -482,10 +482,10 @@ class TestTelegramSendOperations(unittest.TestCase):
         self.assertTrue(any("FloodWaitError" in msg or "60" in msg for msg in log_context.output))
 
     @patch('TelegramHandler.TelegramClient')
-    def test_send_copy_generic_exception_enqueues(self, MockClient):
+    def test_send_message_generic_exception_enqueues(self, MockClient):
         """
         Given: send_message() raises generic Exception
-        When: send_copy() called
+        When: send_message() called
         Then: Exception caught, returns False
 
         Tests: src/TelegramHandler.py:401-403 (generic exception handling)
@@ -501,9 +501,9 @@ class TestTelegramSendOperations(unittest.TestCase):
         text = "Test message"
         destination = 123
 
-        # When: send_copy() called
+        # When: send_message() called
         with self.assertLogs(level='ERROR') as log_context:
-            result = asyncio.run(handler.send_copy(
+            result = asyncio.run(handler.send_message(
                 destination_chat_id=destination,
                 content=text,
                 attachment_path=None

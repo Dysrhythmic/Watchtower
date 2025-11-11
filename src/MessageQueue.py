@@ -139,7 +139,7 @@ class MessageQueue:
 
         try:
             if dest['type'] == APP_TYPE_DISCORD:
-                return watchtower.discord.send_message(
+                return await watchtower.discord.send_message(
                     retry_item.formatted_content,
                     dest['discord_webhook_url'],
                     retry_item.attachment_path
@@ -149,9 +149,9 @@ class MessageQueue:
                 channel_spec = dest['telegram_dst_channel']
                 chat_id = await watchtower.telegram.resolve_destination(channel_spec)
                 if chat_id:
-                    result = await watchtower.telegram.send_copy(
-                        chat_id,
+                    result = await watchtower.telegram.send_message(
                         retry_item.formatted_content,
+                        chat_id,
                         retry_item.attachment_path
                     )
                     return result

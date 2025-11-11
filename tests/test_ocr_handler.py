@@ -158,7 +158,7 @@ class TestOCRMultipleDestinations(unittest.TestCase):
         mock_ocr.extract_text = Mock(return_value="OCR extracted text")
 
         mock_discord = Mock()
-        mock_discord.send_message = Mock(return_value=True)
+        mock_discord.send_message = AsyncMock(return_value=True)
         mock_discord.format_message = Mock(side_effect=lambda msg, dest: msg.text or "")
 
         mock_queue = Mock()

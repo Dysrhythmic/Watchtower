@@ -248,7 +248,7 @@ class Watchtower:
                 return False
 
             # Track incoming messages by source
-            self.metrics.increment(f"messages_received_{message_data.source_type}")
+            self.metrics.increment(f"messages_received_{message_data.source_type.lower()}")
 
             await self._preprocess_message(message_data)
 
@@ -305,7 +305,7 @@ class Watchtower:
                     if ocr_text:
                         message_data.ocr_enabled = True
                         message_data.ocr_raw = ocr_text
-                        self.metrics.increment("ocr_processed")
+                        self.metrics.increment("ocr_msgs_processed")
                 else:
                     _logger.debug(f"Skipping OCR for non-image file: {message_data.attachment_path}")
 

@@ -78,4 +78,5 @@ def setup_logger(name: str, use_color=None) -> logging.Logger:
         root_logger.setLevel(logging.INFO)
         # root_logger.setLevel(logging.DEBUG)
 
-    return logging.getLogger(name)
+    logger_name = "Watchtower" if name == "__main__" else name
+    return logging.getLogger(logger_name)

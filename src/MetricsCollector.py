@@ -5,14 +5,18 @@ This module provides lightweight metrics collection and persistence using JSON f
 storage.
 
 Metrics include:
-  messages_received_telegram
+  total_msgs_routed_success
+  total_msgs_routed_failed
   total_msgs_no_destination
-  telegram_missed_msgs_caught
+  messages_queued_retry
+  messages_retry_succeeded
+  messages_retry_failed
+  messages_received_telegram
   messages_received_rss
   messages_sent_telegram
   messages_sent_discord
-  total_msgs_routed_success
-  ocr_processed
+  messages_first_missed_telegram
+  ocr_msgs_processed
   ocr_msgs_sent
   seconds_ran
 """

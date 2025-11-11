@@ -350,7 +350,7 @@ class TelegramHandler(DestinationHandler):
 
                             missed_count = len(messages_to_process)
                             if self._metrics:
-                                self._metrics.increment("telegram_missed_msgs_caught", missed_count)
+                                self._metrics.increment("messages_first_missed_telegram", missed_count)
                             _logger.warning(
                                 f"Processed {missed_count} missed messages "
                                 f"from {channel_name} (newest_id={newest_msg_id})"

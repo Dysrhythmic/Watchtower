@@ -89,7 +89,7 @@ class DestinationHandler(AbstractBaseClass):
         self._rate_limits[destination_id] = expires_at
 
         _logger.warning(
-            f"[{self.__class__.__name__}] Rate limited: "
+            f"Rate limited: "
             f"retry_after={wait_seconds}s, waiting={rounded_wait}s"
         )
 

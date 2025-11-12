@@ -176,35 +176,14 @@ pip install pytest pytest-cov pytest-asyncio
 python3 -m pytest tests/
 ```
 
-**Run all tests with verbose output:**
-```bash
-python3 -m pytest tests/ -v
-```
-
-**Run specific test file:**
-```bash
-python3 -m pytest tests/test_telegram_handler.py
-```
-
-**Run specific test class:**
-```bash
-python3 -m pytest tests/test_telegram_handler.py::TestTelegramLogFunctionality
-```
-
-**Run specific test method:**
-```bash
-python3 -m pytest tests/test_telegram_handler.py::TestTelegramLogFunctionality::test_create_telegram_log
-```
-
-**Run tests matching a pattern:**
-```bash
-python3 -m pytest tests/ -k "telegram"
-python3 -m pytest tests/ -k "routing"
-```
-
 ### Test Coverage
 
 **Generate coverage report:**
+```bash
+python3 -m pytest tests/ --cov=src
+```
+
+**Generate coverage report including the missing statement line numbers:**
 ```bash
 python3 -m pytest tests/ --cov=src --cov-report=term-missing
 ```

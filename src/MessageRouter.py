@@ -147,13 +147,14 @@ class MessageRouter:
                 # Combine message text and OCR text for keyword matching
                 searchable_text = f"{searchable_text}\n{message_data.ocr_raw}" if searchable_text else message_data.ocr_raw
 
-            # Check text-based attachments (enabled by default)
+            # Check text-based attachments
             keywords = dst_channel_config.get('keywords', [])
+            attachment_info = None
             attachment_matched = False
             if dst_channel_config.get('check_attachments', True) and message_data.attachment_path and keywords:
                 attachment_info = self._extract_attachment_text(message_data.attachment_path, keywords)
                 if attachment_info and attachment_info['has_matches']:
-                    # Cache attachment info for later use (avoid re-reading file)
+                    # Cache attachment info for later use to avoid reading the file again
                     message_data.metadata['attachment_info'] = attachment_info
                     attachment_matched = True
 
@@ -161,13 +162,23 @@ class MessageRouter:
             if not keywords:
                 # No keywords configured, forward all messages from this channel
                 destinations.append(self._make_dest_entry(destination, dst_channel_config, matched=[]))
-            elif attachment_matched:
-                # Attachment matched keywords, add this destination
-                destinations.append(self._make_dest_entry(destination, dst_channel_config, matched=keywords))
-            elif searchable_text:
-                # Check text content for keyword matches
-                matched = [kw for kw in keywords if kw.lower() in searchable_text.lower()]
+            else:
+                # Check attachment and text content for keyword matches
+                matched = []
+
+                # Check text content (message text + OCR if enabled) for keyword matches
+                if searchable_text:
+                    text_matched = [kw for kw in keywords if kw.lower() in searchable_text.lower()]
+                    matched.extend(text_matched)
+
+                # Check attachment for matches separately due to file streaming
+                if attachment_matched and attachment_info:
+                    matched_keywords = attachment_info.get('matched_keywords', [])
+                    matched.extend(matched_keywords)
+
+                # Add destination if any keywords matched
                 if matched:
+                    matched = list(dict.fromkeys(matched))
                     destinations.append(self._make_dest_entry(destination, dst_channel_config, matched=matched))
 
         return destinations
@@ -281,6 +292,7 @@ class MessageRouter:
         Returns:
             Dict with:
                 - has_matches: True if any keyword matched
+                - matched_keywords: List of keywords that matched in the file
                 - matched_lines: List of lines that matched keywords
                 - total_lines: Total number of lines scanned
                 - file_size: File size in bytes
@@ -331,6 +343,7 @@ class MessageRouter:
         # Stream file line-by-line for keyword matching
         try:
             matched_lines = []
+            matched_keywords = set()
             total_lines = 0
             has_matches = False
 
@@ -339,14 +352,19 @@ class MessageRouter:
                     total_lines += 1
                     line_stripped = line.rstrip('\n\r')
 
-                    # Check for keyword matches (case-insensitive)
+                    # Check for keyword matches
                     if keywords:
-                        if any(kw.lower() in line_stripped.lower() for kw in keywords):
-                            matched_lines.append(line_stripped)
-                            has_matches = True
+                        line_lower = line_stripped.lower()
+                        for kw in keywords:
+                            if kw.lower() in line_lower:
+                                matched_keywords.add(kw)
+                                if line_stripped not in matched_lines:
+                                    matched_lines.append(line_stripped)
+                                has_matches = True
 
             result = {
                 'has_matches': has_matches,
+                'matched_keywords': list(matched_keywords),
                 'matched_lines': matched_lines,
                 'total_lines': total_lines,
                 'file_size': file_size
@@ -354,7 +372,7 @@ class MessageRouter:
 
             _logger.debug(
                 f"Scanned {total_lines} lines from {path.name}, "
-                f"found {len(matched_lines)} matches"
+                f"found {len(matched_lines)} matches with keywords: {', '.join(matched_keywords)}"
             )
             return result
 

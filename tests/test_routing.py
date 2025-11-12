@@ -499,6 +499,147 @@ class TestAttachmentKeywordMatching:
         finally:
             Path(temp_path).unlink(missing_ok=True)
 
+    def test_attachment_returns_only_matched_keywords(self, mock_config, message_factory, temp_text_file):
+        """Test that attachment matching returns only keywords that matched, not all configured keywords.
+
+        This test verifies the bug fix where attachments were incorrectly reporting all configured
+        keywords as matched instead of just the subset that actually matched in the file.
+        """
+        from MessageRouter import MessageRouter
+
+        # Create file with lots of 'A's and only the word "test"
+        content = "A" * 100 + "\n" + "A" * 100 + "\n" + "test\n" + "A" * 100
+        temp_path = temp_text_file(content=content, suffix='.txt')
+
+        try:
+            # Configure many keywords, but only "test" is in the file
+            mock_config.destinations = [{
+                'name': 'Test Dest',
+                'type': 'Discord',
+                'discord_webhook_url': 'https://discord.com/webhook',
+                'channels': [{
+                    'id': '@test_channel',
+                    'keywords': ['test', 'ransomware', 'cve', 'malware', 'exploit'],
+                    'check_attachments': True,
+                    'restricted_mode': False,
+                    'parser': None,
+                    'ocr': False
+                }]
+            }]
+
+            router = MessageRouter(mock_config)
+            msg = message_factory(
+                channel_id="@test_channel",
+                text="Message without keywords in text",
+                attachment_path=temp_path
+            )
+
+            destinations = router.get_destinations(msg)
+
+            # Should match the destination
+            assert len(destinations) == 1
+
+            # But should only report "test" as matched, not all keywords
+            matched_keywords = destinations[0]['keywords']
+            assert len(matched_keywords) == 1, f"Expected 1 matched keyword, got {len(matched_keywords)}: {matched_keywords}"
+            assert 'test' in matched_keywords, f"Expected 'test' in matched keywords, got: {matched_keywords}"
+            assert 'ransomware' not in matched_keywords, "Should not match 'ransomware' - it's not in the file"
+            assert 'cve' not in matched_keywords, "Should not match 'cve' - it's not in the file"
+            assert 'malware' not in matched_keywords, "Should not match 'malware' - it's not in the file"
+            assert 'exploit' not in matched_keywords, "Should not match 'exploit' - it's not in the file"
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_keywords_match_in_both_attachment_and_text(self, mock_config, message_factory, temp_text_file):
+        """Test that keywords are matched in BOTH attachment and text, and all matches are reported.
+
+        This verifies that the system checks both sources and combines the results,
+        rather than stopping after the attachment matches.
+        """
+        from MessageRouter import MessageRouter
+
+        # Create attachment with "ransomware"
+        temp_path = temp_text_file(content="This file contains ransomware", suffix='.txt')
+
+        try:
+            mock_config.destinations = [{
+                'name': 'Test Dest',
+                'type': 'Discord',
+                'discord_webhook_url': 'https://discord.com/webhook',
+                'channels': [{
+                    'id': '@test_channel',
+                    'keywords': ['cve', 'ransomware', 'malware'],
+                    'check_attachments': True,
+                    'restricted_mode': False,
+                    'parser': None,
+                    'ocr': False
+                }]
+            }]
+
+            router = MessageRouter(mock_config)
+            msg = message_factory(
+                channel_id="@test_channel",
+                text="CVE-2025-1234 discovered in popular software",  # Contains "cve"
+                attachment_path=temp_path  # Contains "ransomware"
+            )
+
+            destinations = router.get_destinations(msg)
+
+            # Should match the destination
+            assert len(destinations) == 1
+
+            # Should report BOTH keywords: "cve" from text AND "ransomware" from attachment
+            matched_keywords = destinations[0]['keywords']
+            assert len(matched_keywords) == 2, f"Expected 2 matched keywords, got {len(matched_keywords)}: {matched_keywords}"
+            assert 'ransomware' in matched_keywords, "Should match 'ransomware' from attachment"
+            assert 'cve' in matched_keywords, "Should match 'cve' from message text"
+            assert 'malware' not in matched_keywords, "Should not match 'malware' - not in either source"
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_keywords_deduplicated_when_in_both_sources(self, mock_config, message_factory, temp_text_file):
+        """Test that keywords appearing in both attachment and text are only reported once."""
+        from MessageRouter import MessageRouter
+
+        # Create attachment with "ransomware"
+        temp_path = temp_text_file(content="This file contains ransomware", suffix='.txt')
+
+        try:
+            mock_config.destinations = [{
+                'name': 'Test Dest',
+                'type': 'Discord',
+                'discord_webhook_url': 'https://discord.com/webhook',
+                'channels': [{
+                    'id': '@test_channel',
+                    'keywords': ['ransomware', 'malware'],
+                    'check_attachments': True,
+                    'restricted_mode': False,
+                    'parser': None,
+                    'ocr': False
+                }]
+            }]
+
+            router = MessageRouter(mock_config)
+            msg = message_factory(
+                channel_id="@test_channel",
+                text="Alert: ransomware detected in network",  # Contains "ransomware"
+                attachment_path=temp_path  # Also contains "ransomware"
+            )
+
+            destinations = router.get_destinations(msg)
+
+            # Should match the destination
+            assert len(destinations) == 1
+
+            # Should report "ransomware" only once, not twice
+            matched_keywords = destinations[0]['keywords']
+            assert len(matched_keywords) == 1, f"Expected 1 matched keyword (deduplicated), got {len(matched_keywords)}: {matched_keywords}"
+            assert 'ransomware' in matched_keywords
+            # Verify it's not duplicated by checking the list
+            assert matched_keywords.count('ransomware') == 1, "Keyword should only appear once in the list"
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
 
 # ============================================================================
 # RSS ROUTING TESTS

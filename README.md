@@ -57,6 +57,7 @@ See `requirements.txt` for version info.
    Update the `env_key` key for the destination  to the name of the desired env variable and the `type` key to the destination application (e.g., `Telegram` or `Discord`). See the last section of this document for examples of different configuration options.
 
 5. **Run Watchtower using subcommands:**
+
    The `monitor` subcommand examples:
    ```bash
    python3 src/Watchtower.py monitor --sources all

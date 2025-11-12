@@ -39,7 +39,8 @@ See `requirements.txt` for version info.
 ## Setup
 1. **Clone or download this repository**
 
-2. **Install dependencies:**
+2. **Install dependencies**
+
    Use your favorite Python virtual environment or a container and install with:
    ```bash
    pip install -r requirements.txt
@@ -161,7 +162,7 @@ Removes lines from the beginning and/or end of messages:
 ## Security
 - Keep your `.env` and `watchtower_session.session` files private.
 - Both extension and MIME type checks provide some protection against malicious files being downloaded and read, but it is possible to spoof these values.
-- Attachment checking and `restricted_mode` use the same safe file type list (i.e., `AllowedFileTypes.py`).
+- Attachment checking and `restricted_mode` use the same safe file type list (`src/AllowedFileTypes.py`).
 
 ## Testing
 

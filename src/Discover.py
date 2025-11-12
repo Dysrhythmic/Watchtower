@@ -185,7 +185,7 @@ def _print_diff_output(new_channels, removed_channel_ids, existing_channel_ids, 
         _logger.info("")
         _logger.info("Removed/Inaccessible (in config but not accessible):")
         for ch_id in sorted(removed_channel_ids):
-            _logger.info(f"  - {ch_id}")
+            _logger.info(f"  {ch_id}")
 
     if new_channels:
         _logger.info("")

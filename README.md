@@ -44,7 +44,7 @@ See `requirements.txt` for version info.
    pip install -r requirements.txt
    ```
 
-3. **Create a `.env` file** in the project directory based on the provided `env_example.txt` file
+3. **Create a `.env` file** in the `config/` directory based on the provided `env_example.txt` file
 
 4. **Create a configuration file**. You can automatically generate one that defaults to forwarding all messages for all connected Telegram channels by using:
    ```bash

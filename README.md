@@ -44,13 +44,15 @@ See `requirements.txt` for version info.
    pip install -r requirements.txt
    ```
 
-3. **Create a `.env` file** in the `config/` directory based on the provided `env_example.txt` file
+3. **Create a `.env` file** in the `config/` directory based on the provided `env_example.txt` file.
+   - Ensure one of the keys has a destination channel ID or webhook as its value
+   - Ensure the `CONFIG_FILE` env key is set to the JSON configuration file you want to use for mapping the sources and destinations. The name of the generated config file (see next step) is `config_discovered.json`.
 
-4. **Create a configuration file**. You can automatically generate one that defaults to forwarding all messages for all connected Telegram channels by using:
+4. **Create a configuration file** with your preferred options. You can automatically generate one that defaults to forwarding all messages for all connected Telegram channels to the destination(s) set in the `.env` file by using:
    ```bash
    python3 src/Watchtower.py discover --generate
    ```
-   See the last section for examples of different configurations.
+   Update the `env_key` key for the destination  to the name of the desired env variable and the `type` key to the destination application (e.g., `Telegram` or `Discord`). See the last section of this document for examples of different configuration options.
 
 5. **Run Watchtower using subcommands:**
    The `monitor` subcommand examples:

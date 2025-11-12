@@ -339,7 +339,7 @@ Both source types route to the same destination with independent keyword filteri
   ]
 }
 ```
-- **Discord destination**: Monitors Telegram channel `@vxunderground` and an RSS feed
+- Discord destination: Monitors Telegram channel `@vxunderground` and an RSS feed
   - Telegram channel:
     - Forwards messages with `malware` or `ransomware` keywords in their content or attachments
     - Checks OCR-extracted text and entire text-based attachments for keywords
@@ -348,7 +348,7 @@ Both source types route to the same destination with independent keyword filteri
     - Forwards all posts
     - Keeps only first 2 lines of each entrpost
   - Sends to Discord webhook URL in `.env` as `DISCORD_WEBHOOK_ALERTS`
-- **Telegram destination**: Monitors Telegram channel `@CTIUpdates`
+- Telegram destination: Monitors Telegram channel `@CTIUpdates`
   - Only forwards messages containing `breach` in their content or attachments
   - Trims 1 line from the beginning of each message
   - Sends to Telegram channel ID stored in `.env` as `TELEGRAM_BACKUP_CHANNEL` (e.g., `@my_backup_channel` or `-1003291374656`)
@@ -390,5 +390,5 @@ Same RSS feed routed to multiple destinations with different keyword filters:
 }
 ```
 - The RSS feed `https://example.com/feed.xml` is polled once every 300 seconds
-- **Discord destination** receives only items containing `CVE`, `0-day`, or `exploit`
-- **Telegram destination** receives all items with the last line trimmed
+- Discord destination receives only items containing `CVE`, `0-day`, or `exploit`
+- Telegram destination receives all items with the last line trimmed

@@ -40,6 +40,7 @@ See `requirements.txt` for version info.
 1. **Clone or download this repository**
 
 2. **Install dependencies:**
+   Use your favorite Python virtual environment or a container and install with:
    ```bash
    pip install -r requirements.txt
    ```

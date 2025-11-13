@@ -41,25 +41,6 @@ def mock_config():
     return config
 
 
-@pytest.fixture
-def mock_destinations():
-    """Create standard mock destinations configuration."""
-    return [{
-        'name': 'Test Discord',
-        'type': 'Discord',
-        'discord_webhook_url': 'https://discord.com/api/webhooks/test/token',
-        'channels': [{
-            'id': '@test_channel',
-            'keywords': ['cve', 'malware'],
-            'restricted_mode': False,
-            'parser': None,
-            'ocr': False
-        }],
-        'parser': {'trim_front_lines': 0, 'trim_back_lines': 0},
-        'keywords': []
-    }]
-
-
 # ============================================================================
 # HANDLER FIXTURES
 # ============================================================================
@@ -213,38 +194,6 @@ def message_factory():
 
 
 @pytest.fixture
-def destination_factory():
-    """Factory function to create destination configurations."""
-    def _create_destination(
-        dest_type="Discord",
-        name="Test Destination",
-        webhook_url="https://discord.com/api/webhooks/test/token",
-        telegram_channel=None,
-        keywords=None,
-        restricted_mode=False,
-        parser=None,
-        ocr_enabled=False
-    ):
-        """Create a destination configuration with sensible defaults."""
-        dest = {
-            'name': name,
-            'type': dest_type,
-            'keywords': keywords or [],
-            'restricted_mode': restricted_mode,
-            'parser': parser or {'trim_front_lines': 0, 'trim_back_lines': 0}
-        }
-
-        if dest_type == "Discord":
-            dest['discord_webhook_url'] = webhook_url
-        elif dest_type == "Telegram":
-            dest['telegram_dst_channel'] = telegram_channel or '@test_destination'
-
-        return dest
-
-    return _create_destination
-
-
-@pytest.fixture
 def mock_telegram_message():
     """Factory for creating mock Telegram message objects."""
     def _create_telegram_message(
@@ -291,18 +240,6 @@ def temp_text_file():
     return _create_temp_file
 
 
-@pytest.fixture
-def temp_binary_file():
-    """Create a temporary binary file for testing."""
-    import tempfile
-    def _create_temp_file(content=b"Binary content", suffix='.bin'):
-        """Create a temp binary file with given content and suffix."""
-        with tempfile.NamedTemporaryFile(mode='wb', suffix=suffix, delete=False) as f:
-            f.write(content)
-            return f.name
-    return _create_temp_file
-
-
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
@@ -339,23 +276,6 @@ def create_mock_config(extra_attrs=None):
             setattr(mock_config, key, value)
 
     return mock_config
-
-
-def assert_message_sent(mock_handler, expected_calls=1):
-    """Assert that a handler's send method was called the expected number of times."""
-    if hasattr(mock_handler, 'send_message'):
-        assert mock_handler.send_message.call_count == expected_calls
-    elif hasattr(mock_handler, 'send_copy'):
-        assert mock_handler.send_copy.call_count == expected_calls
-
-
-def assert_metrics_incremented(mock_metrics, metric_name, expected_times=1):
-    """Assert that a specific metric was incremented."""
-    calls = [call for call in mock_metrics.increment.call_args_list
-             if call[0][0] == metric_name]
-    assert len(calls) == expected_times, \
-        f"Expected metric '{metric_name}' to be incremented {expected_times} times, " \
-        f"but was called {len(calls)} times"
 
 
 # ============================================================================

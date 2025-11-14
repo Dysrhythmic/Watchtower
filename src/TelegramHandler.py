@@ -389,7 +389,7 @@ class TelegramHandler(DestinationHandler):
 
                 # Skip if already processed by polling mechanism
                 last_processed_id = self._read_telegram_log(channel_id)
-                if telegram_msg_id <= last_processed_id:
+                if last_processed_id is not None and telegram_msg_id <= last_processed_id:
                     _logger.debug(f"Skipping duplicate: {channel_name} msg_id={telegram_msg_id}")
                     return
 
@@ -835,7 +835,7 @@ class TelegramHandler(DestinationHandler):
         if original_text:
             if len(original_text) > 200:
                 original_text = original_text[:200] + " ..."
-            parts.append(f"<b>  Original message:</b> {escape(original_text)}")
+            parts.append(f"<b>  Original message:</b> <blockquote>{escape(original_text)}</blockquote>")
         elif reply_context.get('has_attachments'):
             parts.append("<b>  Original message:</b> [Attachment only, no caption]")
 

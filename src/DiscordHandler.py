@@ -223,7 +223,9 @@ class DiscordHandler(DestinationHandler):
         if original_text:
             if len(original_text) > 200:
                 original_text = original_text[:200] + " ..."
-            parts.append(f"**  Original message:** {original_text}")
+            # Prefix each line with "> " for blockquote
+            quoted_text = '\n> '.join(original_text.split('\n'))
+            parts.append(f"**  Original message:**\n> {quoted_text}")
         elif reply_context.get('has_attachments'):
             parts.append("**  Original message:** [Attachment only, no caption]")
 

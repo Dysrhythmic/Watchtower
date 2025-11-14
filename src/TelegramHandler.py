@@ -387,6 +387,12 @@ class TelegramHandler(DestinationHandler):
                 channel_name = self._get_channel_name(channel_id)
                 telegram_msg_id = event.message.id
 
+                # Skip if already processed by polling mechanism
+                last_processed_id = self._read_telegram_log(channel_id)
+                if telegram_msg_id <= last_processed_id:
+                    _logger.debug(f"Skipping duplicate: {channel_name} msg_id={telegram_msg_id}")
+                    return
+
                 # Update telegram log before creating message_data to prevent race condition with polling
                 if telegram_msg_id:
                     self._update_telegram_log(channel_id, telegram_msg_id)

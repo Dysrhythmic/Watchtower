@@ -13,7 +13,7 @@ import mimetypes
 from LoggerSetup import setup_logger
 from ConfigManager import ConfigManager
 from MessageData import MessageData
-from AppTypes import APP_TYPE_DISCORD, APP_TYPE_TELEGRAM, APP_TYPE_RSS
+from AppTypes import APP_TYPE_DISCORD, APP_TYPE_TELEGRAM, APP_TYPE_RSS, APP_TYPE_SLACK
 from AllowedFileTypes import ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES
 
 _logger = setup_logger(__name__)
@@ -407,6 +407,8 @@ class MessageRouter:
 
         if base['type'] == APP_TYPE_DISCORD:
             base['discord_webhook_url'] = destination['discord_webhook_url']
+        elif base['type'] == APP_TYPE_SLACK:
+            base['slack_webhook_url'] = destination['slack_webhook_url']
         elif base['type'] == APP_TYPE_TELEGRAM:
             base['telegram_dst_channel'] = destination['telegram_dst_channel']
         

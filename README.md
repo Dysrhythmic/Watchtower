@@ -11,6 +11,7 @@ Current Sources:
 Current Destinations:
 - Telegram channels
 - Discord webhooks
+- Slack webhooks
 
 ## Key Features
 - Real-time monitoring of Telegram channels along with periodic polling to ensure no messages are missed

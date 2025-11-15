@@ -23,7 +23,7 @@ from typing import List, Dict, Optional, TYPE_CHECKING
 from pathlib import Path
 from LoggerSetup import setup_logger
 from Discover import discover_channels
-from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD, APP_TYPE_RSS
+from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD, APP_TYPE_SLACK, APP_TYPE_RSS
 from AllowedFileTypes import ALLOWED_EXTENSIONS
 from SendStatus import SendStatus
 
@@ -43,6 +43,7 @@ class Watchtower:
         config: ConfigManager for loading and validating application configuration
         telegram: TelegramHandler for Telegram operations
         discord: DiscordHandler for Discord operations
+        slack: SlackHandler for Slack operations
         router: MessageRouter for keyword matching and routing
         ocr: OCRHandler for text extraction from images
         message_queue: MessageQueue for retry handling
@@ -56,6 +57,7 @@ class Watchtower:
                  config = None,
                  telegram = None,
                  discord = None,
+                 slack = None,
                  router = None,
                  ocr = None,
                  message_queue = None,
@@ -67,6 +69,7 @@ class Watchtower:
             config: ConfigManager instance (or None to create default)
             telegram: TelegramHandler instance (or None to create default)
             discord: DiscordHandler instance (or None to create default)
+            slack: SlackHandler instance (or None to create default)
             router: MessageRouter instance (or None to create default)
             ocr: OCRHandler instance (or None to create default)
             message_queue: MessageQueue instance (or None to create default)
@@ -77,6 +80,7 @@ class Watchtower:
         from TelegramHandler import TelegramHandler
         from MessageRouter import MessageRouter
         from DiscordHandler import DiscordHandler
+        from SlackHandler import SlackHandler
         from OCRHandler import OCRHandler
         from MessageQueue import MessageQueue
         from MetricsCollector import MetricsCollector
@@ -87,6 +91,7 @@ class Watchtower:
         self.telegram = telegram or TelegramHandler(self.config, self.metrics)
         self.router = router or MessageRouter(self.config)
         self.discord = discord or DiscordHandler()
+        self.slack = slack or SlackHandler()
         self.ocr = ocr or OCRHandler()
         self.message_queue = message_queue or MessageQueue(self.metrics)
 
@@ -392,6 +397,9 @@ class Watchtower:
         if destination['type'] == APP_TYPE_DISCORD:
             content = self.discord.format_message(parsed_message, destination)
             status = await self._send_to_discord(parsed_message, destination, content, include_attachment)
+        elif destination['type'] == APP_TYPE_SLACK:
+            content = self.slack.format_message(parsed_message, destination)
+            status = await self._send_to_slack(parsed_message, destination, content, include_attachment)
         elif destination['type'] == APP_TYPE_TELEGRAM:
             content = self.telegram.format_message(parsed_message, destination)
             status = await self._send_to_telegram(parsed_message, destination, content, include_attachment)
@@ -443,6 +451,45 @@ class Watchtower:
                 formatted_content=content,
                 attachment_path=attachment_path,
                 reason="Discord send failed (likely rate limit)"
+            )
+            self.metrics.increment("messages_queued_retry")
+            return SendStatus.QUEUED
+
+    async def _send_to_slack(self, parsed_message: MessageData, destination: Dict, content: str, include_attachment: bool) -> SendStatus:
+        """Send message to Slack webhook.
+
+        Args:
+            parsed_message: The parsed message with applied parser rules
+            destination: Slack webhook destination config
+            content: Formatted message text
+            include_attachment: Whether to include media attachment (will show warning instead)
+
+        Returns:
+            SendStatus: SENT if successful, QUEUED if enqueued for retry, FAILED otherwise
+        """
+        if parsed_message.has_attachments and not include_attachment:
+            if destination.get('restricted_mode', False):
+                content += "\n*[Media attachment filtered due to restricted mode]*"
+            else:
+                content += f"\n*[Media type {parsed_message.attachment_type} could not be forwarded to Slack]*"
+
+        # Slack webhooks don't support attachments, so we pass the attachment_path
+        # to trigger the warning message in send_message, but the file won't be sent
+        attachment_path = parsed_message.attachment_path if include_attachment else None
+
+        success = await self.slack.send_message(content, destination['slack_webhook_url'], attachment_path)
+
+        if success:
+            self.metrics.increment("messages_sent_slack")
+            if parsed_message.ocr_raw:
+                self.metrics.increment("ocr_msgs_sent")
+            return SendStatus.SENT
+        else:
+            self.message_queue.enqueue(
+                destination=destination,
+                formatted_content=content,
+                attachment_path=None,  # Don't retry with attachment since Slack webhooks don't support it
+                reason="Slack send failed (likely rate limit)"
             )
             self.metrics.increment("messages_queued_retry")
             return SendStatus.QUEUED
@@ -642,6 +689,10 @@ class Watchtower:
                     # Discord uses markdown quote prefix ("> ")
                     lines_quoted = [f"> {line}" for line in matched_lines]
                     attachment_section = f"\n\n**{header}**\n" + "\n".join(lines_quoted)
+                elif dest_type == APP_TYPE_SLACK:
+                    # Slack uses markdown quote prefix ("> ") but "*" for bold
+                    lines_quoted = [f"> {line}" for line in matched_lines]
+                    attachment_section = f"\n\n*{header}*\n" + "\n".join(lines_quoted)
 
                 if dest_type == APP_TYPE_TELEGRAM:
                     attachment_section += f"\n\n<b>[Full file has {total_lines:,} lines]</b>"

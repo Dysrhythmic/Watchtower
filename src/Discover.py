@@ -216,10 +216,7 @@ def _print_diff_output(new_channels, removed_channel_ids, existing_channel_ids, 
 def _save_discovered_config(channels, config_dir: Path):
     """Save discovered channels to config file.
 
-    Generates a config with the new 'destinations' format.
-    To configure Telegram as a destination, change:
-    - type: "discord" -> "telegram"
-    - env_key: Use an env variable containing the Telegram channel ID (e.g., "@channel" or "-1001234567890")
+    Generates a configuration file with defaults based on discovered Telegram channels.
     """
     config = {
         "destinations": [

@@ -43,7 +43,7 @@ from typing import List, Dict, Optional, Set
 from dotenv import load_dotenv
 from pathlib import Path
 from LoggerSetup import setup_logger
-from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD, APP_TYPE_RSS
+from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD, APP_TYPE_SLACK, APP_TYPE_RSS
 
 _logger = setup_logger(__name__)
 
@@ -126,6 +126,8 @@ class ConfigManager:
         telegram_used = False
         discord_used = False
         discord_webhooks_valid = False
+        slack_used = False
+        slack_webhooks_valid = False
         destination_types_found = set()
 
         for destination in self.destinations:
@@ -139,6 +141,11 @@ class ConfigManager:
                 # Check if this Discord destination has a webhook URL
                 if destination.get('discord_webhook_url'):
                     discord_webhooks_valid = True
+            elif dest_type == APP_TYPE_SLACK:
+                slack_used = True
+                # Check if this Slack destination has a webhook URL
+                if destination.get('slack_webhook_url'):
+                    slack_webhooks_valid = True
 
             # Check if any sources are Telegram channels
             for channel in destination.get('channels', []):
@@ -162,6 +169,15 @@ class ConfigManager:
                     "Check that the environment variables for Discord webhooks are set correctly in your .env file."
                 )
             _logger.info("Discord webhook URLs validated")
+
+        # Check for Slack webhooks if Slack is used as a destination
+        if slack_used:
+            if not slack_webhooks_valid:
+                raise ValueError(
+                    "Slack destinations are configured but no webhook URLs were found. "
+                    "Check that the environment variables for Slack webhooks are set correctly in your .env file."
+                )
+            _logger.info("Slack webhook URLs validated")
 
         if not destination_types_found:
             raise ValueError(
@@ -226,7 +242,7 @@ class ConfigManager:
         dest_type = destination_config.get('type')
 
         # Destination must be an expected type
-        if dest_type not in [APP_TYPE_DISCORD, APP_TYPE_TELEGRAM]:
+        if dest_type not in [APP_TYPE_DISCORD, APP_TYPE_TELEGRAM, APP_TYPE_SLACK]:
             _logger.error(f"Invalid or missing destination type for '{name}': {dest_type}.")
             return None
 
@@ -255,6 +271,8 @@ class ConfigManager:
         # Add type-specific destination endpoint
         if dest_type == APP_TYPE_DISCORD:
             entry['discord_webhook_url'] = endpoint
+        elif dest_type == APP_TYPE_SLACK:
+            entry['slack_webhook_url'] = endpoint
         elif dest_type == APP_TYPE_TELEGRAM:
             entry['telegram_dst_channel'] = endpoint
 

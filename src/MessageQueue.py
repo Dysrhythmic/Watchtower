@@ -15,7 +15,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import List, Optional, Dict, TYPE_CHECKING
 from LoggerSetup import setup_logger
-from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD
+from AppTypes import APP_TYPE_TELEGRAM, APP_TYPE_DISCORD, APP_TYPE_SLACK
 
 if TYPE_CHECKING:
     from Watchtower import Watchtower
@@ -102,6 +102,11 @@ class MessageQueue:
                         if webhook_url in watchtower.discord._rate_limits:
                             rate_limit_expiry = watchtower.discord._rate_limits[webhook_url]
 
+                    elif dest['type'] == APP_TYPE_SLACK:
+                        webhook_url = dest['slack_webhook_url']
+                        if webhook_url in watchtower.slack._rate_limits:
+                            rate_limit_expiry = watchtower.slack._rate_limits[webhook_url]
+
                     elif dest['type'] == APP_TYPE_TELEGRAM:
                         chat_id = dest.get('telegram_dst_id')
                         if chat_id and chat_id in watchtower.telegram._rate_limits:
@@ -167,6 +172,11 @@ class MessageQueue:
                     retry_item.formatted_content,
                     dest['discord_webhook_url'],
                     retry_item.attachment_path
+                )
+            elif dest['type'] == APP_TYPE_SLACK:
+                return await watchtower.slack.send_message(
+                    retry_item.formatted_content,
+                    dest['slack_webhook_url']
                 )
             elif dest['type'] == APP_TYPE_TELEGRAM:
                 chat_id = dest.get('telegram_dst_id')

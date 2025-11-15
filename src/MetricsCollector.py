@@ -15,6 +15,7 @@ Metrics include:
   messages_received_rss
   messages_sent_telegram
   messages_sent_discord
+  messages_sent_slack
   messages_first_missed_telegram
   ocr_msgs_processed
   ocr_msgs_sent

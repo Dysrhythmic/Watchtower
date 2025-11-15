@@ -8,6 +8,7 @@ standardized message sending operations.
 Current Implementations:
     - DiscordHandler
     - TelegramHandler
+    - SlackHandler
 """
 import time
 import math

@@ -1,20 +1,11 @@
-"""
-Tests for media download and cleanup functionality.
-
-Tests cover:
-- TelegramHandler.download_attachment() (src/TelegramHandler.py:250-258)
-- Watchtower media cleanup (src/Watchtower.py:213-219, 87-101)
-- Media reuse logic (src/Watchtower.py:234)
-"""
-
-import unittest
+"""Tests for media download and cleanup functionality."""
 from unittest.mock import patch, Mock, AsyncMock, call
 from pathlib import Path
 import asyncio
 import os
 import sys
+import pytest
 
-# Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from TelegramHandler import TelegramHandler
@@ -22,265 +13,215 @@ from MessageData import MessageData
 from datetime import datetime, timezone
 
 
-class TestMediaDownload(unittest.TestCase):
-    """Tests for TelegramHandler.download_attachment()"""
+@pytest.fixture
+def mock_config():
+    """Create mock config for tests."""
+    config = Mock()
+    config.api_id = "123456"
+    config.api_hash = "test_hash"
+    config.project_root = Path("/tmp/test")
+    config.config_dir = config.project_root / "config"
+    return config
 
-    def setUp(self):
-        """Set up test fixtures."""
-        self.mock_config = Mock()
-        self.mock_config.api_id = "123456"
-        self.mock_config.api_hash = "test_hash"
-        self.mock_config.project_root = Path("/tmp/test")
-        self.mock_config.config_dir = self.mock_config.project_root / "config"
 
-    @patch('TelegramHandler.TelegramClient')
-    @patch('os.path.getsize')
-    def test_download_attachment_success(self, mock_getsize, MockClient):
-        """
-        Given: Message with media
-        When: download_attachment() called
-        Then: Media downloaded to tmp/attachments/, path returned
+@patch('TelegramHandler.TelegramClient')
+@patch('os.path.getsize')
+def test_download_attachment_success(mock_getsize, MockClient, mock_config, caplog):
+    """
+    Given: Message with media
+    When: download_attachment() called
+    Then: Media downloaded to tmp/attachments/, path returned
+    """
+    handler = TelegramHandler(mock_config)
+    handler.client = MockClient()
+    mock_getsize.return_value = 1024 * 1024
 
-        Tests: src/TelegramHandler.py:250-258 (download_attachment success path)
-        """
-        # Given: Handler with mocked client
-        handler = TelegramHandler(self.mock_config)
-        handler.client = MockClient()
+    message_data = MessageData(
+        source_type="telegram",
+        channel_id="123",
+        channel_name="test_channel",
+        username="test_user",
+        text="Test message",
+        timestamp=datetime.now(timezone.utc),
+        has_attachments=True,
+        attachment_type="Photo"
+    )
+    message_data.original_message = Mock()
+    message_data.original_message.media = Mock()
+    message_data.original_message.download_media = AsyncMock(return_value="/tmp/attachments/12345.jpg")
 
-        # Mock file size for successful download
-        mock_getsize.return_value = 1024 * 1024  # 1 MB
-
-        # Create message data with media
-        message_data = MessageData(
-            source_type="telegram",
-            channel_id="123",
-            channel_name="test_channel",
-            username="test_user",
-            text="Test message",
-            timestamp=datetime.now(timezone.utc),
-            has_attachments=True,
-            attachment_type="Photo"
-        )
-        message_data.original_message = Mock()
-        message_data.original_message.media = Mock()  # Has media
-        message_data.original_message.download_media = AsyncMock(return_value="/tmp/attachments/12345.jpg")
-
-        # When: download_attachment() called
-        with self.assertLogs(level='INFO') as log_context:
-            result = asyncio.run(handler.download_attachment(message_data))
-
-        # Then: Media downloaded successfully
-        self.assertEqual(result, "/tmp/attachments/12345.jpg")
-        message_data.original_message.download_media.assert_called_once()
-        # Check that success log was written
-        self.assertTrue(any("Attachment downloaded successfully" in msg for msg in log_context.output))
-
-    @patch('TelegramHandler.TelegramClient')
-    def test_download_attachment_failure_returns_none(self, MockClient):
-        """
-        Given: Message with media, download fails
-        When: download_attachment() called
-        Then: Exception caught, None returned
-
-        Tests: src/TelegramHandler.py:256-258 (exception handling)
-        """
-        # Given: Handler with failing download
-        handler = TelegramHandler(self.mock_config)
-        handler.client = MockClient()
-
-        # Create message data with media
-        message_data = MessageData(
-            source_type="telegram",
-            channel_id="123",
-            channel_name="test_channel",
-            username="test_user",
-            text="Test message",
-            timestamp=datetime.now(timezone.utc),
-            has_attachments=True,
-            attachment_type="Photo"
-        )
-        message_data.original_message = Mock()
-        message_data.original_message.media = Mock()
-        message_data.original_message.download_media = AsyncMock(
-            side_effect=Exception("Network error")
-        )
-
-        # When: download_attachment() called
-        with self.assertLogs(level='ERROR') as log_context:
-            result = asyncio.run(handler.download_attachment(message_data))
-
-        # Then: Returns None, error logged
-        self.assertIsNone(result)
-        self.assertTrue(any("Attachment download failed" in msg for msg in log_context.output))
-
-    @patch('TelegramHandler.TelegramClient')
-    def test_download_attachment_no_media_returns_none(self, MockClient):
-        """
-        Given: Message without media
-        When: download_attachment() called
-        Then: Returns None immediately without attempting download
-
-        Tests: src/TelegramHandler.py:252 (no media check)
-        """
-        # Given: Handler
-        handler = TelegramHandler(self.mock_config)
-        handler.client = MockClient()
-
-        # Create message data without media
-        message_data = MessageData(
-            source_type="telegram",
-            channel_id="123",
-            channel_name="test_channel",
-            username="test_user",
-            text="Text only message",
-            timestamp=datetime.now(timezone.utc),
-            has_attachments=False
-        )
-        message_data.original_message = Mock()
-        message_data.original_message.media = None  # No media
-        message_data.original_message.download_media = AsyncMock()
-
-        # When: download_attachment() called
+    with caplog.at_level('INFO'):
         result = asyncio.run(handler.download_attachment(message_data))
 
-        # Then: Returns None, download not attempted
-        self.assertIsNone(result)
-        message_data.original_message.download_media.assert_not_called()
+    assert result == "/tmp/attachments/12345.jpg"
+    message_data.original_message.download_media.assert_called_once()
+    assert any("Attachment downloaded successfully" in msg for msg in caplog.text.split('\n'))
 
 
-class TestMediaCleanup(unittest.TestCase):
-    """Tests for media cleanup functionality in Watchtower."""
+@patch('TelegramHandler.TelegramClient')
+def test_download_attachment_failure_returns_none(MockClient, mock_config, caplog):
+    """
+    Given: Message with media, download fails
+    When: download_attachment() called
+    Then: Exception caught, None returned
+    """
+    handler = TelegramHandler(mock_config)
+    handler.client = MockClient()
 
-    @patch('os.remove')
-    @patch('os.path.exists')
-    def test_cleanup_after_message_processing(self, mock_exists, mock_remove):
-        """
-        Given: Media file exists at path
-        When: Message processing completes
-        Then: File deleted
+    message_data = MessageData(
+        source_type="telegram",
+        channel_id="123",
+        channel_name="test_channel",
+        username="test_user",
+        text="Test message",
+        timestamp=datetime.now(timezone.utc),
+        has_attachments=True,
+        attachment_type="Photo"
+    )
+    message_data.original_message = Mock()
+    message_data.original_message.media = Mock()
+    message_data.original_message.download_media = AsyncMock(side_effect=Exception("Network error"))
 
-        Tests: src/Watchtower.py:213-219 (cleanup in finally block)
-        """
-        # Given: File exists
-        mock_exists.return_value = True
-        attachment_path = "/tmp/attachments/test_image.jpg"
+    with caplog.at_level('ERROR'):
+        result = asyncio.run(handler.download_attachment(message_data))
 
-        # When: Cleanup called (simulating finally block)
+    assert result is None
+    assert any("Attachment download failed" in msg for msg in caplog.text.split('\n'))
+
+
+@patch('TelegramHandler.TelegramClient')
+def test_download_attachment_no_media_returns_none(MockClient, mock_config):
+    """
+    Given: Message without media
+    When: download_attachment() called
+    Then: Returns None immediately without attempting download
+    """
+    handler = TelegramHandler(mock_config)
+    handler.client = MockClient()
+
+    message_data = MessageData(
+        source_type="telegram",
+        channel_id="123",
+        channel_name="test_channel",
+        username="test_user",
+        text="Text only message",
+        timestamp=datetime.now(timezone.utc),
+        has_attachments=False
+    )
+    message_data.original_message = Mock()
+    message_data.original_message.media = None
+    message_data.original_message.download_media = AsyncMock()
+
+    result = asyncio.run(handler.download_attachment(message_data))
+
+    assert result is None
+    message_data.original_message.download_media.assert_not_called()
+
+
+@patch('os.remove')
+@patch('os.path.exists')
+def test_cleanup_after_message_processing(mock_exists, mock_remove):
+    """
+    Given: Media file exists at path
+    When: Message processing completes
+    Then: File deleted
+    """
+    mock_exists.return_value = True
+    attachment_path = "/tmp/attachments/test_image.jpg"
+
+    if os.path.exists(attachment_path):
+        os.remove(attachment_path)
+
+    mock_exists.assert_called_with(attachment_path)
+    mock_remove.assert_called_once_with(attachment_path)
+
+
+@patch('os.remove')
+@patch('os.path.exists')
+def test_cleanup_error_logged_not_raised(mock_exists, mock_remove):
+    """
+    Given: Media file exists, os.remove() raises exception
+    When: Cleanup runs
+    Then: Exception logged, not raised
+    """
+    mock_exists.return_value = True
+    mock_remove.side_effect = OSError("Permission denied")
+    attachment_path = "/tmp/attachments/test_image.jpg"
+
+    try:
         if os.path.exists(attachment_path):
             os.remove(attachment_path)
+    except OSError:
+        pass
 
-        # Then: File removed
-        mock_exists.assert_called_with(attachment_path)
-        mock_remove.assert_called_once_with(attachment_path)
-
-    @patch('os.remove')
-    @patch('os.path.exists')
-    def test_cleanup_error_logged_not_raised(self, mock_exists, mock_remove):
-        """
-        Given: Media file exists, os.remove() raises exception
-        When: Cleanup runs
-        Then: Exception logged, not raised
-
-        Tests: src/Watchtower.py:218-219 (exception handling in cleanup)
-        """
-        # Given: File exists but removal fails
-        mock_exists.return_value = True
-        mock_remove.side_effect = OSError("Permission denied")
-        attachment_path = "/tmp/attachments/test_image.jpg"
-
-        # When: Cleanup attempted with exception handling
-        try:
-            if os.path.exists(attachment_path):
-                os.remove(attachment_path)
-        except OSError:
-            pass  # Watchtower logs but doesn't raise
-
-        # Then: Exception occurred but was handled
-        mock_remove.assert_called_once()
-        # In real code, this would be logged - we're testing error doesn't propagate
-
-    @patch('os.listdir')
-    @patch('os.remove')
-    @patch('os.path.exists')
-    def test_startup_cleanup_removes_leftover_files(self, mock_exists, mock_remove, mock_listdir):
-        """
-        Given: tmp/attachments/ contains leftover files from crash
-        When: Watchtower initializes
-        Then: All files in tmp/attachments/ removed
-
-        Tests: src/Watchtower.py:87-101 (startup cleanup)
-        """
-        # Given: Attachments directory has leftover files
-        mock_exists.return_value = True
-        mock_listdir.return_value = ["file1.jpg", "file2.png", "file3.mp4"]
-        attachments_dir = Path("/tmp/attachments")
-
-        # When: Startup cleanup runs (simulated)
-        if os.path.exists(attachments_dir):
-            for filename in os.listdir(attachments_dir):
-                filepath = attachments_dir / filename
-                try:
-                    os.remove(filepath)
-                except Exception:
-                    pass
-
-        # Then: All files removed
-        self.assertEqual(mock_remove.call_count, 3)
-        expected_calls = [
-            call(attachments_dir / "file1.jpg"),
-            call(attachments_dir / "file2.png"),
-            call(attachments_dir / "file3.mp4")
-        ]
-        mock_remove.assert_has_calls(expected_calls, any_order=True)
-
-    def test_media_already_downloaded_reused(self):
-        """
-        Given: message_data.attachment_path already set
-        When: Media decision logic runs
-        Then: download_attachment() NOT called, existing path reused
-
-        Tests: src/Watchtower.py:234 (media reuse logic)
-        """
-        # Given: Message data with existing attachment_path
-        message_data = MessageData(
-            source_type="telegram",
-            channel_id="123",
-            channel_name="test_channel",
-            username="test_user",
-            text="Test",
-            timestamp=datetime.now(timezone.utc),
-            has_attachments=True,
-            attachment_type="Photo",
-            attachment_path="/tmp/attachments/existing.jpg"
-        )
-
-        # When: Checking if download needed (simulated logic from Watchtower.py:234)
-        needs_download = message_data.attachment_path is None
-
-        # Then: Download not needed
-        self.assertFalse(needs_download)
-        self.assertEqual(message_data.attachment_path, "/tmp/attachments/existing.jpg")
-
-    @patch('os.path.exists')
-    def test_cleanup_nonexistent_file_skipped(self, mock_exists):
-        """
-        Given: Media path doesn't exist
-        When: Cleanup runs
-        Then: No error, removal skipped
-
-        Tests: src/Watchtower.py:215 (exists check before removal)
-        """
-        # Given: File doesn't exist
-        mock_exists.return_value = False
-        attachment_path = "/tmp/attachments/nonexistent.jpg"
-
-        # When: Cleanup checked
-        if os.path.exists(attachment_path):
-            os.remove(attachment_path)  # This line won't execute
-
-        # Then: No removal attempted
-        mock_exists.assert_called_with(attachment_path)
+    mock_remove.assert_called_once()
 
 
-if __name__ == '__main__':
-    unittest.main()
+@patch('os.listdir')
+@patch('os.remove')
+@patch('os.path.exists')
+def test_startup_cleanup_removes_leftover_files(mock_exists, mock_remove, mock_listdir):
+    """
+    Given: tmp/attachments/ contains leftover files from crash
+    When: Watchtower initializes
+    Then: All files in tmp/attachments/ removed
+    """
+    mock_exists.return_value = True
+    mock_listdir.return_value = ["file1.jpg", "file2.png", "file3.mp4"]
+    attachments_dir = Path("/tmp/attachments")
+
+    if os.path.exists(attachments_dir):
+        for filename in os.listdir(attachments_dir):
+            filepath = attachments_dir / filename
+            try:
+                os.remove(filepath)
+            except Exception:
+                pass
+
+    assert mock_remove.call_count == 3
+    expected_calls = [
+        call(attachments_dir / "file1.jpg"),
+        call(attachments_dir / "file2.png"),
+        call(attachments_dir / "file3.mp4")
+    ]
+    mock_remove.assert_has_calls(expected_calls, any_order=True)
+
+
+def test_media_already_downloaded_reused():
+    """
+    Given: message_data.attachment_path already set
+    When: Media decision logic runs
+    Then: download_attachment() NOT called, existing path reused
+    """
+    message_data = MessageData(
+        source_type="telegram",
+        channel_id="123",
+        channel_name="test_channel",
+        username="test_user",
+        text="Test",
+        timestamp=datetime.now(timezone.utc),
+        has_attachments=True,
+        attachment_type="Photo",
+        attachment_path="/tmp/attachments/existing.jpg"
+    )
+
+    needs_download = message_data.attachment_path is None
+
+    assert not needs_download
+    assert message_data.attachment_path == "/tmp/attachments/existing.jpg"
+
+
+@patch('os.path.exists')
+def test_cleanup_nonexistent_file_skipped(mock_exists):
+    """
+    Given: Media path doesn't exist
+    When: Cleanup runs
+    Then: No error, removal skipped
+    """
+    mock_exists.return_value = False
+    attachment_path = "/tmp/attachments/nonexistent.jpg"
+
+    if os.path.exists(attachment_path):
+        os.remove(attachment_path)
+
+    mock_exists.assert_called_with(attachment_path)

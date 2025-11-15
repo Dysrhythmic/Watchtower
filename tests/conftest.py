@@ -65,7 +65,7 @@ def mock_telegram_handler(mock_config):
 def mock_discord_handler():
     """Create a real DiscordHandler instance for testing DiscordHandler methods.
 
-    This fixture does NOT mock any methods, so tests can verify real behavior
+    This fixture does not mock any methods, so tests can verify real behavior
     with mocked HTTP calls (via @patch('requests.post')).
 
     For Watchtower integration tests that need mocked handlers, use mock_discord_for_watchtower.
@@ -133,7 +133,7 @@ def mock_metrics():
 def mock_watchtower(mock_config, mock_telegram_handler, mock_discord_for_watchtower,
                     mock_message_router, mock_ocr_handler, mock_message_queue,
                     mock_metrics):
-    """Create a fully-mocked Watchtower instance."""
+    """Create a fully mocked Watchtower instance."""
     from Watchtower import Watchtower
 
     watchtower = Watchtower(
@@ -171,7 +171,7 @@ def message_factory():
         reply_context=None,
         metadata=None
     ):
-        """Create a MessageData instance with sensible defaults."""
+        """Create a MessageData instance with defaults."""
         msg = MessageData(
             source_type=source_type,
             channel_id=channel_id,
@@ -247,7 +247,7 @@ def temp_text_file():
 def create_mock_config(extra_attrs=None):
     """Helper to create properly configured mock config for integration tests.
 
-    This function is used by integration tests that use unittest.TestCase style.
+    This function is used by integration tests that use unittest.TestCase
     For pytest tests, use the mock_config fixture instead.
 
     Args:

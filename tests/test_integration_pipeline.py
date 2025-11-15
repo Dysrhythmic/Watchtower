@@ -1,351 +1,258 @@
-"""
-Tests for Watchtower async pipeline integration.
-
-These tests cover critical end-to-end flows through the async pipeline:
-- Message routing from source to destination
-- OCR integration trigger
-- Media download/cleanup integration
-- Restricted mode enforcement in full flow
-- Error handling in pipeline
-
-Tests:
-- OCR integration trigger (src/Watchtower.py:231-241)
-- Media restrictions check (src/Watchtower.py:253-286)
-- Defanged URL generation (src/Watchtower.py:243-251)
-- Cleanup after processing (src/Watchtower.py:213-219)
-"""
-
-import unittest
+"""Tests for Watchtower async pipeline integration."""
 from unittest.mock import Mock, AsyncMock, patch
 import asyncio
 import sys
 import os
 from pathlib import Path
 from datetime import datetime, timezone
+import pytest
 
-# Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from MessageData import MessageData
 
 
-class TestWatchtowerOCRIntegration(unittest.TestCase):
-    """Tests for OCR integration in message pipeline."""
+@patch('Watchtower.os.path.exists')
+@patch('MetricsCollector.MetricsCollector')
+@patch('MessageQueue.MessageQueue')
+@patch('DiscordHandler.DiscordHandler')
+@patch('TelegramHandler.TelegramHandler')
+@patch('OCRHandler.OCRHandler')
+@patch('MessageRouter.MessageRouter')
+@patch('ConfigManager.ConfigManager')
+def test_ocr_trigger_when_enabled_for_channel(MockConfig, MockRouter, MockOCR, MockTelegram, MockDiscord, MockQueue, MockMetrics, mock_exists):
+    """Test OCR extraction when enabled for channel."""
+    from Watchtower import Watchtower
 
-    @patch('Watchtower.os.path.exists')
-    @patch('MetricsCollector.MetricsCollector')
-    @patch('MessageQueue.MessageQueue')
-    @patch('DiscordHandler.DiscordHandler')
-    @patch('TelegramHandler.TelegramHandler')
-    @patch('OCRHandler.OCRHandler')
-    @patch('MessageRouter.MessageRouter')
-    @patch('ConfigManager.ConfigManager')
-    def test_ocr_trigger_when_enabled_for_channel(self, MockConfig, MockRouter, MockOCR, MockTelegram, MockDiscord, MockQueue, MockMetrics, mock_exists):
-        """
-        Given: Telegram message with media, OCR enabled for channel
-        When: _preprocess_message() called
-        Then: OCR extraction attempted, ocr_raw set
+    mock_exists.return_value = True
 
-        Tests: src/Watchtower.py:231-241 (OCR trigger logic)
+    mock_config = MockConfig.return_value
+    mock_config.telegram_api_id = "123"
+    mock_config.telegram_api_hash = "hash"
+    mock_config.telegram_session_name = "session"
+    mock_config.project_root = Path("/tmp")
+    mock_config.attachments_dir = Path("/tmp/attachments")
+    mock_config.rsslog_dir = Path("/tmp/rsslog")
+    mock_config.tmp_dir = Path("/tmp")
 
-        This is CRITICAL - OCR allows routing based on text in images.
-        """
-        from Watchtower import Watchtower
+    mock_router = MockRouter.return_value
+    mock_router.is_ocr_enabled_for_channel = Mock(return_value=True)
 
-        # Mock os.path.exists to return True for media file
-        mock_exists.return_value = True
+    mock_ocr = MockOCR.return_value
+    mock_ocr.is_available = Mock(return_value=True)
+    mock_ocr.extract_text = Mock(return_value="Extracted text from image")
 
-        # Mock config
-        mock_config = MockConfig.return_value
-        mock_config.telegram_api_id = "123"
-        mock_config.telegram_api_hash = "hash"
-        mock_config.telegram_session_name = "session"
-        mock_config.project_root = Path("/tmp")
-        mock_config.attachments_dir = Path("/tmp/attachments")
-        mock_config.rsslog_dir = Path("/tmp/rsslog")
-        mock_config.tmp_dir = Path("/tmp")
+    mock_telegram = MockTelegram.return_value
+    mock_telegram.download_attachment = AsyncMock(return_value="/tmp/attachments/test.jpg")
 
-        # Mock router to enable OCR for channel
-        mock_router = MockRouter.return_value
-        mock_router.is_ocr_enabled_for_channel = Mock(return_value=True)
+    watchtower = Watchtower(sources=['telegram'])
 
-        # Mock OCR handler
-        mock_ocr = MockOCR.return_value
-        mock_ocr.is_available = Mock(return_value=True)
-        mock_ocr.extract_text = Mock(return_value="Extracted text from image")
+    message_data = MessageData(
+        source_type="Telegram",
+        channel_id="123456",
+        channel_name="test_channel",
+        username="test_user",
+        timestamp=datetime.now(timezone.utc),
+        text="Test message",
+        has_attachments=True,
+        attachment_path=None
+    )
+    message_data.original_message = Mock()
 
-        # Mock Telegram handler
-        mock_telegram = MockTelegram.return_value
-        mock_telegram.download_attachment = AsyncMock(return_value="/tmp/attachments/test.jpg")
+    asyncio.run(watchtower._preprocess_message(message_data))
 
-        # Create Watchtower instance
-        watchtower = Watchtower(sources=['telegram'])
-
-        # Create message data with media
-        message_data = MessageData(
-            source_type="Telegram",
-            channel_id="123456",
-            channel_name="test_channel",
-            username="test_user",
-            timestamp=datetime.now(timezone.utc),
-            text="Test message",
-            has_attachments=True,
-            attachment_path=None  # Not yet downloaded
-        )
-        message_data.original_message = Mock()
-
-        # When: Preprocess message
-        asyncio.run(watchtower._preprocess_message(message_data))
-
-        # Then: OCR extraction performed
-        mock_router.is_ocr_enabled_for_channel.assert_called_once()
-        mock_ocr.extract_text.assert_called_once()
-        self.assertTrue(message_data.ocr_enabled)
-        self.assertEqual(message_data.ocr_raw, "Extracted text from image")
-
-    @patch('MetricsCollector.MetricsCollector')
-    @patch('MessageQueue.MessageQueue')
-    @patch('DiscordHandler.DiscordHandler')
-    @patch('TelegramHandler.TelegramHandler')
-    @patch('OCRHandler.OCRHandler')
-    @patch('MessageRouter.MessageRouter')
-    @patch('ConfigManager.ConfigManager')
-    def test_ocr_skipped_when_not_enabled_for_channel(self, MockConfig, MockRouter, MockOCR, MockTelegram, MockDiscord, MockQueue, MockMetrics):
-        """
-        Given: Telegram message with media, OCR NOT enabled for channel
-        When: _preprocess_message() called
-        Then: OCR extraction NOT attempted
-
-        Tests: src/Watchtower.py:231-233 (OCR check logic)
-        """
-        from Watchtower import Watchtower
-
-        mock_config = MockConfig.return_value
-        mock_config.telegram_api_id = "123"
-        mock_config.telegram_api_hash = "hash"
-        mock_config.telegram_session_name = "session"
-        mock_config.project_root = Path("/tmp")
-        mock_config.attachments_dir = Path("/tmp/attachments")
-        mock_config.rsslog_dir = Path("/tmp/rsslog")
-        mock_config.tmp_dir = Path("/tmp")
-
-        # Mock router to disable OCR for channel
-        mock_router = MockRouter.return_value
-        mock_router.is_ocr_enabled_for_channel = Mock(return_value=False)
-
-        # Mock OCR handler
-        mock_ocr = MockOCR.return_value
-        mock_ocr.is_available = Mock(return_value=True)
-        mock_ocr.extract_text = Mock()
-
-        mock_telegram = MockTelegram.return_value
-
-        watchtower = Watchtower(sources=['telegram'])
-
-        message_data = MessageData(
-            source_type="Telegram",
-            channel_id="123456",
-            channel_name="test_channel",
-            username="test_user",
-            timestamp=datetime.now(timezone.utc),
-            text="Test message",
-            has_attachments=True
-        )
-        message_data.original_message = Mock()
-
-        # When: Preprocess message
-        asyncio.run(watchtower._preprocess_message(message_data))
-
-        # Then: OCR NOT attempted
-        mock_ocr.extract_text.assert_not_called()
-        self.assertFalse(message_data.ocr_enabled)
+    mock_router.is_ocr_enabled_for_channel.assert_called_once()
+    mock_ocr.extract_text.assert_called_once()
+    assert message_data.ocr_enabled
+    assert message_data.ocr_raw == "Extracted text from image"
 
 
-class TestWatchtowerDefangedURLs(unittest.TestCase):
-    """Tests for defanged URL generation."""
+@patch('MetricsCollector.MetricsCollector')
+@patch('MessageQueue.MessageQueue')
+@patch('DiscordHandler.DiscordHandler')
+@patch('TelegramHandler.TelegramHandler')
+@patch('OCRHandler.OCRHandler')
+@patch('MessageRouter.MessageRouter')
+@patch('ConfigManager.ConfigManager')
+def test_ocr_skipped_when_not_enabled_for_channel(MockConfig, MockRouter, MockOCR, MockTelegram, MockDiscord, MockQueue, MockMetrics):
+    """Test OCR extraction is skipped when not enabled."""
+    from Watchtower import Watchtower
 
-    @patch('MetricsCollector.MetricsCollector')
-    @patch('MessageQueue.MessageQueue')
-    @patch('DiscordHandler.DiscordHandler')
-    @patch('OCRHandler.OCRHandler')
-    @patch('TelegramHandler.TelegramHandler')
-    @patch('MessageRouter.MessageRouter')
-    @patch('ConfigManager.ConfigManager')
-    def test_defanged_url_added_to_telegram_messages(self, MockConfig, MockRouter, MockTelegram, MockOCR, MockDiscord, MockQueue, MockMetrics):
-        """
-        Given: Telegram message
-        When: _preprocess_message() called
-        Then: Defanged t.me URL added to metadata
+    mock_config = MockConfig.return_value
+    mock_config.telegram_api_id = "123"
+    mock_config.telegram_api_hash = "hash"
+    mock_config.telegram_session_name = "session"
+    mock_config.project_root = Path("/tmp")
+    mock_config.attachments_dir = Path("/tmp/attachments")
+    mock_config.rsslog_dir = Path("/tmp/rsslog")
+    mock_config.tmp_dir = Path("/tmp")
 
-        Tests: src/Watchtower.py:243-251 (defanged URL generation)
+    mock_router = MockRouter.return_value
+    mock_router.is_ocr_enabled_for_channel = Mock(return_value=False)
 
-        This is SECURITY - prevents accidental navigation in CTI workflows.
-        """
-        from Watchtower import Watchtower
+    mock_ocr = MockOCR.return_value
+    mock_ocr.is_available = Mock(return_value=True)
+    mock_ocr.extract_text = Mock()
 
-        mock_config = MockConfig.return_value
-        mock_config.telegram_api_id = "123"
-        mock_config.telegram_api_hash = "hash"
-        mock_config.telegram_session_name = "session"
-        mock_config.project_root = Path("/tmp")
-        mock_config.attachments_dir = Path("/tmp/attachments")
-        mock_config.rsslog_dir = Path("/tmp/rsslog")
-        mock_config.tmp_dir = Path("/tmp")
+    mock_telegram = MockTelegram.return_value
 
-        mock_router = MockRouter.return_value
-        mock_router.is_ocr_enabled_for_channel = Mock(return_value=False)
+    watchtower = Watchtower(sources=['telegram'])
 
-        # Mock Telegram handler to return defanged URL
-        mock_telegram = MockTelegram.return_value
-        mock_telegram.build_defanged_tg_url = Mock(
-            return_value="hxxps://t[.]me/testchannel/123"
-        )
+    message_data = MessageData(
+        source_type="Telegram",
+        channel_id="123456",
+        channel_name="test_channel",
+        username="test_user",
+        timestamp=datetime.now(timezone.utc),
+        text="Test message",
+        has_attachments=True
+    )
+    message_data.original_message = Mock()
 
-        watchtower = Watchtower(sources=['telegram'])
+    asyncio.run(watchtower._preprocess_message(message_data))
 
-        # Create Telegram message
-        message_data = MessageData(
-            source_type="Telegram",
-            channel_id="123456",
-            channel_name="testchannel",
-            username="test_user",
-            timestamp=datetime.now(timezone.utc),
-            text="Test message"
-        )
-        message_data.original_message = Mock()
-        message_data.original_message.id = 123
-
-        # When: Preprocess message
-        asyncio.run(watchtower._preprocess_message(message_data))
-
-        # Then: Defanged URL added to metadata
-        mock_telegram.build_defanged_tg_url.assert_called_once_with(
-            "123456", "testchannel", 123
-        )
-        self.assertIn('src_url_defanged', message_data.metadata)
-        self.assertEqual(message_data.metadata['src_url_defanged'], "hxxps://t[.]me/testchannel/123")
+    mock_ocr.extract_text.assert_not_called()
+    assert not message_data.ocr_enabled
 
 
-class TestWatchtowerRestrictedMode(unittest.TestCase):
-    """Tests for restricted mode enforcement in pipeline."""
+@patch('MetricsCollector.MetricsCollector')
+@patch('MessageQueue.MessageQueue')
+@patch('DiscordHandler.DiscordHandler')
+@patch('OCRHandler.OCRHandler')
+@patch('TelegramHandler.TelegramHandler')
+@patch('MessageRouter.MessageRouter')
+@patch('ConfigManager.ConfigManager')
+def test_defanged_url_added_to_telegram_messages(MockConfig, MockRouter, MockTelegram, MockOCR, MockDiscord, MockQueue, MockMetrics):
+    """Test defanged URL is added to Telegram messages."""
+    from Watchtower import Watchtower
 
-    @patch('MetricsCollector.MetricsCollector')
-    @patch('MessageQueue.MessageQueue')
-    @patch('DiscordHandler.DiscordHandler')
-    @patch('OCRHandler.OCRHandler')
-    @patch('TelegramHandler.TelegramHandler')
-    @patch('MessageRouter.MessageRouter')
-    @patch('ConfigManager.ConfigManager')
-    def test_media_restrictions_enforced_for_restricted_destinations(self, MockConfig, MockRouter, MockTelegram, MockOCR, MockDiscord, MockQueue, MockMetrics):
-        """
-        Given: Telegram message with media, destination with restricted_mode=True
-        When: _handle_attachment_restrictions() called
-        Then: Media restriction check performed
+    mock_config = MockConfig.return_value
+    mock_config.telegram_api_id = "123"
+    mock_config.telegram_api_hash = "hash"
+    mock_config.telegram_session_name = "session"
+    mock_config.project_root = Path("/tmp")
+    mock_config.attachments_dir = Path("/tmp/attachments")
+    mock_config.rsslog_dir = Path("/tmp/rsslog")
+    mock_config.tmp_dir = Path("/tmp")
 
-        Tests: src/Watchtower.py:267-271 (restricted mode check)
+    mock_router = MockRouter.return_value
+    mock_router.is_ocr_enabled_for_channel = Mock(return_value=False)
 
-        This is SECURITY CRITICAL - enforces document validation.
-        """
-        from Watchtower import Watchtower
+    mock_telegram = MockTelegram.return_value
+    mock_telegram.build_defanged_tg_url = Mock(return_value="hxxps://t[.]me/testchannel/123")
 
-        mock_config = MockConfig.return_value
-        mock_config.telegram_api_id = "123"
-        mock_config.telegram_api_hash = "hash"
-        mock_config.telegram_session_name = "session"
-        mock_config.project_root = Path("/tmp")
-        mock_config.attachments_dir = Path("/tmp/attachments")
-        mock_config.rsslog_dir = Path("/tmp/rsslog")
-        mock_config.tmp_dir = Path("/tmp")
+    watchtower = Watchtower(sources=['telegram'])
 
-        mock_router = MockRouter.return_value
+    message_data = MessageData(
+        source_type="Telegram",
+        channel_id="123456",
+        channel_name="testchannel",
+        username="test_user",
+        timestamp=datetime.now(timezone.utc),
+        text="Test message"
+    )
+    message_data.original_message = Mock()
+    message_data.original_message.id = 123
 
-        # Mock Telegram handler with restriction check
-        mock_telegram = MockTelegram.return_value
-        mock_telegram._is_attachment_restricted = Mock(return_value=False)  # Media allowed (not restricted)
-        mock_telegram.download_attachment = AsyncMock(return_value="/tmp/attachments/test.jpg")
+    asyncio.run(watchtower._preprocess_message(message_data))
 
-        watchtower = Watchtower(sources=['telegram'])
-
-        # Create message with media
-        message_data = MessageData(
-            source_type="Telegram",
-            channel_id="123456",
-            channel_name="test_channel",
-            username="test_user",
-            timestamp=datetime.now(timezone.utc),
-            text="Test message",
-            has_attachments=True
-        )
-        message_data.original_message = Mock()
-
-        # Destination with restricted mode
-        destinations = [
-            {'type': 'Telegram', 'restricted_mode': True, 'telegram_dst_channel': '@channel'}
-        ]
-
-        # When: Check media restrictions
-        result = asyncio.run(watchtower._handle_attachment_restrictions(message_data, destinations))
-
-        # Then: Restriction check performed
-        mock_telegram._is_attachment_restricted.assert_called_once()
-        self.assertTrue(result)  # Media allowed
-
-    @patch('MetricsCollector.MetricsCollector')
-    @patch('MessageQueue.MessageQueue')
-    @patch('DiscordHandler.DiscordHandler')
-    @patch('OCRHandler.OCRHandler')
-    @patch('TelegramHandler.TelegramHandler')
-    @patch('MessageRouter.MessageRouter')
-    @patch('ConfigManager.ConfigManager')
-    def test_media_blocked_when_restricted_mode_fails(self, MockConfig, MockRouter, MockTelegram, MockOCR, MockDiscord, MockQueue, MockMetrics):
-        """
-        Given: Telegram message with media that fails restricted mode check
-        When: _handle_attachment_restrictions() called
-        Then: Returns False (media blocked)
-
-        Tests: src/Watchtower.py:269-271 (restriction failure)
-        """
-        from Watchtower import Watchtower
-
-        mock_config = MockConfig.return_value
-        mock_config.telegram_api_id = "123"
-        mock_config.telegram_api_hash = "hash"
-        mock_config.telegram_session_name = "session"
-        mock_config.project_root = Path("/tmp")
-        mock_config.attachments_dir = Path("/tmp/attachments")
-        mock_config.rsslog_dir = Path("/tmp/rsslog")
-        mock_config.tmp_dir = Path("/tmp")
-
-        mock_router = MockRouter.return_value
-
-        # Mock Telegram handler with restriction check that fails
-        mock_telegram = MockTelegram.return_value
-        mock_telegram._is_attachment_restricted = Mock(return_value=True)  # Media BLOCKED (restricted=True)
-        mock_telegram.download_attachment = AsyncMock(return_value="/tmp/attachments/test.jpg")
-
-        watchtower = Watchtower(sources=['telegram'])
-
-        message_data = MessageData(
-            source_type="Telegram",
-            channel_id="123456",
-            channel_name="test_channel",
-            username="test_user",
-            timestamp=datetime.now(timezone.utc),
-            text="Test message",
-            has_attachments=True
-        )
-        message_data.original_message = Mock()
-
-        destinations = [
-            {'type': 'Telegram', 'restricted_mode': True, 'telegram_dst_channel': '@channel'}
-        ]
-
-        # When: Check media restrictions
-        result = asyncio.run(watchtower._handle_attachment_restrictions(message_data, destinations))
-
-        # Then: Media blocked
-        self.assertFalse(result)
+    mock_telegram.build_defanged_tg_url.assert_called_once_with("123456", "testchannel", 123)
+    assert 'src_url_defanged' in message_data.metadata
+    assert message_data.metadata['src_url_defanged'] == "hxxps://t[.]me/testchannel/123"
 
 
-if __name__ == '__main__':
-    unittest.main()
+@patch('MetricsCollector.MetricsCollector')
+@patch('MessageQueue.MessageQueue')
+@patch('DiscordHandler.DiscordHandler')
+@patch('OCRHandler.OCRHandler')
+@patch('TelegramHandler.TelegramHandler')
+@patch('MessageRouter.MessageRouter')
+@patch('ConfigManager.ConfigManager')
+def test_media_restrictions_enforced_for_restricted_destinations(MockConfig, MockRouter, MockTelegram, MockOCR, MockDiscord, MockQueue, MockMetrics):
+    """Test media restrictions are enforced for restricted mode destinations."""
+    from Watchtower import Watchtower
+
+    mock_config = MockConfig.return_value
+    mock_config.telegram_api_id = "123"
+    mock_config.telegram_api_hash = "hash"
+    mock_config.telegram_session_name = "session"
+    mock_config.project_root = Path("/tmp")
+    mock_config.attachments_dir = Path("/tmp/attachments")
+    mock_config.rsslog_dir = Path("/tmp/rsslog")
+    mock_config.tmp_dir = Path("/tmp")
+
+    mock_router = MockRouter.return_value
+
+    mock_telegram = MockTelegram.return_value
+    mock_telegram._is_attachment_restricted = Mock(return_value=False)
+    mock_telegram.download_attachment = AsyncMock(return_value="/tmp/attachments/test.jpg")
+
+    watchtower = Watchtower(sources=['telegram'])
+
+    message_data = MessageData(
+        source_type="Telegram",
+        channel_id="123456",
+        channel_name="test_channel",
+        username="test_user",
+        timestamp=datetime.now(timezone.utc),
+        text="Test message",
+        has_attachments=True
+    )
+    message_data.original_message = Mock()
+
+    destinations = [
+        {'type': 'Telegram', 'restricted_mode': True, 'telegram_dst_channel': '@channel'}
+    ]
+
+    result = asyncio.run(watchtower._handle_attachment_restrictions(message_data, destinations))
+
+    mock_telegram._is_attachment_restricted.assert_called_once()
+    assert result
+
+
+@patch('MetricsCollector.MetricsCollector')
+@patch('MessageQueue.MessageQueue')
+@patch('DiscordHandler.DiscordHandler')
+@patch('OCRHandler.OCRHandler')
+@patch('TelegramHandler.TelegramHandler')
+@patch('MessageRouter.MessageRouter')
+@patch('ConfigManager.ConfigManager')
+def test_media_blocked_when_restricted_mode_fails(MockConfig, MockRouter, MockTelegram, MockOCR, MockDiscord, MockQueue, MockMetrics):
+    """Test media is blocked when restricted mode check fails."""
+    from Watchtower import Watchtower
+
+    mock_config = MockConfig.return_value
+    mock_config.telegram_api_id = "123"
+    mock_config.telegram_api_hash = "hash"
+    mock_config.telegram_session_name = "session"
+    mock_config.project_root = Path("/tmp")
+    mock_config.attachments_dir = Path("/tmp/attachments")
+    mock_config.rsslog_dir = Path("/tmp/rsslog")
+    mock_config.tmp_dir = Path("/tmp")
+
+    mock_router = MockRouter.return_value
+
+    mock_telegram = MockTelegram.return_value
+    mock_telegram._is_attachment_restricted = Mock(return_value=True)
+    mock_telegram.download_attachment = AsyncMock(return_value="/tmp/attachments/test.jpg")
+
+    watchtower = Watchtower(sources=['telegram'])
+
+    message_data = MessageData(
+        source_type="Telegram",
+        channel_id="123456",
+        channel_name="test_channel",
+        username="test_user",
+        timestamp=datetime.now(timezone.utc),
+        text="Test message",
+        has_attachments=True
+    )
+    message_data.original_message = Mock()
+
+    destinations = [
+        {'type': 'Telegram', 'restricted_mode': True, 'telegram_dst_channel': '@channel'}
+    ]
+
+    result = asyncio.run(watchtower._handle_attachment_restrictions(message_data, destinations))
+
+    assert not result

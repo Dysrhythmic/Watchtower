@@ -98,7 +98,7 @@ class Watchtower:
         self.sources = sources
         self.rss = None  # created only if RSS is enabled
         self._shutdown_requested = False
-        self._start_time = None  # Track application runtime
+        self._start_time = None
 
         # Clean up any potential attachment files from previous runs
         self._cleanup_attachments_dir()
@@ -141,14 +141,18 @@ class Watchtower:
         # Start message queue processor (background retry task)
         tasks.append(asyncio.create_task(self.message_queue.process_queue(self)))
 
-        if APP_TYPE_TELEGRAM in self.sources:
+        # Start Telegram client if needed as either a source or destination
+        has_telegram_destination = any(dest['type'] == APP_TYPE_TELEGRAM for dest in self.config.destinations)
+        is_telegram_source = APP_TYPE_TELEGRAM in self.sources
+
+        if is_telegram_source or has_telegram_destination:
             await self.telegram.start()
-            self.telegram.setup_handlers(self._handle_message)
-            # Connection proofs
-            await self.telegram.fetch_latest_messages()
-            tasks.append(asyncio.create_task(self.telegram.run()))
-            # Start polling for missed messages
-            tasks.append(asyncio.create_task(self.telegram.poll_missed_messages()))
+
+            if is_telegram_source:
+                self.telegram.setup_handlers(self._handle_message)
+                await self.telegram.fetch_latest_messages()
+                tasks.append(asyncio.create_task(self.telegram.run()))
+                tasks.append(asyncio.create_task(self.telegram.poll_missed_messages()))
 
         if APP_TYPE_RSS in self.sources and self.config.rss_feeds:
             from RSSHandler import RSSHandler

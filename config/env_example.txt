@@ -10,10 +10,16 @@ TELEGRAM_CHANNEL_PERSONAL=-12345678910
 
 
 # === Discord  Configuration ===
-# Add your webhook URLs as environment variables, e.g.:
+# Add your Discord webhook URLs as environment variables, e.g.:
 DISCORD_WEBHOOK_CYBER_NEWS=webhook_url_1
 DISCORD_WEBHOOK_TECH_UPDATES=webhook_url_2
 DISCORD_WEBHOOK_GENERAL_FEED=webhook_url_3
+
+
+# == Slack Configuration ==
+# Add your Slack webhook URLs as environment variables, e.g.:
+SLACK_WEBHOOK_WORK=webhook_url_4
+SLACK_WEBHOOK_RSS=webhook_url_5
 
 
 # === General Configuration ===

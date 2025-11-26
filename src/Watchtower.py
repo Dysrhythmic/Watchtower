@@ -707,9 +707,9 @@ class Watchtower:
             else:
                 # Empty file or no lines extracted
                 if dest_type == APP_TYPE_TELEGRAM:
-                    content += f"\n\n<b>[Attachment too large to forward ({file_size_mb:.0f} MB), file appears empty]</b>"
+                    content += f"\n\n<b>[Attachment too large to forward ({file_size_mb:.0f} MB) or no lines matched]</b>"
                 elif dest_type == APP_TYPE_DISCORD:
-                    content += f"\n\n**[Attachment too large to forward ({file_size_mb:.0f} MB), file appears empty]**"
+                    content += f"\n\n**[Attachment too large to forward ({file_size_mb:.0f} MB) or no lines matched]**"
 
             return content, False
 

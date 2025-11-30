@@ -227,7 +227,10 @@ Both source types route to the same destination with independent keyword filteri
       "channels": [
         {
           "id": "@example",
-          "keywords": ["ransomware", " PoC ", "My Company Brand Here"],
+          "keywords": {
+            "files": [],
+            "inline": ["ransomware", " PoC ", "My Company Brand Here"]
+          },
           "restricted_mode": false,
           "ocr": true,
           "check_attachments": true
@@ -256,7 +259,10 @@ Both source types route to the same destination with independent keyword filteri
       "channels": [
         {
           "id": "-1001234567890",
-          "keywords": [],
+          "keywords": {
+            "files": [],
+            "inline": []
+          },
           "restricted_mode": true,
           "parser": {"trim_front_lines": 0, "trim_back_lines": 2},
           "ocr": false,
@@ -285,7 +291,10 @@ Both source types route to the same destination with independent keyword filteri
         {
           "url": "https://example.com/feed.xml",
           "name": "Security News Feed",
-          "keywords": ["vulnerability", "CVE"],
+          "keywords": {
+            "files": [],
+            "inline": ["vulnerability", "CVE"]
+          },
           "parser": {"trim_front_lines": 0, "trim_back_lines": 0},
         }
       ]
@@ -309,7 +318,10 @@ Both source types route to the same destination with independent keyword filteri
       "channels": [
         {
           "id": "@vxunderground",
-          "keywords": ["malware", "ransomware"],
+          "keywords": {
+            "files": ["kw-malware.json"],
+            "inline": []
+          },
           "restricted_mode": false,
           "parser": {"trim_front_lines": 1, "trim_back_lines": 2},
           "ocr": true,
@@ -320,7 +332,10 @@ Both source types route to the same destination with independent keyword filteri
         {
           "url": "https://example.com/rss",
           "name": "Example RSS Feed",
-          "keywords": [],
+          "keywords": {
+            "files": [],
+            "inline": []
+          },
           "parser": {"keep_first_lines": 2}
         }
       ]
@@ -332,7 +347,10 @@ Both source types route to the same destination with independent keyword filteri
       "channels": [
         {
           "id": "@CTIUpdates",
-          "keywords": ["breach"],
+          "keywords": {
+            "files": ["kw-work.json"],
+            "inline": ["breach"]
+          },
           "restricted_mode": false,
           "parser": {"trim_front_lines": 1, "trim_back_lines": 0},
           "ocr": false,
@@ -345,7 +363,7 @@ Both source types route to the same destination with independent keyword filteri
 ```
 - Discord destination: Monitors Telegram channel `@vxunderground` and an RSS feed
   - Telegram channel:
-    - Forwards messages with `malware` or `ransomware` keywords in their content or attachments
+    - Forwards messages with keywords listed in the `kw-malware.json` file in their content or attachments
     - Checks OCR-extracted text and entire text-based attachments for keywords
     - Trims 1 line from front and 2 lines from end
   - RSS feed:
@@ -353,7 +371,7 @@ Both source types route to the same destination with independent keyword filteri
     - Keeps only first 2 lines of each entrpost
   - Sends to Discord webhook URL in `.env` as `DISCORD_WEBHOOK_ALERTS`
 - Telegram destination: Monitors Telegram channel `@CTIUpdates`
-  - Only forwards messages containing `breach` in their content or attachments
+  - Forwards messages containing `breach` or other keywords specified in the `kw-work.json` file in their content or attachments
   - Trims 1 line from the beginning of each message
   - Sends to Telegram channel ID stored in `.env` as `TELEGRAM_BACKUP_CHANNEL` (e.g., `@my_backup_channel` or `-1003291374656`)
 
@@ -373,7 +391,10 @@ Same RSS feed routed to multiple destinations with different keyword filters:
         {
           "url": "https://example.com/feed.xml",
           "name": "Security Feed",
-          "keywords": ["CVE", "0-day", "exploit"],
+          "keywords": {
+            "files": [],
+            "inline": ["CVE", "0-day", "exploit"]
+          },
         }
       ]
     },
@@ -385,7 +406,10 @@ Same RSS feed routed to multiple destinations with different keyword filters:
         {
           "url": "https://example.com/feed.xml",
           "name": "Security Feed",
-          "keywords": [],
+          "keywords": {
+            "files": [],
+            "inline": []
+          },
           "parser": {"trim_front_lines": 0, "trim_back_lines": 1}
         }
       ]

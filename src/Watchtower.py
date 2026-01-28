@@ -731,7 +731,9 @@ class Watchtower:
         if not include_attachment or not parsed_message.attachment_path:
             return None
 
+        # Restricted mode always blocks forwarding attachments
         if destination.get('restricted_mode', False):
+            # OCR does not currently change this behavior
             if destination.get('ocr', False):
                 return None
             return None
